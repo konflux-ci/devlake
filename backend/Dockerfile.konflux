@@ -149,4 +149,4 @@ ENV DEBUG="$DEBUG"
 #add tini, prevent zombie process
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD ["lake"]
+CMD ["/app/bin/lake"]
