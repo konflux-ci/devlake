@@ -1,0 +1,152 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#Apache DevLake is an effort undergoing incubation at The Apache Software
+#Foundation (ASF), sponsored by the Apache Incubator PMC.
+#
+#Incubation is required of all newly accepted projects until a further review
+#indicates that the infrastructure, communications, and decision making process
+#have stabilized in a manner consistent with other successful ASF projects.
+#
+#While incubation status is not necessarily a reflection of the completeness or stability of the code,
+#it does indicate that the project has yet to be fully endorsed by the ASF.
+
+FROM --platform=linux/amd64 debian:bookworm as debian-amd64
+RUN apt-get update
+RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
+
+FROM --platform=$BUILDPLATFORM golang:1.23.10-bookworm as builder
+
+# docker build --build-arg GOPROXY=https://goproxy.io,direct -t mericodev/lake .
+ARG GOPROXY=
+# docker build --build-arg HTTPS_PROXY=http://localhost:4780 -t mericodev/lake .
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+
+RUN apt-get update
+RUN apt-get install -y gcc binutils libfindbin-libs-perl cmake libssh2-1-dev libssl-dev zlib1g-dev
+
+# Install Go dev tools
+RUN go install github.com/vektra/mockery/v2@v2.43.1
+RUN go install github.com/swaggo/swag/cmd/swag@v1.16.1
+
+# Only build for amd64 - no cross-compilation needed
+COPY --from=debian-amd64 /usr/include /rootfs-amd64/usr/include
+COPY --from=debian-amd64 /usr/lib/x86_64-linux-gnu /rootfs-amd64/usr/lib/x86_64-linux-gnu
+COPY --from=debian-amd64 /lib/x86_64-linux-gnu /rootfs-amd64/lib/x86_64-linux-gnu
+
+# Build libgit2 for amd64 only
+RUN mkdir -p /tmp/build/x86_64 && cd /tmp/build/x86_64 && \
+    wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.2.tar.gz -O - | tar -xz && \
+    cd libgit2-1.3.2 && \
+    mkdir build && cd build && \
+    cmake .. \
+        -DBUILD_SHARED_LIBS=ON \
+        -DCMAKE_SYSROOT=/rootfs-amd64 \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/deps/x86_64 && \
+    make -j install && \
+    cd / && rm -rf /tmp/build
+
+
+FROM builder as build
+
+WORKDIR /app
+COPY . /app
+ENV GOBIN=/app/bin
+
+ARG TARGETPLATFORM
+ARG TAG=
+ARG SHA=
+ARG GO_PLUGINS=
+
+# Build for amd64 only
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /app/bin && \
+    ln -s /usr/local/deps/x86_64 /usr/local/deps/target && \
+    export PKG_CONFIG_PATH=/usr/local/deps/target/lib/pkgconfig && \
+    export CGO_ENABLED=1 && \
+    export GOARCH=amd64 && \
+    DEVLAKE_PLUGINS="$GO_PLUGINS" make all
+
+# remove symlink in lib, we will recreate in final image
+RUN cd /usr/local/deps/target/lib && \
+    for file in *.so* ; do \
+        if [ -L $file ] ; then \
+            unlink $file ; \
+        fi \
+    done
+
+
+FROM debian:bookworm-slim as base
+
+RUN apt-get update && \
+    apt-get install -y tar pkg-config curl libssh2-1 zlib1g default-libmysqlclient-dev libpq-dev tini git openssh-client ca-certificates && \
+    apt-get clean && \
+    rm -fr /usr/share/doc/* \
+           /usr/share/info/* \
+           /usr/share/linda/* \
+           /usr/share/lintian/overrides/* \
+           /usr/share/locale/* \
+           /usr/share/man/* \
+           /usr/share/doc/kde/HTML/* \
+           /usr/share/gnome/help/* \
+           /usr/share/locale/* \
+           /usr/share/omf/*/*-*.emf \
+           /var/lib/apt/lists/*
+
+EXPOSE 8080
+
+RUN useradd -ms /bin/bash -d /app devlake -u 1010
+RUN chown -R devlake:devlake /etc/ssl/certs
+USER devlake
+
+WORKDIR /app
+
+RUN mkdir logs
+VOLUME /app/logs
+
+FROM base as devlake-base
+ARG DEBUG=
+
+# Install ORAS CLI and setup libraries
+# Based on https://github.com/konflux-ci/oras-container/blob/main/Containerfile#L65
+# Switch to root for operations that require root permissions
+USER root
+
+# Install ORAS CLI
+COPY --from=quay.io/konflux-ci/oras:latest /usr/bin/oras /usr/local/bin/oras
+RUN chmod +x /usr/local/bin/oras
+
+# libraries
+ENV LD_LIBRARY_PATH=/app/libs
+RUN mkdir -p /app/libs
+COPY --from=build /usr/local/deps/target/lib/*.so* /app/libs
+COPY --from=build /go/bin /usr/bin
+RUN ldconfig -vn /app/libs
+
+# Switch back to devlake user
+USER devlake
+
+# apps
+COPY --from=build /app/bin /app/bin
+COPY --from=build /app/resources /app/resources
+
+ENV PATH="/app/bin:${PATH}"
+ENV DEBUG="$DEBUG"
+
+#add tini, prevent zombie process
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+CMD ["lake"]
