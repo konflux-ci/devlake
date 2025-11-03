@@ -232,6 +232,13 @@ func processTektonArtifacts(
 
 		artifactRef := tag.Name
 
+		// Check if tag (job_id) already exists in database before pulling artifact
+		// The tag name from Quay is the same as the job_id (PipelineRunName) in the database
+		if isTektonJobAlreadyProcessed(db, data.Options.ConnectionId, artifactRef) {
+			logger.Debug("Tag already processed as job_id, skipping artifact pull", "tag", artifactRef)
+			continue
+		}
+
 		logger.Info("Processing artifact [%d/%d]: quay.io/%s:%s", processedCount, len(artifacts), repoFullPath, artifactRef)
 
 		// Pull artifact using ORAS

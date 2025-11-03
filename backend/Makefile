@@ -29,7 +29,7 @@ all: build
 go-dep:
 	go install github.com/vektra/mockery/v2@v2.43.0
 	go install github.com/swaggo/swag/cmd/swag@v1.16.1
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.4
 
 go-dev-tools:
 	# go install github.com/atombender/go-jsonschema/cmd/gojsonschema@latest
@@ -106,7 +106,7 @@ clean:
 	@rm -rf bin
 
 build-server-image:
-	podman build -t $(IMAGE_REPO)/devlake:$(TAG) --build-arg TAG=$(TAG) --build-arg SHA=$(SHA) --file ./Dockerfile .
+	docker build -t $(IMAGE_REPO)/devlake:$(TAG) --build-arg TAG=$(TAG) --build-arg SHA=$(SHA) --file ./Dockerfile .
 
 migration-script-lint:
 	go run core/migration/linter/main.go -- $$(find . -path '**/migrationscripts/**.go')
