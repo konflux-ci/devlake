@@ -71,18 +71,18 @@ __metadata:
   linkType: hard
 
 "@ant-design/icons@npm:^5.3.0":
-  version: 5.3.1
-  resolution: "@ant-design/icons@npm:5.3.1"
+  version: 5.6.1
+  resolution: "@ant-design/icons@npm:5.6.1"
   dependencies:
     "@ant-design/colors": ^7.0.0
     "@ant-design/icons-svg": ^4.4.0
-    "@babel/runtime": ^7.11.2
+    "@babel/runtime": ^7.24.8
     classnames: ^2.2.6
     rc-util: ^5.31.1
   peerDependencies:
     react: ">=16.0.0"
     react-dom: ">=16.0.0"
-  checksum: b244ed7c36609cf361382ae4f17cb172470c0ac4d9505e98dc09cae625d89df9840df68c8c1fdb0e7603fccc4394b3986da2bab4535d03cfad80cafdbf4bcebb
+  checksum: a278939e24d71ed5dfb857cb6659a46e1a14d1441247bc0fe81d642263f2eeb4dfdc4c944fcb4f26467b87a484976ddf2c188106d025e1af4a636c27ee265417
   languageName: node
   linkType: hard
 
@@ -1652,6 +1652,13 @@ __metadata:
   dependencies:
     regenerator-runtime: ^0.14.0
   checksum: 7a6a5d40fbdd68491ec183ba2e631c07415119960083b4fd76564cce3751e9acd2f12ab89575e38496fa389fa06d458732776e69ee1858e366cc3fbdb049f847
+  languageName: node
+  linkType: hard
+
+"@babel/runtime@npm:^7.24.8":
+  version: 7.28.4
+  resolution: "@babel/runtime@npm:7.28.4"
+  checksum: 934b0a0460f7d06637d93fcd1a44ac49adc33518d17253b5a0b55ff4cb90a45d8fe78bf034b448911dbec7aff2a90b918697559f78d21c99ff8dbadae9565b55
   languageName: node
   linkType: hard
 
