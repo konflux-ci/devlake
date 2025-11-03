@@ -139,6 +139,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
       <Form
         type={type}
         name={name}
+        connectionId={connectionId}
         fields={fields}
         initialValues={{ ...initialValues, ...(connection ?? {}) }}
         values={values}
