@@ -37,6 +37,7 @@ import { OpsgenieConfig } from './opsgenie';
 import { QDevConfig } from './q-dev';
 import { TeambitionConfig } from './teambition';
 import { TestmoConfig } from './testmo';
+import { TestRegistryConfig } from './testregistry';
 import { SlackConfig } from './slack/config';
 
 export const pluginConfigs: IPluginConfig[] = [
@@ -57,6 +58,7 @@ export const pluginConfigs: IPluginConfig[] = [
   SonarQubeConfig,
   TAPDConfig,
   TestmoConfig,
+  TestRegistryConfig,
   ZenTaoConfig,
   WebhookConfig,
   OpsgenieConfig,
