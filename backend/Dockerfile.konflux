@@ -27,7 +27,7 @@ FROM --platform=linux/amd64 debian:bookworm as debian-amd64
 RUN apt-get update
 RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
-FROM --platform=$BUILDPLATFORM golang:1.23.10-bookworm as builder
+FROM --platform=linux/amd64 golang:1.20.5-bookworm as builder
 
 # docker build --build-arg GOPROXY=https://goproxy.io,direct -t mericodev/lake .
 ARG GOPROXY=
@@ -38,16 +38,13 @@ ARG HTTPS_PROXY=
 RUN apt-get update
 RUN apt-get install -y gcc binutils libfindbin-libs-perl cmake libssh2-1-dev libssl-dev zlib1g-dev
 
-# Install Go dev tools
-RUN go install github.com/vektra/mockery/v2@v2.43.1
+RUN go install github.com/vektra/mockery/v2@v2.20.0
 RUN go install github.com/swaggo/swag/cmd/swag@v1.16.1
 
-# Only build for amd64 - no cross-compilation needed
 COPY --from=debian-amd64 /usr/include /rootfs-amd64/usr/include
 COPY --from=debian-amd64 /usr/lib/x86_64-linux-gnu /rootfs-amd64/usr/lib/x86_64-linux-gnu
 COPY --from=debian-amd64 /lib/x86_64-linux-gnu /rootfs-amd64/lib/x86_64-linux-gnu
 
-# Build libgit2 for amd64 only
 RUN mkdir -p /tmp/build/x86_64 && cd /tmp/build/x86_64 && \
     wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.2.tar.gz -O - | tar -xz && \
     cd libgit2-1.3.2 && \
@@ -66,14 +63,11 @@ WORKDIR /app
 COPY . /app
 ENV GOBIN=/app/bin
 
-ARG TARGETPLATFORM
 ARG TAG=
 ARG SHA=
 ARG GO_PLUGINS=
 
-# Build for amd64 only
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    mkdir -p /app/bin && \
     ln -s /usr/local/deps/x86_64 /usr/local/deps/target && \
     export PKG_CONFIG_PATH=/usr/local/deps/target/lib/pkgconfig && \
     export CGO_ENABLED=1 && \
@@ -89,10 +83,10 @@ RUN cd /usr/local/deps/target/lib && \
     done
 
 
-FROM debian:bookworm-slim as base
+FROM python:3.9-slim-bookworm as base
 
 RUN apt-get update && \
-    apt-get install -y tar pkg-config curl libssh2-1 zlib1g default-libmysqlclient-dev libpq-dev tini git openssh-client ca-certificates && \
+    apt-get install -y python3-dev python3-pip tar pkg-config curl libssh2-1 zlib1g libffi-dev default-libmysqlclient-dev libpq-dev tini git openssh-client corkscrew && \
     apt-get clean && \
     rm -fr /usr/share/doc/* \
            /usr/share/info/* \
@@ -111,44 +105,40 @@ EXPOSE 8080
 RUN useradd -ms /bin/bash -d /app devlake -u 1010
 RUN chown -R devlake:devlake /etc/ssl/certs
 USER devlake
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
 RUN mkdir logs
 VOLUME /app/logs
 
+# Setup Python
+COPY python/ /app/python/
+RUN python3 -m pip install --no-cache --upgrade pip setuptools && \
+    python3 -m pip install --no-cache -r python/requirements.txt && \
+    python3 -m pip install --upgrade pip
+
+# Setup Python Poetry package manager
+RUN curl -sSL https://install.python-poetry.org | python3 -
+ENV PATH="$PATH:/app/.local/bin"
+
+# Build Python plugins, make sure the scripts has execute permission
+# RUN find /app/python/ -name "*.sh" | xargs -I{} chmod +x {}
+RUN /app/python/build.sh
+
 FROM base as devlake-base
 ARG DEBUG=
-
-# Install ORAS CLI and setup libraries
-# Based on https://github.com/konflux-ci/oras-container/blob/main/Containerfile#L65
-# Switch to root for operations that require root permissions
-USER root
-
-# Install ORAS CLI
-COPY --from=quay.io/konflux-ci/oras:latest /usr/bin/oras /usr/local/bin/oras
-RUN chmod +x /usr/local/bin/oras
 
 # libraries
 ENV LD_LIBRARY_PATH=/app/libs
 RUN mkdir -p /app/libs
 COPY --from=build /usr/local/deps/target/lib/*.so* /app/libs
 COPY --from=build /go/bin /usr/bin
-# Create ldconfig cache for the libraries
-RUN echo "/app/libs" > /etc/ld.so.conf.d/app-libs.conf && ldconfig
+RUN ldconfig -vn /app/libs
 
-# Switch back to devlake user
-USER devlake
-
-# apps - copy with proper ownership
-COPY --chown=devlake:devlake --from=build /app/bin /app/bin
-COPY --chown=devlake:devlake --from=build /app/resources /app/resources
-
-# Ensure binary is executable
-USER root
-RUN chmod +x /app/bin/lake && \
-    ldd /app/bin/lake || true
-USER devlake
+# apps
+COPY --from=build /app/bin /app/bin
+COPY --from=build /app/resources /app/resources
 
 ENV PATH="/app/bin:${PATH}"
 ENV DEBUG="$DEBUG"
@@ -156,4 +146,4 @@ ENV DEBUG="$DEBUG"
 #add tini, prevent zombie process
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD ["/app/bin/lake"]
+CMD ["lake"]
