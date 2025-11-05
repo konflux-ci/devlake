@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-FROM --platform=linux/amd64 debian:bullseye as debian-amd64
+FROM --platform=linux/amd64 debian:trixie as debian-amd64
 RUN apt-get -y update && apt -y upgrade &&\
     apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
