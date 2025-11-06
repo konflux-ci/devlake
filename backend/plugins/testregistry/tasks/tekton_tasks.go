@@ -89,14 +89,19 @@ func saveTektonTasks(db dal.Dal, logger log.Logger, connectionId uint64, jobId s
 //   - repository: The repository name (for logging)
 //
 // Returns:
-//   - bool: true if JUnit XML was found and processed successfully, false otherwise
+//   - bool: true if at least one JUnit XML file was found and processed successfully, false otherwise
 func findAndProcessJUnitFiles(taskCtx plugin.SubTaskContext, artifactPath string, ciJob *models.TestRegistryCIJob, organization, repository string) bool {
 	logger := taskCtx.GetLogger()
-	var foundJUnit bool
-	var junitContent []byte
-	var xmlFileName string
 
-	// Walk the artifact directory to find JUnit XML files matching the regex
+	// Collect all JUnit files found in the artifact directory
+	type junitFile struct {
+		content  []byte
+		fileName string
+		path     string
+	}
+	var junitFiles []junitFile
+
+	// Walk the artifact directory to find all JUnit XML files matching the regex
 	err := filepath.Walk(artifactPath, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -115,13 +120,12 @@ func findAndProcessJUnitFiles(taskCtx plugin.SubTaskContext, artifactPath string
 					return nil // Continue processing other files
 				}
 
-				// If we already found a JUnit file, combine content or use the first one
-				// For now, we'll process the first matching file found
-				if !foundJUnit {
-					junitContent = content
-					xmlFileName = fileName
-					foundJUnit = true
-				}
+				// Collect all matching JUnit files
+				junitFiles = append(junitFiles, junitFile{
+					content:  content,
+					fileName: fileName,
+					path:     path,
+				})
 			}
 		}
 
@@ -133,11 +137,32 @@ func findAndProcessJUnitFiles(taskCtx plugin.SubTaskContext, artifactPath string
 		return false
 	}
 
-	if !foundJUnit {
+	if len(junitFiles) == 0 {
 		logger.Debug("No JUnit XML files found in artifact", "job_id", ciJob.JobId, "artifact_path", artifactPath)
 		return false
 	}
 
-	// Process and save JUnit XML using the same function as Prow
-	return parseAndSaveJUnitSuites(taskCtx, logger, junitContent, xmlFileName, ciJob, organization, repository)
+	if len(junitFiles) > 1 {
+		logger.Info("Found multiple JUnit XML files, processing all", "job_id", ciJob.JobId, "file_count", len(junitFiles))
+	} else {
+		logger.Info("Found JUnit XML file, processing", "job_id", ciJob.JobId, "file", junitFiles[0].fileName)
+	}
+
+	// Process each JUnit file found
+	successCount := 0
+	for idx, junitFile := range junitFiles {
+		logger.Debug("Processing JUnit XML file", "job_id", ciJob.JobId, "file", junitFile.fileName, "index", idx+1, "total", len(junitFiles))
+
+		// Process and save JUnit XML using the same function as Prow
+		if parseAndSaveJUnitSuites(taskCtx, logger, junitFile.content, junitFile.fileName, ciJob, organization, repository) {
+			successCount++
+		} else {
+			logger.Warn(nil, "failed to process JUnit XML file", "job_id", ciJob.JobId, "file", junitFile.fileName)
+		}
+	}
+
+	logger.Info("Finished processing JUnit XML files", "job_id", ciJob.JobId, "total_files", len(junitFiles), "successful", successCount)
+
+	// Return true if at least one file was successfully processed
+	return successCount > 0
 }
