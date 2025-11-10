@@ -11,7 +11,7 @@ require (
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/gocarina/gocsv v0.0.0-20220707092902-b9da1f06c77e
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
 	github.com/lib/pq v1.10.2
 	github.com/libgit2/git2go/v33 v33.0.6
