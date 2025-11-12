@@ -2606,12 +2606,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^18.19.20":
-  version: 18.19.20
-  resolution: "@types/node@npm:18.19.20"
+"@types/node@npm:^20.0.0":
+  version: 20.19.25
+  resolution: "@types/node@npm:20.19.25"
   dependencies:
-    undici-types: ~5.26.4
-  checksum: 1f12606e0732fbbdfb4df4fd111f47312091dcfa46c4856ce86222530a6045c16f8efb2a38d9b18fbe3e6763cafa2b1e48f0042e9ef51bd1c075547cce5280c5
+    undici-types: ~6.21.0
+  checksum: f6d854995d173e9d85c7ffd4ca69ee645daac8c0a150fc3ed2f7b21dfc7ece34e44063213c4e9b11de56fe7de807d59c1bb717fca8af8590b40bfb9d9068e629
   languageName: node
   linkType: hard
 
@@ -3670,7 +3670,7 @@ __metadata:
     "@ant-design/icons": ^5.3.0
     "@reduxjs/toolkit": ^2.2.1
     "@types/file-saver": ^2.0.5
-    "@types/node": ^18.19.20
+    "@types/node": ^20.0.0
     "@types/react": ^18.2.56
     "@types/react-copy-to-clipboard": ^5.0.7
     "@types/react-dom": ^18.2.19
@@ -8840,10 +8840,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"undici-types@npm:~5.26.4":
-  version: 5.26.5
-  resolution: "undici-types@npm:5.26.5"
-  checksum: 3192ef6f3fd5df652f2dc1cd782b49d6ff14dc98e5dced492aa8a8c65425227da5da6aafe22523c67f035a272c599bb89cfe803c1db6311e44bed3042fc25487
+"undici-types@npm:~6.21.0":
+  version: 6.21.0
+  resolution: "undici-types@npm:6.21.0"
+  checksum: 46331c7d6016bf85b3e8f20c159d62f5ae471aba1eb3dc52fff35a0259d58dcc7d592d4cc4f00c5f9243fa738a11cfa48bd20203040d4a9e6bc25e807fab7ab3
   languageName: node
   linkType: hard
 
