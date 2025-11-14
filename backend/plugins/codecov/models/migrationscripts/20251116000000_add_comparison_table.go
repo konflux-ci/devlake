@@ -18,20 +18,29 @@ limitations under the License.
 package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
+	"github.com/apache/incubator-devlake/plugins/codecov/tasks"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addCoverageTables),
-		new(addRawDataOriginToCommits),
-		new(addRawDataOriginToFlags),
-		new(addComparisonTable),
-		new(addModifiedCoverageToCoverages),
-		new(addRawDataOriginToCoverageTables),
-		new(addRawDataOriginToComparisons),
-		new(addModifiedLinesToComparisons),
-	}
+type addComparisonTable struct{}
+
+func (u *addComparisonTable) Up(basicRes context.BasicRes) errors.Error {
+	// Create the ComparisonData table (helper table for storing comparison results)
+	// This will create the table with RawDataOrigin columns
+	err := migrationhelper.AutoMigrateTables(
+		basicRes,
+		&tasks.ComparisonData{},
+	)
+	return err
 }
+
+func (*addComparisonTable) Version() uint64 {
+	return 20251116000000
+}
+
+func (*addComparisonTable) Name() string {
+	return "Codecov add comparison table"
+}
+

@@ -23,9 +23,11 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	coreModels "github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/core/plugin"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/codecov/api"
 	"github.com/apache/incubator-devlake/plugins/codecov/models"
 	"github.com/apache/incubator-devlake/plugins/codecov/models/migrationscripts"
+	"github.com/apache/incubator-devlake/plugins/codecov/tasks"
 )
 
 var _ interface {
@@ -61,6 +63,11 @@ func (p Codecov) GetTablesInfo() []dal.Tabler {
 		&models.CodecovConnection{},
 		&models.CodecovRepo{},
 		&models.CodecovScopeConfig{},
+		&models.CodecovFlag{},
+		&models.CodecovCommit{},
+		&models.CodecovCoverage{},
+		&models.CodecovCoverageTrend{},
+		&models.CodecovCommitCoverage{},
 	}
 }
 
@@ -128,9 +135,65 @@ func (p Codecov) ApiResources() map[string]map[string]plugin.ApiResourceHandler 
 	}
 }
 
+func (p Codecov) SubTaskMetas() []plugin.SubTaskMeta {
+	return []plugin.SubTaskMeta{
+		// Step 1: Collect and convert flags first (needed for flag-based coverage collection)
+		tasks.CollectFlagsMeta,
+		tasks.ConvertFlagsMeta,
+		// Step 2: Collect commits
+		tasks.CollectCommitsMeta,
+		tasks.ExtractCommitsMeta,
+		// Step 3: Collect coverage data (depends on flags and commits)
+		tasks.CollectCommitTotalsMeta,
+		tasks.CollectCommitCoverageMeta,
+		tasks.CollectComparisonMeta,
+		tasks.CollectFlagCoverageTrendMeta,
+		// Step 4: Convert coverage data
+		tasks.ConvertComparisonMeta,
+		tasks.ConvertCoverageMeta,
+		tasks.ConvertCommitCoverageMeta,
+		tasks.ConvertCoverageTrendMeta,
+	}
+}
+
+func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]interface{}) (interface{}, errors.Error) {
+	op, err := tasks.DecodeAndValidateTaskOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
+	db := taskCtx.GetDal()
+	connection := &models.CodecovConnection{}
+	err = db.First(connection, dal.Where("id = ?", op.ConnectionId))
+	if err != nil {
+		return nil, errors.BadInput.Wrap(err, "unable to get Codecov connection by the given connection ID")
+	}
+
+	// create synchronize api client
+	apiClient, err := helper.NewApiClientFromConnection(taskCtx.GetContext(), taskCtx, connection)
+	if err != nil {
+		return nil, err
+	}
+
+	// create async api client
+	asyncApiClient, err := helper.CreateAsyncApiClient(
+		taskCtx,
+		apiClient,
+		nil, // no rate limiter for now
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tasks.CodecovTaskData{
+		Options:   op,
+		ApiClient: asyncApiClient,
+	}, nil
+}
+
 func (p Codecov) MakeDataSourcePipelinePlanV200(
 	connectionId uint64,
 	scopes []*coreModels.BlueprintScope,
 ) (coreModels.PipelinePlan, []plugin.Scope, errors.Error) {
-	return api.MakeDataSourcePipelinePlanV200(connectionId, scopes)
+	return api.MakeDataSourcePipelinePlanV200(p.SubTaskMetas(), connectionId, scopes)
 }

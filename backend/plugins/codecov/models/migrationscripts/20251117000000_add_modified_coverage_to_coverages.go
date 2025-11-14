@@ -18,20 +18,28 @@ limitations under the License.
 package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
+	"github.com/apache/incubator-devlake/plugins/codecov/models"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addCoverageTables),
-		new(addRawDataOriginToCommits),
-		new(addRawDataOriginToFlags),
-		new(addComparisonTable),
-		new(addModifiedCoverageToCoverages),
-		new(addRawDataOriginToCoverageTables),
-		new(addRawDataOriginToComparisons),
-		new(addModifiedLinesToComparisons),
-	}
+type addModifiedCoverageToCoverages struct{}
+
+func (u *addModifiedCoverageToCoverages) Up(basicRes context.BasicRes) errors.Error {
+	// AutoMigrate will add the missing ModifiedCoverage column to the existing table
+	err := migrationhelper.AutoMigrateTables(
+		basicRes,
+		&models.CodecovCoverage{},
+	)
+	return err
 }
+
+func (*addModifiedCoverageToCoverages) Version() uint64 {
+	return 20251117000000
+}
+
+func (*addModifiedCoverageToCoverages) Name() string {
+	return "Codecov add ModifiedCoverage to coverages table"
+}
+

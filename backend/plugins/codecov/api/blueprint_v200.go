@@ -21,13 +21,15 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	coreModels "github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/core/plugin"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/helpers/srvhelper"
 	"github.com/apache/incubator-devlake/plugins/codecov/models"
+	"github.com/apache/incubator-devlake/plugins/codecov/tasks"
 )
 
 // MakeDataSourcePipelinePlanV200 creates a pipeline plan for Codecov
-// Since we don't have tasks yet, this returns an empty plan but properly handles scopes
 func MakeDataSourcePipelinePlanV200(
+	subtaskMetas []plugin.SubTaskMeta,
 	connectionId uint64,
 	bpScopes []*coreModels.BlueprintScope,
 ) (coreModels.PipelinePlan, []plugin.Scope, errors.Error) {
@@ -45,8 +47,10 @@ func MakeDataSourcePipelinePlanV200(
 		return nil, nil, err
 	}
 
-	// For now, return empty plan since we don't have tasks yet
-	plan := make(coreModels.PipelinePlan, 0)
+	plan, err := makePipelinePlanV200(subtaskMetas, scopeDetails, connection)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Return scopes for project mapping
 	scopes, err := makeScopesV200(scopeDetails, connection)
@@ -55,6 +59,40 @@ func MakeDataSourcePipelinePlanV200(
 	}
 
 	return plan, scopes, nil
+}
+
+func makePipelinePlanV200(
+	subtaskMetas []plugin.SubTaskMeta,
+	scopeDetails []*srvhelper.ScopeDetail[models.CodecovRepo, models.CodecovScopeConfig],
+	connection *models.CodecovConnection,
+) (coreModels.PipelinePlan, errors.Error) {
+	plan := make(coreModels.PipelinePlan, len(scopeDetails))
+	for i, scopeDetail := range scopeDetails {
+		stage := plan[i]
+		if stage == nil {
+			stage = coreModels.PipelineStage{}
+		}
+
+		scope, scopeConfig := scopeDetail.Scope, scopeDetail.ScopeConfig
+		// construct task options for codecov
+		task, err := helper.MakePipelinePlanTask(
+			"codecov",
+			subtaskMetas,
+			scopeConfig.Entities,
+			tasks.CodecovOptions{
+				ConnectionId: connection.ID,
+				FullName:     scope.FullName,
+				ScopeConfig:  scopeConfig,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		stage = append(stage, task)
+		plan[i] = stage
+	}
+
+	return plan, nil
 }
 
 func makeScopesV200(

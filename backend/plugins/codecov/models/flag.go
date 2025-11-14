@@ -15,23 +15,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package models
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/models/common"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addCoverageTables),
-		new(addRawDataOriginToCommits),
-		new(addRawDataOriginToFlags),
-		new(addComparisonTable),
-		new(addModifiedCoverageToCoverages),
-		new(addRawDataOriginToCoverageTables),
-		new(addRawDataOriginToComparisons),
-		new(addModifiedLinesToComparisons),
-	}
+type CodecovFlag struct {
+	common.Model
+	common.RawDataOrigin `mapstructure:",squash"`
+	ConnectionId         uint64 `gorm:"primaryKey;type:bigint" json:"connectionId"`
+	RepoId               string `gorm:"primaryKey;type:varchar(200)" json:"repoId"`
+	FlagName             string `gorm:"primaryKey;type:varchar(100)" json:"flagName"`
+	Carryforward         bool   `json:"carryforward"`
+	Deleted              bool   `json:"deleted"`
+	Yaml                 string `gorm:"type:text" json:"yaml"`
+}
+
+func (CodecovFlag) TableName() string {
+	return "_tool_codecov_flags"
 }

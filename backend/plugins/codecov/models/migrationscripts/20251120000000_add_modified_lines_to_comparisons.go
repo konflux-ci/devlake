@@ -18,20 +18,28 @@ limitations under the License.
 package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
+	"github.com/apache/incubator-devlake/plugins/codecov/tasks"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addCoverageTables),
-		new(addRawDataOriginToCommits),
-		new(addRawDataOriginToFlags),
-		new(addComparisonTable),
-		new(addModifiedCoverageToCoverages),
-		new(addRawDataOriginToCoverageTables),
-		new(addRawDataOriginToComparisons),
-		new(addModifiedLinesToComparisons),
-	}
+type addModifiedLinesToComparisons struct{}
+
+func (u *addModifiedLinesToComparisons) Up(basicRes context.BasicRes) errors.Error {
+	// AutoMigrate will add the missing LinesCovered, LinesTotal, and LinesMissed columns
+	err := migrationhelper.AutoMigrateTables(
+		basicRes,
+		&tasks.ComparisonData{},
+	)
+	return err
 }
+
+func (*addModifiedLinesToComparisons) Version() uint64 {
+	return 20251120000000
+}
+
+func (*addModifiedLinesToComparisons) Name() string {
+	return "Codecov add modified lines to comparisons table"
+}
+

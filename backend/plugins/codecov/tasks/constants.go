@@ -15,23 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package tasks
 
-import (
-	"github.com/apache/incubator-devlake/core/plugin"
+const (
+	RAW_FLAGS_TABLE                = "codecov_api_flags"
+	RAW_COMMITS_TABLE              = "codecov_api_commits"
+	RAW_COMMIT_TOTALS_TABLE        = "codecov_api_commit_totals"
+	RAW_COMMIT_COVERAGES_TABLE     = "codecov_api_commit_coverages"
+	RAW_COMPARISONS_TABLE          = "codecov_api_comparisons"
+	RAW_FLAG_COVERAGE_TRENDS_TABLE = "codecov_api_flag_coverage_trends"
 )
-
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addCoverageTables),
-		new(addRawDataOriginToCommits),
-		new(addRawDataOriginToFlags),
-		new(addComparisonTable),
-		new(addModifiedCoverageToCoverages),
-		new(addRawDataOriginToCoverageTables),
-		new(addRawDataOriginToComparisons),
-		new(addModifiedLinesToComparisons),
-	}
-}
