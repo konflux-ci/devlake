@@ -24,6 +24,7 @@ import { BambooConfig } from './bamboo';
 import { BitbucketConfig } from './bitbucket';
 import { BitbucketServerConfig } from './bitbucket-server';
 import { CircleCIConfig } from './circleci';
+import { CodecovConfig } from './codecov';
 import { GitHubConfig } from './github';
 import { GitLabConfig } from './gitlab';
 import { JenkinsConfig } from './jenkins';
@@ -48,6 +49,7 @@ export const pluginConfigs: IPluginConfig[] = [
   BitbucketConfig,
   BitbucketServerConfig,
   CircleCIConfig,
+  CodecovConfig,
   GitHubConfig,
   GitLabConfig,
   JenkinsConfig,
