@@ -73,7 +73,7 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 	// Build comparison pairs for each commit × flag combination
 	iterator := helper.NewQueueIterator()
 	for i := 1; i < len(commits); i++ {
-		// Add comparison for each flag
+		// Add comparison for each flag only (skip overall comparison without flag)
 		for _, flag := range flags {
 			iterator.Push(&ComparisonInput{
 				CommitSha: commits[i].CommitSha,
@@ -81,12 +81,6 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 				FlagName:  flag.FlagName,
 			})
 		}
-		// Also add overall comparison (no flag)
-		iterator.Push(&ComparisonInput{
-			CommitSha: commits[i].CommitSha,
-			ParentSha: commits[i-1].CommitSha,
-			FlagName:  "", // Empty flag name for overall comparison
-		})
 	}
 
 	collector, err := helper.NewApiCollector(helper.ApiCollectorArgs{

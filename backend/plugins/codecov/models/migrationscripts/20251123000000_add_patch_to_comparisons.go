@@ -21,23 +21,25 @@ import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/codecov/models"
+	"github.com/apache/incubator-devlake/plugins/codecov/tasks"
 )
 
-type addFileCoverageTable struct{}
+type addPatchToComparisons struct{}
 
-func (u *addFileCoverageTable) Up(basicRes context.BasicRes) errors.Error {
-	return migrationhelper.AutoMigrateTables(
+func (u *addPatchToComparisons) Up(basicRes context.BasicRes) errors.Error {
+	// AutoMigrate will add the missing Patch column to the existing table
+	err := migrationhelper.AutoMigrateTables(
 		basicRes,
-		&models.CodecovFileCoverage{},
+		&tasks.ComparisonData{},
 	)
+	return err
 }
 
-func (*addFileCoverageTable) Version() uint64 {
-	return 20251121000000
+func (*addPatchToComparisons) Version() uint64 {
+	return 20251123000000
 }
 
-func (*addFileCoverageTable) Name() string {
-	return "Codecov add file coverage table"
+func (*addPatchToComparisons) Name() string {
+	return "Codecov add Patch to comparisons table"
 }
 

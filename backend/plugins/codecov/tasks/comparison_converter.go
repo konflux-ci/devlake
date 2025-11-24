@@ -30,18 +30,19 @@ import (
 type ComparisonData struct {
 	common.Model
 	common.RawDataOrigin `mapstructure:",squash"`
-	ConnectionId     uint64  `gorm:"primaryKey;type:bigint"`
-	RepoId           string  `gorm:"primaryKey;type:varchar(200);index"`
-	CommitSha        string  `gorm:"primaryKey;type:varchar(64);index"`
-	FlagName         string  `gorm:"primaryKey;type:varchar(100);index"`
-	ParentSha        string  `gorm:"type:varchar(64)"`
-	ModifiedCoverage float64 `gorm:"type:double"`
-	FilesChanged     int     `gorm:"type:int"`
-	MethodsCovered   int     `gorm:"type:int"`
-	MethodsTotal     int     `gorm:"type:int"`
-	LinesCovered     int     `gorm:"type:int"` // Lines covered in modified code
-	LinesTotal       int     `gorm:"type:int"` // Total lines in modified code
-	LinesMissed      int     `gorm:"type:int"` // Lines missed in modified code
+	ConnectionId         uint64   `gorm:"primaryKey;type:bigint"`
+	RepoId               string   `gorm:"primaryKey;type:varchar(200);index"`
+	CommitSha            string   `gorm:"primaryKey;type:varchar(64);index"`
+	FlagName             string   `gorm:"primaryKey;type:varchar(100);index"`
+	ParentSha            string   `gorm:"type:varchar(64)"`
+	ModifiedCoverage     float64  `gorm:"type:double"`
+	FilesChanged         int      `gorm:"type:int"`
+	MethodsCovered       int      `gorm:"type:int"`
+	MethodsTotal         int      `gorm:"type:int"`
+	LinesCovered         int      `gorm:"type:int"`    // Lines covered in modified code
+	LinesTotal           int      `gorm:"type:int"`    // Total lines in modified code
+	LinesMissed          int      `gorm:"type:int"`    // Lines missed in modified code
+	Patch                *float64 `gorm:"type:double"` // Patch coverage from compare API (can be null)
 }
 
 func (ComparisonData) TableName() string {
@@ -100,11 +101,31 @@ func ConvertComparison(taskCtx plugin.SubTaskContext) errors.Error {
 						Complexity float64 `json:"complexity"`
 					} `json:"totals"`
 				} `json:"diff"`
+				Totals struct {
+					Patch *struct {
+						Files    int      `json:"files"`
+						Lines    int      `json:"lines"`
+						Coverage *float64 `json:"coverage"`
+					} `json:"patch"`
+				} `json:"totals"`
 			}
 			err = errors.Convert(json.Unmarshal(resData.Data, &comparison))
 			if err != nil {
 				return nil, err
 			}
+
+			// Extract patch coverage from totals.patch.coverage (can be null)
+			// Only store patch coverage if there are actual changes (files > 0 or lines > 0)
+			// If files=0 and lines=0, treat as NULL even if coverage is 0
+			var patchCoverage *float64
+			if comparison.Totals.Patch != nil && comparison.Totals.Patch.Coverage != nil {
+				// Only set patch coverage if there are actual changes
+				if comparison.Totals.Patch.Files > 0 || comparison.Totals.Patch.Lines > 0 {
+					patchCoverage = comparison.Totals.Patch.Coverage
+				}
+				// If files=0 and lines=0, patchCoverage remains nil (will be stored as NULL in DB)
+			}
+			// If patch is null or doesn't exist in response, patchCoverage remains nil (will be stored as NULL in DB)
 
 			// Store comparison data for later use in coverage conversion (per flag)
 			comparisonData := &ComparisonData{
@@ -118,9 +139,10 @@ func ConvertComparison(taskCtx plugin.SubTaskContext) errors.Error {
 				FilesChanged:     len(comparison.Diff.Files),
 				MethodsCovered:   comparison.Diff.Totals.Methods, // This might need adjustment based on API
 				MethodsTotal:     comparison.Diff.Totals.Methods, // This might need adjustment based on API
-				LinesCovered:     comparison.Diff.Totals.Hits,   // Lines covered in modified code
-				LinesTotal:       comparison.Diff.Totals.Lines,    // Total lines in modified code
+				LinesCovered:     comparison.Diff.Totals.Hits,    // Lines covered in modified code
+				LinesTotal:       comparison.Diff.Totals.Lines,   // Total lines in modified code
 				LinesMissed:      comparison.Diff.Totals.Misses,  // Lines missed in modified code
+				Patch:            patchCoverage,
 			}
 
 			return []interface{}{comparisonData}, nil
@@ -133,4 +155,3 @@ func ConvertComparison(taskCtx plugin.SubTaskContext) errors.Error {
 
 	return extractor.Execute()
 }
-

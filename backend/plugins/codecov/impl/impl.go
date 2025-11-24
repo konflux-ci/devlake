@@ -68,7 +68,6 @@ func (p Codecov) GetTablesInfo() []dal.Tabler {
 		&models.CodecovCoverage{},
 		&models.CodecovCoverageTrend{},
 		&models.CodecovCommitCoverage{},
-		&models.CodecovFileCoverage{},
 	}
 }
 
@@ -148,11 +147,9 @@ func (p Codecov) SubTaskMetas() []plugin.SubTaskMeta {
 		tasks.CollectCommitTotalsMeta,
 		tasks.CollectCommitCoverageMeta,
 		tasks.CollectComparisonMeta,
-		tasks.CollectFileCoverageMeta,
 		tasks.CollectFlagCoverageTrendMeta,
 		// Step 4: Convert coverage data
 		tasks.ConvertComparisonMeta,
-		tasks.ConvertFileCoverageMeta,
 		tasks.ConvertCoverageMeta,
 		tasks.ConvertCommitCoverageMeta,
 		tasks.ConvertCoverageTrendMeta,

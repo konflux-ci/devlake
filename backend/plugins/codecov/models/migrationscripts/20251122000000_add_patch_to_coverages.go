@@ -15,13 +15,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tasks
+package migrationscripts
 
-const (
-	RAW_FLAGS_TABLE                = "codecov_api_flags"
-	RAW_COMMITS_TABLE              = "codecov_api_commits"
-	RAW_COMMIT_TOTALS_TABLE        = "codecov_api_commit_totals"
-	RAW_COMMIT_COVERAGES_TABLE     = "codecov_api_commit_coverages"
-	RAW_COMPARISONS_TABLE          = "codecov_api_comparisons"
-	RAW_FLAG_COVERAGE_TRENDS_TABLE = "codecov_api_flag_coverage_trends"
+import (
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
+	"github.com/apache/incubator-devlake/plugins/codecov/models"
 )
+
+type addPatchToCoverages struct{}
+
+func (u *addPatchToCoverages) Up(basicRes context.BasicRes) errors.Error {
+	// AutoMigrate will add the missing Patch column to the existing table
+	err := migrationhelper.AutoMigrateTables(
+		basicRes,
+		&models.CodecovCoverage{},
+	)
+	return err
+}
+
+func (*addPatchToCoverages) Version() uint64 {
+	return 20251122000000
+}
+
+func (*addPatchToCoverages) Name() string {
+	return "Codecov add Patch to coverages table"
+}
+

@@ -33,6 +33,7 @@ func All() []plugin.MigrationScript {
 		new(addRawDataOriginToCoverageTables),
 		new(addRawDataOriginToComparisons),
 		new(addModifiedLinesToComparisons),
-		new(addFileCoverageTable),
+		new(addPatchToCoverages),
+		new(addPatchToComparisons),
 	}
 }
