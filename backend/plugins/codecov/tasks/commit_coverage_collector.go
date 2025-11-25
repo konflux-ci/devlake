@@ -107,6 +107,10 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			return query, nil
 		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
+			// Safety check: if status is 404 or 500+, return empty array to skip
+			if res.StatusCode == http.StatusNotFound || res.StatusCode >= http.StatusInternalServerError {
+				return []json.RawMessage{}, nil
+			}
 			var body json.RawMessage
 			err := helper.UnmarshalResponse(res, &body)
 			if err != nil {
@@ -116,9 +120,12 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			return []json.RawMessage{body}, nil
 		},
 		AfterResponse: func(res *http.Response) errors.Error {
-			// Handle 404 for commits/flags that don't have coverage data
-			if res.StatusCode == http.StatusNotFound {
-				return nil // Skip this combination, continue
+			if res.StatusCode == http.StatusUnauthorized {
+				return errors.Unauthorized.New("authentication failed, please check your AccessToken")
+			}
+			// Skip 404 (no coverage) and 500 (server error) without retrying
+			if res.StatusCode == http.StatusNotFound || res.StatusCode >= http.StatusInternalServerError {
+				return helper.ErrIgnoreAndContinue
 			}
 			return nil
 		},

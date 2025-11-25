@@ -71,13 +71,18 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	// Build comparison pairs for each commit × flag combination
+	// Collect comparisons for all flags and all commit pairs
+	// The API will return 404 if coverage doesn't exist, and we'll skip it gracefully
 	iterator := helper.NewQueueIterator()
 	for i := 1; i < len(commits); i++ {
-		// Add comparison for each flag only (skip overall comparison without flag)
+		currentCommit := commits[i]
+		parentCommit := commits[i-1]
+
+		// Add comparison for each flag (for all flags)
 		for _, flag := range flags {
 			iterator.Push(&ComparisonInput{
-				CommitSha: commits[i].CommitSha,
-				ParentSha: commits[i-1].CommitSha,
+				CommitSha: currentCommit.CommitSha,
+				ParentSha: parentCommit.CommitSha,
 				FlagName:  flag.FlagName,
 			})
 		}
@@ -106,6 +111,10 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 			return query, nil
 		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
+			// Safety check: if status is 404 or 500+, return empty array to skip
+			if res.StatusCode == http.StatusNotFound || res.StatusCode >= http.StatusInternalServerError {
+				return []json.RawMessage{}, nil
+			}
 			var body json.RawMessage
 			err := helper.UnmarshalResponse(res, &body)
 			if err != nil {
@@ -114,9 +123,12 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 			return []json.RawMessage{body}, nil
 		},
 		AfterResponse: func(res *http.Response) errors.Error {
-			// Handle 404 for comparisons that don't exist
-			if res.StatusCode == http.StatusNotFound {
-				return nil // Skip this comparison, continue
+			if res.StatusCode == http.StatusUnauthorized {
+				return errors.Unauthorized.New("authentication failed, please check your AccessToken")
+			}
+			// Skip 404 (no coverage) and 500 (server error) without retrying
+			if res.StatusCode == http.StatusNotFound || res.StatusCode >= http.StatusInternalServerError {
+				return helper.ErrIgnoreAndContinue
 			}
 			return nil
 		},
