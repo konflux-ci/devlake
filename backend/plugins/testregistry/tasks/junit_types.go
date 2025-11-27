@@ -22,8 +22,9 @@ import (
 	"regexp"
 )
 
-// JUnitRegexpSearch matches JUnit XML file names starting with "devlake-", "e2e" or "qd-report-"
-var JUnitRegexpSearch = regexp.MustCompile(`(devlake-|e2e|qd-report-)-?[0-9a-z]+\.xml`)
+// JUnitRegexpSearch matches JUnit file names starting with "devlake-", "e2e" or "qd-report-"
+// Supports both .xml and .junit file extensions
+var JUnitRegexpSearch = regexp.MustCompile(`(devlake-|e2e|qd-report-)[0-9a-z-]+\.(xml|junit)`)
 
 // The below types are directly marshalled into XML. The types correspond to jUnit
 // XML schema, but do not contain all valid fields. For instance, the class name
