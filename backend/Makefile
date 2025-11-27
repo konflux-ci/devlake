@@ -47,9 +47,21 @@ swag: mock
 	scripts/swag.sh
 
 build-plugin:
+	@if [ -d "$(HOME)/local/lib/pkgconfig" ] && [ -f "$(HOME)/local/lib/pkgconfig/libgit2.pc" ]; then \
+		export PKG_CONFIG_PATH="$(HOME)/local/lib/pkgconfig:$$PKG_CONFIG_PATH"; \
+		export DYLD_LIBRARY_PATH="$(HOME)/local/lib:$$DYLD_LIBRARY_PATH"; \
+		export CGO_CFLAGS="-I$(HOME)/local/include $$CGO_CFLAGS"; \
+		export CGO_LDFLAGS="-L$(HOME)/local/lib $$CGO_LDFLAGS"; \
+	fi; \
 	scripts/build-plugins.sh
 
 build-plugin-debug:
+	@if [ -d "$(HOME)/local/lib/pkgconfig" ] && [ -f "$(HOME)/local/lib/pkgconfig/libgit2.pc" ]; then \
+		export PKG_CONFIG_PATH="$(HOME)/local/lib/pkgconfig:$$PKG_CONFIG_PATH"; \
+		export DYLD_LIBRARY_PATH="$(HOME)/local/lib:$$DYLD_LIBRARY_PATH"; \
+		export CGO_CFLAGS="-I$(HOME)/local/include $$CGO_CFLAGS"; \
+		export CGO_LDFLAGS="-L$(HOME)/local/lib $$CGO_LDFLAGS"; \
+	fi; \
 	DEVLAKE_DEBUG=1 scripts/build-plugins.sh
 
 build-server: swag
@@ -106,7 +118,7 @@ clean:
 	@rm -rf bin
 
 build-server-image:
-	docker build -t $(IMAGE_REPO)/devlake:$(TAG) --build-arg TAG=$(TAG) --build-arg SHA=$(SHA) --file ./Dockerfile .
+	podman build -t $(IMAGE_REPO)/devlake:$(TAG) --build-arg TAG=$(TAG) --build-arg SHA=$(SHA) --file ./Dockerfile .
 
 migration-script-lint:
 	go run core/migration/linter/main.go -- $$(find . -path '**/migrationscripts/**.go')
