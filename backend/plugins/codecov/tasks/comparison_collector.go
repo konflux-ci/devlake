@@ -49,6 +49,7 @@ var CollectComparisonMeta = plugin.SubTaskMeta{
 func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 	db := taskCtx.GetDal()
+	logger := taskCtx.GetLogger()
 
 	// Extract owner and repo from FullName
 	owner, repo, err := parseFullName(data.Options.FullName)
@@ -70,22 +71,51 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
+	// Get existing comparisons to skip already collected data (OPTIMIZATION)
+	var existingComparisons []ComparisonData
+	err = db.All(&existingComparisons, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
+	if err != nil {
+		return err
+	}
+
+	// Build a set of already collected comparison combinations
+	collectedSet := make(map[string]bool)
+	for _, comp := range existingComparisons {
+		key := fmt.Sprintf("%s|%s|%s", comp.CommitSha, comp.ParentSha, comp.FlagName)
+		collectedSet[key] = true
+	}
+
 	// Build comparison pairs for each commit × flag combination
-	// Collect comparisons for all flags and all commit pairs
-	// The API will return 404 if coverage doesn't exist, and we'll skip it gracefully
+	// Only collect NEW comparisons that don't exist in the database
 	iterator := helper.NewQueueIterator()
+	skippedCount := 0
+	addedCount := 0
 	for i := 1; i < len(commits); i++ {
 		currentCommit := commits[i]
 		parentCommit := commits[i-1]
 
 		// Add comparison for each flag (for all flags)
 		for _, flag := range flags {
-			iterator.Push(&ComparisonInput{
-				CommitSha: currentCommit.CommitSha,
-				ParentSha: parentCommit.CommitSha,
-				FlagName:  flag.FlagName,
-			})
+			key := fmt.Sprintf("%s|%s|%s", currentCommit.CommitSha, parentCommit.CommitSha, flag.FlagName)
+			if !collectedSet[key] {
+				iterator.Push(&ComparisonInput{
+					CommitSha: currentCommit.CommitSha,
+					ParentSha: parentCommit.CommitSha,
+					FlagName:  flag.FlagName,
+				})
+				addedCount++
+			} else {
+				skippedCount++
+			}
 		}
+	}
+
+	logger.Info("[Codecov] Comparison: Skipped %d already collected, collecting %d new", skippedCount, addedCount)
+
+	// If nothing new to collect, return early
+	if addedCount == 0 {
+		logger.Info("[Codecov] Comparison: All data already collected, skipping API calls")
+		return nil
 	}
 
 	collector, err := helper.NewApiCollector(helper.ApiCollectorArgs{

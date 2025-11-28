@@ -48,6 +48,7 @@ var CollectCommitCoverageMeta = plugin.SubTaskMeta{
 func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 	db := taskCtx.GetDal()
+	logger := taskCtx.GetLogger()
 
 	// Extract owner and repo from FullName
 	owner, repo, err := parseFullName(data.Options.FullName)
@@ -69,20 +70,56 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Build iterator with all commit × flag combinations
+	// Get existing coverage records to skip already collected data (OPTIMIZATION)
+	var existingCoverages []models.CodecovCoverage
+	err = db.All(&existingCoverages, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
+	if err != nil {
+		return err
+	}
+
+	// Build a set of already collected commit+flag combinations
+	collectedSet := make(map[string]bool)
+	for _, cov := range existingCoverages {
+		key := fmt.Sprintf("%s|%s", cov.CommitSha, cov.FlagName)
+		collectedSet[key] = true
+	}
+
+	// Build iterator with only NEW commit × flag combinations
 	iterator := helper.NewQueueIterator()
+	skippedCount := 0
+	addedCount := 0
 	for _, commit := range commits {
 		for _, flag := range flags {
+			key := fmt.Sprintf("%s|%s", commit.CommitSha, flag.FlagName)
+			if !collectedSet[key] {
+				iterator.Push(&CommitFlagInput{
+					CommitSha: commit.CommitSha,
+					FlagName:  flag.FlagName,
+				})
+				addedCount++
+			} else {
+				skippedCount++
+			}
+		}
+		// Also add overall coverage (no flag) if not already collected
+		overallKey := fmt.Sprintf("%s|", commit.CommitSha)
+		if !collectedSet[overallKey] {
 			iterator.Push(&CommitFlagInput{
 				CommitSha: commit.CommitSha,
-				FlagName:  flag.FlagName,
+				FlagName:  "", // Empty flag name for overall coverage
 			})
+			addedCount++
+		} else {
+			skippedCount++
 		}
-		// Also add overall coverage (no flag)
-		iterator.Push(&CommitFlagInput{
-			CommitSha: commit.CommitSha,
-			FlagName:  "", // Empty flag name for overall coverage
-		})
+	}
+
+	logger.Info("[Codecov] CommitCoverage: Skipped %d already collected, collecting %d new", skippedCount, addedCount)
+
+	// If nothing new to collect, return early
+	if addedCount == 0 {
+		logger.Info("[Codecov] CommitCoverage: All data already collected, skipping API calls")
+		return nil
 	}
 
 	collector, err := helper.NewApiCollector(helper.ApiCollectorArgs{

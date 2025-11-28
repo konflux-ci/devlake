@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"reflect"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -47,6 +46,7 @@ var CollectCommitTotalsMeta = plugin.SubTaskMeta{
 func CollectCommitTotals(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 	db := taskCtx.GetDal()
+	logger := taskCtx.GetLogger()
 
 	// Extract owner and repo from FullName
 	owner, repo, err := parseFullName(data.Options.FullName)
@@ -54,22 +54,47 @@ func CollectCommitTotals(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Create iterator from extracted commits (tool layer)
-	clauses := []dal.Clause{
-		dal.Select("commit_sha AS commit_sha"),
-		dal.From(&models.CodecovCommit{}),
-		dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName),
-	}
-
-	cursor, err := db.Cursor(clauses...)
+	// Get existing commit coverages to skip already collected data (OPTIMIZATION)
+	var existingCoverages []models.CodecovCommitCoverage
+	err = db.All(&existingCoverages, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
 	if err != nil {
 		return err
 	}
-	defer cursor.Close()
 
-	iterator, err := helper.NewDalCursorIterator(db, cursor, reflect.TypeOf(CommitInput{}))
+	// Build a set of already collected commit SHAs
+	collectedSet := make(map[string]bool)
+	for _, cov := range existingCoverages {
+		collectedSet[cov.CommitSha] = true
+	}
+
+	// Get all commits and filter to only new ones
+	var allCommits []models.CodecovCommit
+	err = db.All(&allCommits, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
 	if err != nil {
 		return err
+	}
+
+	// Build iterator with only NEW commits
+	iterator := helper.NewQueueIterator()
+	skippedCount := 0
+	addedCount := 0
+	for _, commit := range allCommits {
+		if !collectedSet[commit.CommitSha] {
+			iterator.Push(&CommitInput{
+				CommitSha: commit.CommitSha,
+			})
+			addedCount++
+		} else {
+			skippedCount++
+		}
+	}
+
+	logger.Info("[Codecov] CommitTotals: Skipped %d already collected, collecting %d new", skippedCount, addedCount)
+
+	// If nothing new to collect, return early
+	if addedCount == 0 {
+		logger.Info("[Codecov] CommitTotals: All data already collected, skipping API calls")
+		return nil
 	}
 
 	collector, err := helper.NewApiCollector(helper.ApiCollectorArgs{
