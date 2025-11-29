@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
 
@@ -43,6 +44,21 @@ type CodecovConn struct {
 	helper.RestConnection `mapstructure:",squash"`
 	CodecovAccessToken    `mapstructure:",squash"`
 	Organization          string `mapstructure:"organization" json:"organization" gorm:"type:varchar(255)" validate:"required"`
+}
+
+// PrepareApiClient configures the HTTP client headers for optimal performance
+// Similar to Python pycodecov's ClientSession setup
+func (conn *CodecovConn) PrepareApiClient(apiClient plugin.ApiClient) errors.Error {
+	// Set default headers for better compatibility and performance
+	// These help with connection keep-alive and proper API interaction
+	apiClient.SetHeaders(map[string]string{
+		"Accept":       "application/json",
+		"User-Agent":   "DevLake/1.0 (Codecov Plugin)",
+		"Connection":   "keep-alive", // Request persistent connections
+		"Content-Type": "application/json",
+	})
+
+	return nil
 }
 
 // CodecovConnection holds CodecovConn plus ID/Name for database storage

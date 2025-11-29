@@ -193,6 +193,11 @@ spec:
       - name: netrc
         workspace: netrc
     - name: build-container
+      computeResources:
+        limits:
+          memory: 12Gi
+        requests:
+          memory: 4Gi
       params:
       - name: IMAGE
         value: $(params.output-image)
