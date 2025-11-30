@@ -169,21 +169,28 @@ func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 		return nil, errors.BadInput.Wrap(err, "unable to get Codecov connection by the given connection ID")
 	}
 
-	// create synchronize api client
+	// Create synchronize API client (PrepareApiClient on connection will set headers)
 	apiClient, err := helper.NewApiClientFromConnection(taskCtx.GetContext(), taskCtx, connection)
 	if err != nil {
 		return nil, err
 	}
 
-	// create async api client
+	// Create async API client with rate limiter optimized for Codecov
+	// Note: Go's http.Client already has connection pooling via http.Transport
+	rateLimiter := &helper.ApiRateLimitCalculator{
+		UserRateLimitPerHour: 5000, // Codecov's rate limit (adjust based on your plan)
+	}
+
 	asyncApiClient, err := helper.CreateAsyncApiClient(
 		taskCtx,
 		apiClient,
-		nil, // no rate limiter for now
+		rateLimiter,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	taskCtx.GetLogger().Info("[Codecov] API client initialized with rate limiter (5000 req/hour)")
 
 	return &tasks.CodecovTaskData{
 		Options:   op,
