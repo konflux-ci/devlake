@@ -25,7 +25,7 @@
 
 # ARM64-only Dockerfile for local development
 
-FROM --platform=linux/arm64 debian:bookworm as debian-arm64
+FROM --platform=linux/arm64 debian:trixie as debian-arm64
 RUN apt-get update
 RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
