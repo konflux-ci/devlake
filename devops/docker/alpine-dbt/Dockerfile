@@ -15,7 +15,7 @@
 #
 
 # current tag: mericodev/alpine-dbt:0.0.1
-FROM --platform=linux/amd64 alpine:3.15
+FROM --platform=linux/amd64 alpine:3.23
 RUN apk add --no-cache musl-dev libgit2-dev libffi-dev \
     && apk add --no-cache gcc
 
