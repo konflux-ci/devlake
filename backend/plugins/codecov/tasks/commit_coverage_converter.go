@@ -103,7 +103,7 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			}
 
 			codecovCommitCoverage := &models.CodecovCommitCoverage{
-				Model:            common.Model{},
+				NoPKModel:        common.NoPKModel{},
 				ConnectionId:     data.Options.ConnectionId,
 				RepoId:           data.Options.FullName,
 				CommitSha:        totals.Commitid,

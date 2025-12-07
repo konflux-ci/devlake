@@ -90,6 +90,10 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 	addedCount := 0
 	for _, commit := range commits {
 		for _, flag := range flags {
+			// Skip empty flag names - only collect per-flag coverage
+			if flag.FlagName == "" {
+				continue
+			}
 			key := fmt.Sprintf("%s|%s", commit.CommitSha, flag.FlagName)
 			if !collectedSet[key] {
 				iterator.Push(&CommitFlagInput{
@@ -100,17 +104,6 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			} else {
 				skippedCount++
 			}
-		}
-		// Also add overall coverage (no flag) if not already collected
-		overallKey := fmt.Sprintf("%s|", commit.CommitSha)
-		if !collectedSet[overallKey] {
-			iterator.Push(&CommitFlagInput{
-				CommitSha: commit.CommitSha,
-				FlagName:  "", // Empty flag name for overall coverage
-			})
-			addedCount++
-		} else {
-			skippedCount++
 		}
 	}
 
@@ -131,6 +124,7 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			},
 			Table: RAW_COMMIT_COVERAGES_TABLE,
 		},
+		Incremental: true, // ALWAYS preserve historical data
 		ApiClient:   data.ApiClient,
 		Input:       iterator,
 		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/totals/", owner, repo),

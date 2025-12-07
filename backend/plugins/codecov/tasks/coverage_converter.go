@@ -114,6 +114,11 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			// Determine which flag this coverage is for
 			flagName := input.FlagName
 
+			// Skip empty flag names - we only want per-flag coverage
+			if flagName == "" {
+				return nil, nil
+			}
+
 			// Extract coverage data - when flag is specified, API returns flag-specific in totals
 			// When no flag, API returns overall coverage in totals
 			var coveragePercentage float64
@@ -168,7 +173,7 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Create one coverage record for this flag/commit combination
 			results = append(results, &models.CodecovCoverage{
-				Model:              common.Model{},
+				NoPKModel:          common.NoPKModel{},
 				ConnectionId:       data.Options.ConnectionId,
 				RepoId:             data.Options.FullName,
 				FlagName:           flagName,

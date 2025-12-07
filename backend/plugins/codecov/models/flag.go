@@ -22,14 +22,14 @@ import (
 )
 
 type CodecovFlag struct {
-	common.Model
-	common.RawDataOrigin `mapstructure:",squash"`
-	ConnectionId         uint64 `gorm:"primaryKey;type:bigint" json:"connectionId"`
-	RepoId               string `gorm:"primaryKey;type:varchar(200)" json:"repoId"`
-	FlagName             string `gorm:"primaryKey;type:varchar(100)" json:"flagName"`
-	Carryforward         bool   `json:"carryforward"`
-	Deleted              bool   `json:"deleted"`
-	Yaml                 string `gorm:"type:text" json:"yaml"`
+	common.NoPKModel // Includes CreatedAt, UpdatedAt, and RawDataOrigin
+	ConnectionId     uint64   `gorm:"primaryKey;type:bigint" json:"connectionId"`
+	RepoId           string   `gorm:"primaryKey;type:varchar(200)" json:"repoId"`
+	FlagName         string   `gorm:"primaryKey;type:varchar(100)" json:"flagName"`
+	Carryforward     bool     `json:"carryforward"`
+	Deleted          bool     `json:"deleted"`
+	Yaml             string   `gorm:"type:text" json:"yaml"`
+	Coverage         *float64 `json:"coverage"` // Latest overall coverage for this flag
 }
 
 func (CodecovFlag) TableName() string {

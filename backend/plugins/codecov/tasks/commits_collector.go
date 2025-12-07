@@ -38,6 +38,7 @@ var CollectCommitsMeta = plugin.SubTaskMeta{
 
 func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
+	logger := taskCtx.GetLogger()
 
 	// Extract owner and repo from FullName
 	owner, repo, err := parseFullName(data.Options.FullName)
@@ -50,6 +51,8 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 	if data.Options.ScopeConfig != nil {
 		// Could add branch config here if needed
 	}
+
+	logger.Info("[Codecov] Collecting ALL commits for %s/%s branch=%s", owner, repo, branch)
 
 	apiCollector, err := helper.NewStatefulApiCollector(helper.RawDataSubTaskArgs{
 		Ctx: taskCtx,
@@ -65,6 +68,7 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 
 	err = apiCollector.InitCollector(helper.ApiCollectorArgs{
 		ApiClient:   data.ApiClient,
+		Incremental: true, // ALWAYS preserve historical data
 		PageSize:    100,
 		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/commits", owner, repo),
 		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
@@ -72,14 +76,17 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 			query.Set("branch", branch)
 			query.Set("page", fmt.Sprintf("%v", reqData.Pager.Page))
 			query.Set("page_size", fmt.Sprintf("%v", reqData.Pager.Size))
-			if apiCollector.GetSince() != nil {
-				query.Set("updated_at", fmt.Sprintf(">%s", apiCollector.GetSince().Format("2006-01-02T15:04:05Z")))
-			}
+			// NOTE: Removed updated_at filter to always collect ALL historical commits
+			// The stateful collector and incremental mode will handle deduplication
 			return query, nil
 		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
 			var response struct {
-				Results []json.RawMessage `json:"results"`
+				Count      int               `json:"count"`
+				Next       *string           `json:"next"`
+				Previous   *string           `json:"previous"`
+				Results    []json.RawMessage `json:"results"`
+				TotalPages int               `json:"total_pages"`
 			}
 			err := helper.UnmarshalResponse(res, &response)
 			if err != nil {
@@ -88,9 +95,26 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 			return response.Results, nil
 		},
 		GetTotalPages: func(res *http.Response, args *helper.ApiCollectorArgs) (int, errors.Error) {
-			// Codecov API may return total count in headers or response
-			// For now, we'll use pagination until no more results
-			return 0, nil // 0 means unknown, collector will continue until no results
+			// Parse Codecov API pagination response
+			var response struct {
+				Count      int     `json:"count"`
+				Next       *string `json:"next"`
+				TotalPages int     `json:"total_pages"`
+			}
+			err := helper.UnmarshalResponse(res, &response)
+			if err != nil {
+				return 0, nil // Continue until no results
+			}
+			// If total_pages is provided, use it
+			if response.TotalPages > 0 {
+				return response.TotalPages, nil
+			}
+			// Otherwise calculate from count
+			if response.Count > 0 && args.PageSize > 0 {
+				totalPages := (response.Count + args.PageSize - 1) / args.PageSize
+				return totalPages, nil
+			}
+			return 0, nil // 0 means unknown, continue until no results
 		},
 	})
 	if err != nil {

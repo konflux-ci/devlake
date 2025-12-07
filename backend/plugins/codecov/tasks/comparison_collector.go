@@ -86,22 +86,26 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	// Build comparison pairs for each commit × flag combination
+	// Use the actual ParentSha from the commit (from Codecov API) instead of assuming sequential order
+	// Patch coverage IS flag-specific - each flag shows how well that test type covers new code
 	// Only collect NEW comparisons that don't exist in the database
 	iterator := helper.NewQueueIterator()
 	skippedCount := 0
 	addedCount := 0
-	for i := 1; i < len(commits); i++ {
-		currentCommit := commits[i]
-		parentCommit := commits[i-1]
+	for _, commit := range commits {
+		// Skip commits without a parent (first commit in repo)
+		if commit.ParentSha == "" {
+			continue
+		}
 
-		// Add comparison for each flag (for all flags)
+		// Collect comparison for each flag (flag-specific patch coverage)
 		for _, flag := range flags {
-			key := fmt.Sprintf("%s|%s|%s", currentCommit.CommitSha, parentCommit.CommitSha, flag.FlagName)
+			key := fmt.Sprintf("%s|%s|%s", commit.CommitSha, commit.ParentSha, flag.FlagName)
 			if !collectedSet[key] {
 				iterator.Push(&ComparisonInput{
-					CommitSha: currentCommit.CommitSha,
-					ParentSha: parentCommit.CommitSha,
-					FlagName:  flag.FlagName,
+					CommitSha: commit.CommitSha,
+					ParentSha: commit.ParentSha, // Use actual parent from Codecov API
+					FlagName:  flag.FlagName,    // Flag-specific patch coverage
 				})
 				addedCount++
 			} else {
@@ -127,6 +131,7 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 			},
 			Table: RAW_COMPARISONS_TABLE,
 		},
+		Incremental: true, // ALWAYS preserve historical data
 		ApiClient:   data.ApiClient,
 		Input:       iterator,
 		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/compare", owner, repo),
@@ -135,6 +140,7 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 			query := url.Values{}
 			query.Set("base", input.ParentSha)
 			query.Set("head", input.CommitSha)
+			// Send flag parameter for flag-specific patch coverage
 			if input.FlagName != "" {
 				query.Set("flag", input.FlagName)
 			}

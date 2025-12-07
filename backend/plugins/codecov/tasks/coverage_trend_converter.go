@@ -50,22 +50,26 @@ func ConvertCoverageTrend(taskCtx plugin.SubTaskContext) errors.Error {
 			Table: RAW_FLAG_COVERAGE_TRENDS_TABLE,
 		},
 		Extract: func(resData *helper.RawData) ([]interface{}, errors.Error) {
-			var trend struct {
+			// Read input to get flag name
+			var input struct {
 				FlagName string `json:"flag_name"`
-				Trend    []struct {
-					Date     string  `json:"date"`
-					Coverage float64 `json:"coverage"`
-					Lines    int     `json:"lines"`
-					Hits     int     `json:"hits"`
-					Methods  int     `json:"methods"`
-				} `json:"trend"`
 			}
-			err := errors.Convert(json.Unmarshal(resData.Data, &trend))
-			if err != nil {
+			if err := errors.Convert(json.Unmarshal(resData.Input, &input)); err != nil {
 				return nil, err
 			}
 
-			var results []interface{}
+			// Parse individual trend point from results array
+			// Each raw data record is a single trend point: {"timestamp": "...", "min": ..., "max": ..., "avg": ...}
+			var point struct {
+				Timestamp string  `json:"timestamp"`
+				Min       float64 `json:"min"`
+				Max       float64 `json:"max"`
+				Avg       float64 `json:"avg"`
+			}
+			err := errors.Convert(json.Unmarshal(resData.Data, &point))
+			if err != nil {
+				return nil, err
+			}
 
 			// Extract branch from scope config or default to main
 			branch := "main"
@@ -73,31 +77,31 @@ func ConvertCoverageTrend(taskCtx plugin.SubTaskContext) errors.Error {
 				// Could add branch config here if needed
 			}
 
-			// Convert each trend point
-			for _, point := range trend.Trend {
-				date, err := time.Parse("2006-01-02", point.Date)
-				if err != nil {
-					continue // Skip invalid dates
+			// Parse timestamp like "2025-12-02T00:00:00Z"
+			date, parseErr := time.Parse(time.RFC3339, point.Timestamp)
+			if parseErr != nil {
+				// Try alternative format
+				date, parseErr = time.Parse("2006-01-02", point.Timestamp[:10])
+				if parseErr != nil {
+					return nil, nil // Skip invalid dates
 				}
-
-				codecovTrend := &models.CodecovCoverageTrend{
-					Model:              common.Model{},
-					ConnectionId:       data.Options.ConnectionId,
-					RepoId:             data.Options.FullName,
-					FlagName:           trend.FlagName,
-					Branch:             branch,
-					Date:               date,
-					CoveragePercentage: point.Coverage,
-					LinesCovered:       point.Hits,
-					LinesTotal:         point.Lines,
-					MethodsCovered:     point.Methods, // Approximate
-					MethodsTotal:       point.Methods, // Approximate
-				}
-
-				results = append(results, codecovTrend)
 			}
 
-			return results, nil
+			codecovTrend := &models.CodecovCoverageTrend{
+				NoPKModel:          common.NoPKModel{},
+				ConnectionId:       data.Options.ConnectionId,
+				RepoId:             data.Options.FullName,
+				FlagName:           input.FlagName,
+				Branch:             branch,
+				Date:               date,
+				CoveragePercentage: point.Avg, // Use average coverage
+				LinesCovered:       0,         // Not provided by this endpoint
+				LinesTotal:         0,         // Not provided by this endpoint
+				MethodsCovered:     0,         // Not provided by this endpoint
+				MethodsTotal:       0,         // Not provided by this endpoint
+			}
+
+			return []interface{}{codecovTrend}, nil
 		},
 	})
 

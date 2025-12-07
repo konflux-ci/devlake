@@ -53,10 +53,11 @@ func ExtractCommits(taskCtx plugin.SubTaskContext) errors.Error {
 		},
 		Extract: func(resData *helper.RawData) ([]interface{}, errors.Error) {
 			var commit struct {
-				Commitid string `json:"commitid"`
-				Branch   string `json:"branch"`
-				Message  string `json:"message"`
-				Author   struct {
+				Commitid  string `json:"commitid"`
+				Branch    string `json:"branch"`
+				Message   string `json:"message"`
+				Parent    string `json:"parent"` // Parent commit SHA for comparisons
+				Author    struct {
 					Name string `json:"name"`
 				} `json:"author"`
 				Timestamp string `json:"timestamp"`
@@ -75,7 +76,7 @@ func ExtractCommits(taskCtx plugin.SubTaskContext) errors.Error {
 			}
 
 			codecovCommit := &models.CodecovCommit{
-				Model:           common.Model{},
+				NoPKModel:       common.NoPKModel{},
 				ConnectionId:    data.Options.ConnectionId,
 				RepoId:          data.Options.FullName,
 				CommitSha:       commit.Commitid,
@@ -83,6 +84,7 @@ func ExtractCommits(taskCtx plugin.SubTaskContext) errors.Error {
 				CommitTimestamp: commitTimestamp,
 				Message:         commit.Message,
 				Author:          commit.Author.Name,
+				ParentSha:       commit.Parent, // Store parent SHA for comparison API calls
 			}
 
 			return []interface{}{codecovCommit}, nil

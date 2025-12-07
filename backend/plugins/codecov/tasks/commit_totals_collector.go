@@ -106,6 +106,7 @@ func CollectCommitTotals(taskCtx plugin.SubTaskContext) errors.Error {
 			},
 			Table: RAW_COMMIT_TOTALS_TABLE,
 		},
+		Incremental: true, // ALWAYS preserve historical data
 		ApiClient:   data.ApiClient,
 		Input:       iterator,
 		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/totals/", owner, repo),

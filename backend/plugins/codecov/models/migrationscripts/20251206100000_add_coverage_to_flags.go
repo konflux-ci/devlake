@@ -18,24 +18,32 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addCoverageTables),
-		new(addRawDataOriginToCommits),
-		new(addRawDataOriginToFlags),
-		new(addComparisonTable),
-		new(addModifiedCoverageToCoverages),
-		new(addRawDataOriginToCoverageTables),
-		new(addRawDataOriginToComparisons),
-		new(addModifiedLinesToComparisons),
-		new(addPatchToCoverages),
-		new(addPatchToComparisons),
-		new(fixPrimaryKeys),          // Remove duplicates and fix primary keys
-		new(addCoverageToFlags),      // Add coverage column to flags
-	}
+var _ plugin.MigrationScript = (*addCoverageToFlags)(nil)
+
+type addCoverageToFlags struct{}
+
+type codecovFlag20251206 struct {
+	Coverage *float64
+}
+
+func (codecovFlag20251206) TableName() string {
+	return "_tool_codecov_flags"
+}
+
+func (script *addCoverageToFlags) Up(basicRes context.BasicRes) errors.Error {
+	return migrationhelper.AutoMigrateTables(basicRes, &codecovFlag20251206{})
+}
+
+func (*addCoverageToFlags) Version() uint64 {
+	return 20251206100000
+}
+
+func (*addCoverageToFlags) Name() string {
+	return "Codecov add coverage column to flags table"
 }
