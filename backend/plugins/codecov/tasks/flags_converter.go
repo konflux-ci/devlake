@@ -50,21 +50,28 @@ func ConvertFlags(taskCtx plugin.SubTaskContext) errors.Error {
 		},
 		Extract: func(resData *helper.RawData) ([]interface{}, errors.Error) {
 			var flag struct {
-				FlagName     string `json:"flag_name"`
-				Carryforward bool   `json:"carryforward"`
-				Deleted      bool   `json:"deleted"`
-				Yaml         string `json:"yaml"`
+				FlagName     string   `json:"flag_name"`
+				Coverage     *float64 `json:"coverage"`
+				Carryforward bool     `json:"carryforward"`
+				Deleted      bool     `json:"deleted"`
+				Yaml         string   `json:"yaml"`
 			}
 			err := errors.Convert(json.Unmarshal(resData.Data, &flag))
 			if err != nil {
 				return nil, err
 			}
 
+			// Skip empty flag names
+			if flag.FlagName == "" {
+				return nil, nil
+			}
+
 			codecovFlag := &models.CodecovFlag{
-				Model:        common.Model{},
+				NoPKModel:    common.NoPKModel{},
 				ConnectionId: data.Options.ConnectionId,
 				RepoId:       data.Options.FullName,
 				FlagName:     flag.FlagName,
+				Coverage:     flag.Coverage,
 				Carryforward: flag.Carryforward,
 				Deleted:      flag.Deleted,
 				Yaml:         flag.Yaml,

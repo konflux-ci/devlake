@@ -24,8 +24,7 @@ import (
 )
 
 type CodecovCoverage struct {
-	common.Model
-	common.RawDataOrigin `mapstructure:",squash"`
+	common.NoPKModel              // Includes CreatedAt, UpdatedAt, and RawDataOrigin
 	ConnectionId       uint64     `gorm:"primaryKey;type:bigint" json:"connectionId"`
 	RepoId             string     `gorm:"primaryKey;type:varchar(200);index" json:"repoId"`
 	FlagName           string     `gorm:"primaryKey;type:varchar(100);index" json:"flagName"`

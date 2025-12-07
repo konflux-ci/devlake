@@ -21,7 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -47,6 +49,15 @@ var CollectFlagCoverageTrendMeta = plugin.SubTaskMeta{
 func CollectFlagCoverageTrend(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 	db := taskCtx.GetDal()
+	logger := taskCtx.GetLogger()
+
+	// Log sync policy time range
+	syncPolicy := taskCtx.TaskContext().SyncPolicy()
+	if syncPolicy != nil && syncPolicy.TimeAfter != nil {
+		logger.Info("[Codecov] CollectFlagCoverageTrend: Using sync policy time range from %s", syncPolicy.TimeAfter.Format("2006-01-02"))
+	} else {
+		logger.Info("[Codecov] CollectFlagCoverageTrend: No sync policy, using default 90 days")
+	}
 
 	// Extract owner and repo from FullName
 	owner, repo, err := parseFullName(data.Options.FullName)
@@ -54,11 +65,11 @@ func CollectFlagCoverageTrend(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Create iterator from collected flags
+	// Create iterator from collected flags (skip empty flag names)
 	clauses := []dal.Clause{
 		dal.Select("flag_name AS flag_name"),
 		dal.From(&models.CodecovFlag{}),
-		dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName),
+		dal.Where("connection_id = ? AND repo_id = ? AND flag_name != ''", data.Options.ConnectionId, data.Options.FullName),
 	}
 
 	cursor, err := db.Cursor(clauses...)
@@ -81,20 +92,56 @@ func CollectFlagCoverageTrend(taskCtx plugin.SubTaskContext) errors.Error {
 			},
 			Table: RAW_FLAG_COVERAGE_TRENDS_TABLE,
 		},
+		Incremental: true, // ALWAYS preserve historical data
 		ApiClient:   data.ApiClient,
 		Input:       iterator,
-		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/flags/{{ .Input.FlagName }}/coverage/trend", owner, repo),
+		PageSize:    100, // Max results per page
+		// Use the correct per-flag coverage endpoint: /flags/{flag_name}/coverage (NO trailing slash!)
+		// See: https://docs.codecov.com/reference/repos_flags_coverage_list
+		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/flags/{{ .Input.FlagName }}/coverage", owner, repo),
+		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
+			query := url.Values{}
+			query.Set("interval", "1d") // Daily trend data
+			query.Set("page", fmt.Sprintf("%d", reqData.Pager.Page))
+
+			// Use sync policy time range, default to last 90 days
+			endDate := time.Now()
+			var startDate time.Time
+			syncPolicy := taskCtx.TaskContext().SyncPolicy()
+			if syncPolicy != nil && syncPolicy.TimeAfter != nil {
+				startDate = *syncPolicy.TimeAfter
+			} else {
+				// Default to last 90 days if no sync policy
+				startDate = endDate.AddDate(0, 0, -90)
+			}
+			query.Set("start_date", startDate.Format("2006-01-02"))
+			query.Set("end_date", endDate.Format("2006-01-02"))
+			return query, nil
+		},
+		GetTotalPages: func(res *http.Response, args *helper.ApiCollectorArgs) (int, errors.Error) {
+			var response struct {
+				TotalPages int `json:"total_pages"`
+			}
+			err := helper.UnmarshalResponse(res, &response)
+			if err != nil {
+				return 0, err
+			}
+			logger.Info("[Codecov] Coverage trend has %d pages to collect", response.TotalPages)
+			return response.TotalPages, nil
+		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
 			// Safety check: if status is 404 or 500+, return empty array to skip
 			if res.StatusCode == http.StatusNotFound || res.StatusCode >= http.StatusInternalServerError {
 				return []json.RawMessage{}, nil
 			}
-			var body json.RawMessage
-			err := helper.UnmarshalResponse(res, &body)
+			var response struct {
+				Results []json.RawMessage `json:"results"`
+			}
+			err := helper.UnmarshalResponse(res, &response)
 			if err != nil {
 				return nil, err
 			}
-			return []json.RawMessage{body}, nil
+			return response.Results, nil
 		},
 		AfterResponse: func(res *http.Response) errors.Error {
 			if res.StatusCode == http.StatusUnauthorized {
