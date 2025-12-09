@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -56,9 +57,20 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Get all commits
+	// Use sync policy time range, default to last 90 days
+	var startDate time.Time
+	syncPolicy := taskCtx.TaskContext().SyncPolicy()
+	if syncPolicy != nil && syncPolicy.TimeAfter != nil {
+		startDate = *syncPolicy.TimeAfter
+		logger.Info("[Codecov] CommitCoverage: Using sync policy from %s", startDate.Format("2006-01-02"))
+	} else {
+		startDate = time.Now().AddDate(0, 0, -90)
+		logger.Info("[Codecov] CommitCoverage: Using default 90 days from %s", startDate.Format("2006-01-02"))
+	}
+
+	// Get commits filtered by sync policy
 	var commits []models.CodecovCommit
-	err = db.All(&commits, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
+	err = db.All(&commits, dal.Where("connection_id = ? AND repo_id = ? AND commit_timestamp >= ?", data.Options.ConnectionId, data.Options.FullName, startDate))
 	if err != nil {
 		return err
 	}

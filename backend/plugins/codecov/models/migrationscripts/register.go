@@ -35,7 +35,6 @@ func All() []plugin.MigrationScript {
 		new(addModifiedLinesToComparisons),
 		new(addPatchToCoverages),
 		new(addPatchToComparisons),
-		new(fixPrimaryKeys),          // Remove duplicates and fix primary keys
-		new(addCoverageToFlags),      // Add coverage column to flags
+		new(addCoverageToFlags), // Add coverage column to flags
 	}
 }
