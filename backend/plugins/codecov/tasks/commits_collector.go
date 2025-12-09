@@ -18,14 +18,15 @@ limitations under the License.
 package tasks
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
+	"time"
 
+	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/plugins/codecov/models"
 )
 
 var CollectCommitsMeta = plugin.SubTaskMeta{
@@ -36,9 +37,22 @@ var CollectCommitsMeta = plugin.SubTaskMeta{
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE},
 }
 
+// CommitResponse represents a single commit from the Codecov API
+type CommitResponse struct {
+	CommitID  string `json:"commitid"`
+	Branch    string `json:"branch"`
+	Message   string `json:"message"`
+	Parent    string `json:"parent"`
+	Timestamp string `json:"timestamp"`
+	Author    struct {
+		Name string `json:"name"`
+	} `json:"author"`
+}
+
 func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 	logger := taskCtx.GetLogger()
+	db := taskCtx.GetDal()
 
 	// Extract owner and repo from FullName
 	owner, repo, err := parseFullName(data.Options.FullName)
@@ -48,78 +62,106 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 
 	// Determine branch (main or master) from scope config or default to main
 	branch := "main"
-	if data.Options.ScopeConfig != nil {
-		// Could add branch config here if needed
+
+	// Use sync policy time range, default to last 90 days
+	var cutoffDate time.Time
+	syncPolicy := taskCtx.TaskContext().SyncPolicy()
+	if syncPolicy != nil && syncPolicy.TimeAfter != nil {
+		// Truncate to start of day to include all commits from the cutoff day
+		t := *syncPolicy.TimeAfter
+		cutoffDate = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		logger.Info("[Codecov] Collecting commits for %s/%s branch=%s from %s (sync policy, inclusive)", owner, repo, branch, cutoffDate.Format("2006-01-02"))
+	} else {
+		// Default to last 90 days if no sync policy
+		now := time.Now()
+		cutoffDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -90)
+		logger.Info("[Codecov] Collecting commits for %s/%s branch=%s from %s (default 90 days, inclusive)", owner, repo, branch, cutoffDate.Format("2006-01-02"))
 	}
 
-	logger.Info("[Codecov] Collecting ALL commits for %s/%s branch=%s", owner, repo, branch)
+	// Manual pagination with early termination
+	// Codecov API doesn't support start_date filter, so we paginate until we hit old commits
+	apiClient := data.ApiClient
+	pageSize := 100
+	page := 1
+	totalCollected := 0
+	stopPagination := false
 
-	apiCollector, err := helper.NewStatefulApiCollector(helper.RawDataSubTaskArgs{
-		Ctx: taskCtx,
-		Params: CodecovApiParams{
-			ConnectionId: data.Options.ConnectionId,
-			Name:         data.Options.FullName,
-		},
-		Table: RAW_COMMITS_TABLE,
-	})
-	if err != nil {
-		return err
+	for !stopPagination {
+		// Build the request URL
+		reqUrl := fmt.Sprintf("api/v2/github/%s/repos/%s/commits?branch=%s&page=%d&page_size=%d",
+			owner, repo, branch, page, pageSize)
+
+		res, err := apiClient.Get(reqUrl, nil, nil)
+		if err != nil {
+			return errors.Default.Wrap(err, fmt.Sprintf("failed to fetch commits page %d", page))
+		}
+
+		var response struct {
+			Count      int              `json:"count"`
+			Next       *string          `json:"next"`
+			Results    []CommitResponse `json:"results"`
+			TotalPages int              `json:"total_pages"`
+		}
+
+		if err := helper.UnmarshalResponse(res, &response); err != nil {
+			return errors.Default.Wrap(err, "failed to parse commits response")
+		}
+
+		if len(response.Results) == 0 {
+			logger.Info("[Codecov] No more commits found on page %d", page)
+			break
+		}
+
+		// Process each commit
+		for _, commit := range response.Results {
+			// Parse timestamp
+			var commitTimestamp *time.Time
+			if commit.Timestamp != "" {
+				parsed, parseErr := time.Parse(time.RFC3339, commit.Timestamp)
+				if parseErr == nil {
+					commitTimestamp = &parsed
+
+					// Check if this commit is older than our cutoff date
+					if parsed.Before(cutoffDate) {
+						logger.Info("[Codecov] Reached commit older than cutoff (%s < %s), stopping pagination",
+							parsed.Format("2006-01-02"), cutoffDate.Format("2006-01-02"))
+						stopPagination = true
+						break
+					}
+				}
+			}
+
+			// Save commit to database
+			codecovCommit := &models.CodecovCommit{
+				NoPKModel:       common.NoPKModel{},
+				ConnectionId:    data.Options.ConnectionId,
+				RepoId:          data.Options.FullName,
+				CommitSha:       commit.CommitID,
+				Branch:          commit.Branch,
+				CommitTimestamp: commitTimestamp,
+				Message:         commit.Message,
+				Author:          commit.Author.Name,
+				ParentSha:       commit.Parent,
+			}
+
+			// Use CreateOrUpdate to handle duplicates
+			if err := db.CreateOrUpdate(codecovCommit, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ?",
+				codecovCommit.ConnectionId, codecovCommit.RepoId, codecovCommit.CommitSha)); err != nil {
+				logger.Warn(err, "failed to save commit %s", commit.CommitID)
+			} else {
+				totalCollected++
+			}
+		}
+
+		// Check if there are more pages
+		if response.Next == nil || stopPagination {
+			break
+		}
+
+		page++
+		logger.Info("[Codecov] Processed page %d, collected %d commits so far", page-1, totalCollected)
 	}
 
-	err = apiCollector.InitCollector(helper.ApiCollectorArgs{
-		ApiClient:   data.ApiClient,
-		Incremental: true, // ALWAYS preserve historical data
-		PageSize:    100,
-		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/commits", owner, repo),
-		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
-			query := url.Values{}
-			query.Set("branch", branch)
-			query.Set("page", fmt.Sprintf("%v", reqData.Pager.Page))
-			query.Set("page_size", fmt.Sprintf("%v", reqData.Pager.Size))
-			// NOTE: Removed updated_at filter to always collect ALL historical commits
-			// The stateful collector and incremental mode will handle deduplication
-			return query, nil
-		},
-		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
-			var response struct {
-				Count      int               `json:"count"`
-				Next       *string           `json:"next"`
-				Previous   *string           `json:"previous"`
-				Results    []json.RawMessage `json:"results"`
-				TotalPages int               `json:"total_pages"`
-			}
-			err := helper.UnmarshalResponse(res, &response)
-			if err != nil {
-				return nil, err
-			}
-			return response.Results, nil
-		},
-		GetTotalPages: func(res *http.Response, args *helper.ApiCollectorArgs) (int, errors.Error) {
-			// Parse Codecov API pagination response
-			var response struct {
-				Count      int     `json:"count"`
-				Next       *string `json:"next"`
-				TotalPages int     `json:"total_pages"`
-			}
-			err := helper.UnmarshalResponse(res, &response)
-			if err != nil {
-				return 0, nil // Continue until no results
-			}
-			// If total_pages is provided, use it
-			if response.TotalPages > 0 {
-				return response.TotalPages, nil
-			}
-			// Otherwise calculate from count
-			if response.Count > 0 && args.PageSize > 0 {
-				totalPages := (response.Count + args.PageSize - 1) / args.PageSize
-				return totalPages, nil
-			}
-			return 0, nil // 0 means unknown, continue until no results
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	return apiCollector.Execute()
+	logger.Info("[Codecov] Finished collecting commits: %d total commits within sync policy window", totalCollected)
+	return nil
 }

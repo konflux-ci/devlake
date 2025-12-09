@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -57,9 +58,20 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Get commits ordered by timestamp, then compare each with previous
+	// Use sync policy time range, default to last 90 days
+	var startDate time.Time
+	syncPolicy := taskCtx.TaskContext().SyncPolicy()
+	if syncPolicy != nil && syncPolicy.TimeAfter != nil {
+		startDate = *syncPolicy.TimeAfter
+		logger.Info("[Codecov] Comparison: Using sync policy from %s", startDate.Format("2006-01-02"))
+	} else {
+		startDate = time.Now().AddDate(0, 0, -90)
+		logger.Info("[Codecov] Comparison: Using default 90 days from %s", startDate.Format("2006-01-02"))
+	}
+
+	// Get commits ordered by timestamp, filtered by sync policy
 	var commits []models.CodecovCommit
-	err = db.All(&commits, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName), dal.Orderby("commit_timestamp ASC"))
+	err = db.All(&commits, dal.Where("connection_id = ? AND repo_id = ? AND commit_timestamp >= ?", data.Options.ConnectionId, data.Options.FullName, startDate), dal.Orderby("commit_timestamp ASC"))
 	if err != nil {
 		return err
 	}

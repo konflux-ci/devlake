@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -54,6 +55,17 @@ func CollectCommitTotals(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
+	// Use sync policy time range, default to last 90 days
+	var startDate time.Time
+	syncPolicy := taskCtx.TaskContext().SyncPolicy()
+	if syncPolicy != nil && syncPolicy.TimeAfter != nil {
+		startDate = *syncPolicy.TimeAfter
+		logger.Info("[Codecov] CommitTotals: Using sync policy from %s", startDate.Format("2006-01-02"))
+	} else {
+		startDate = time.Now().AddDate(0, 0, -90)
+		logger.Info("[Codecov] CommitTotals: Using default 90 days from %s", startDate.Format("2006-01-02"))
+	}
+
 	// Get existing commit coverages to skip already collected data (OPTIMIZATION)
 	var existingCoverages []models.CodecovCommitCoverage
 	err = db.All(&existingCoverages, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
@@ -67,9 +79,9 @@ func CollectCommitTotals(taskCtx plugin.SubTaskContext) errors.Error {
 		collectedSet[cov.CommitSha] = true
 	}
 
-	// Get all commits and filter to only new ones
+	// Get commits filtered by sync policy
 	var allCommits []models.CodecovCommit
-	err = db.All(&allCommits, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
+	err = db.All(&allCommits, dal.Where("connection_id = ? AND repo_id = ? AND commit_timestamp >= ?", data.Options.ConnectionId, data.Options.FullName, startDate))
 	if err != nil {
 		return err
 	}
