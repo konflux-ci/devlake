@@ -53,6 +53,13 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			Table: RAW_COMMIT_TOTALS_TABLE,
 		},
 		Extract: func(resData *helper.RawData) ([]interface{}, errors.Error) {
+			// Read input to get commit SHA (more reliable than API response)
+			var input CommitInput
+			err := errors.Convert(json.Unmarshal(resData.Input, &input))
+			if err != nil {
+				return nil, err
+			}
+
 			var totals struct {
 				Commitid string `json:"commitid"`
 				Totals   struct {
@@ -69,14 +76,24 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 					Complexity float64 `json:"complexity"`
 				} `json:"totals"`
 			}
-			err := errors.Convert(json.Unmarshal(resData.Data, &totals))
+			err = errors.Convert(json.Unmarshal(resData.Data, &totals))
 			if err != nil {
 				return nil, err
 			}
 
+			// Use commit SHA from input (more reliable than API response which may be empty)
+			commitSha := input.CommitSha
+			if commitSha == "" && totals.Commitid != "" {
+				commitSha = totals.Commitid
+			}
+			if commitSha == "" {
+				// No commit SHA available, skip this record
+				return nil, nil
+			}
+
 			// Get commit info
 			var commit models.CodecovCommit
-			err = db.First(&commit, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ?", data.Options.ConnectionId, data.Options.FullName, totals.Commitid))
+			err = db.First(&commit, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ?", data.Options.ConnectionId, data.Options.FullName, commitSha))
 			if err != nil {
 				return nil, nil // Skip if commit not found
 			}
@@ -88,7 +105,7 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Try to find comparison data for this commit (overall, flag_name = "")
 			var comparison ComparisonData
-			err = db.First(&comparison, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ? AND flag_name = ?", data.Options.ConnectionId, data.Options.FullName, totals.Commitid, ""))
+			err = db.First(&comparison, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ? AND flag_name = ?", data.Options.ConnectionId, data.Options.FullName, commitSha, ""))
 			if err == nil {
 				// Found comparison data
 				modifiedCoverage = comparison.ModifiedCoverage
@@ -106,7 +123,7 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 				NoPKModel:        common.NoPKModel{},
 				ConnectionId:     data.Options.ConnectionId,
 				RepoId:           data.Options.FullName,
-				CommitSha:        totals.Commitid,
+				CommitSha:        commitSha,
 				Branch:           commit.Branch,
 				CommitTimestamp:  commit.CommitTimestamp,
 				OverallCoverage:  totals.Totals.Coverage,
