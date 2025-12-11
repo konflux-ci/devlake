@@ -29,7 +29,7 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.1
-	github.com/tidwall/gjson v1.14.3
+	github.com/tidwall/gjson v1.18.0
 	github.com/viant/afs v1.16.0
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20221028150844-83b7d23a625f
