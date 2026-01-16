@@ -40,6 +40,9 @@ type TestSuite struct {
 	NumFailed  uint    `json:"num_failed"`  // Number of failed tests
 	Duration   float64 `json:"duration"`    // Duration in seconds
 
+	// Hostname is the name of the host that ran the test suite
+	Hostname string `gorm:"type:varchar(255)" json:"hostname"`
+
 	// Properties stored as JSON (optional test suite properties)
 	Properties string `gorm:"type:text" json:"properties"` // JSON string of suite properties
 
