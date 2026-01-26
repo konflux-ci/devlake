@@ -20,6 +20,7 @@ package tasks
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -87,11 +88,17 @@ func saveTektonTasks(db dal.Dal, logger log.Logger, connectionId uint64, jobId s
 //   - ciJob: The CI job model
 //   - organization: The organization name (for logging)
 //   - repository: The repository name (for logging)
+//   - junitRegex: Compiled regex pattern for matching JUnit file names
 //
 // Returns:
 //   - bool: true if at least one JUnit XML file was found and processed successfully, false otherwise
-func findAndProcessJUnitFiles(taskCtx plugin.SubTaskContext, artifactPath string, ciJob *models.TestRegistryCIJob, organization, repository string) bool {
+func findAndProcessJUnitFiles(taskCtx plugin.SubTaskContext, artifactPath string, ciJob *models.TestRegistryCIJob, organization, repository string, junitRegex *regexp.Regexp) bool {
 	logger := taskCtx.GetLogger()
+
+	// Use default regex if not provided
+	if junitRegex == nil {
+		junitRegex = JUnitRegexpSearch
+	}
 
 	// Collect all JUnit files found in the artifact directory
 	type junitFile struct {
@@ -110,7 +117,7 @@ func findAndProcessJUnitFiles(taskCtx plugin.SubTaskContext, artifactPath string
 		// Look for files matching the JUnit regex pattern
 		if !info.IsDir() {
 			fileName := filepath.Base(path)
-			if JUnitRegexpSearch.MatchString(fileName) {
+			if junitRegex.MatchString(fileName) {
 				logger.Debug("Found JUnit XML file", "file", fileName, "path", path, "job_id", ciJob.JobId)
 
 				// Read the JUnit XML content
