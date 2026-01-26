@@ -20,11 +20,86 @@ package tasks
 import (
 	"encoding/xml"
 	"regexp"
+	"sync"
+
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
 )
 
-// JUnitRegexpSearch matches JUnit file names starting with "devlake-", "e2e" or "qd-report-"
-// Supports both .xml and .junit file extensions
-var JUnitRegexpSearch = regexp.MustCompile(`(devlake-|e2e|qd-report-)[0-9a-z-]+\.(xml|junit)`)
+// DefaultJUnitRegexPattern is the default regex pattern for matching JUnit XML file names
+// Matches files starting with "devlake-", "e2e", or "qd-report-" and ending with .xml or .junit
+const DefaultJUnitRegexPattern = `(devlake-|e2e|qd-report-)[0-9a-z-]+\.(xml|junit)`
+
+// JUnitRegexpSearch is the compiled default regex for backwards compatibility
+// Deprecated: Use GetJUnitRegex(pattern) instead for configurable regex support
+var JUnitRegexpSearch = regexp.MustCompile(DefaultJUnitRegexPattern)
+
+// regexCache caches compiled regex patterns to avoid recompilation
+var regexCache = struct {
+	sync.RWMutex
+	patterns map[string]*regexp.Regexp
+}{
+	patterns: make(map[string]*regexp.Regexp),
+}
+
+// GetJUnitRegex returns a compiled regex for the given pattern, or the default if pattern is empty.
+// The compiled regex is cached for performance.
+//
+// Parameters:
+//   - pattern: The regex pattern string to compile. If empty, DefaultJUnitRegexPattern is used.
+//   - logger: Optional logger for error reporting (can be nil)
+//
+// Returns:
+//   - *regexp.Regexp: The compiled regex pattern
+//   - errors.Error: Any error if the pattern is invalid
+func GetJUnitRegex(pattern string, logger log.Logger) (*regexp.Regexp, errors.Error) {
+	// Use default pattern if not specified
+	if pattern == "" {
+		return JUnitRegexpSearch, nil
+	}
+
+	// Check cache first
+	regexCache.RLock()
+	if cached, ok := regexCache.patterns[pattern]; ok {
+		regexCache.RUnlock()
+		return cached, nil
+	}
+	regexCache.RUnlock()
+
+	// Compile the pattern
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		if logger != nil {
+			logger.Warn(err, "invalid JUnit regex pattern, falling back to default", "pattern", pattern)
+		}
+		// Return default regex on compilation error for backwards compatibility
+		return JUnitRegexpSearch, errors.BadInput.Wrap(err, "invalid JUnit regex pattern")
+	}
+
+	// Cache the compiled pattern
+	regexCache.Lock()
+	regexCache.patterns[pattern] = compiled
+	regexCache.Unlock()
+
+	return compiled, nil
+}
+
+// GetJUnitRegexOrDefault returns the compiled regex for the given pattern, falling back to default on error.
+// This is a convenience function that never returns an error.
+//
+// Parameters:
+//   - pattern: The regex pattern string to compile. If empty, DefaultJUnitRegexPattern is used.
+//   - logger: Optional logger for error reporting (can be nil)
+//
+// Returns:
+//   - *regexp.Regexp: The compiled regex pattern (always returns a valid regex)
+func GetJUnitRegexOrDefault(pattern string, logger log.Logger) *regexp.Regexp {
+	regex, err := GetJUnitRegex(pattern, logger)
+	if err != nil {
+		return JUnitRegexpSearch
+	}
+	return regex
+}
 
 // The below types are directly marshalled into XML. The types correspond to jUnit
 // XML schema, but do not contain all valid fields. For instance, the class name
