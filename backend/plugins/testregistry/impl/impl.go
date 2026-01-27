@@ -92,9 +92,20 @@ func (p TestRegistry) PrepareTaskData(taskCtx plugin.TaskContext, options map[st
 		return nil, err
 	}
 
+	// Initialize the JUnit regex from connection configuration
+	// Uses default regex if JUnitRegex is empty or invalid
+	logger := taskCtx.GetLogger()
+	junitRegex := tasks.GetJUnitRegexOrDefault(connection.JUnitRegex, logger)
+	if connection.JUnitRegex != "" {
+		logger.Info("Using custom JUnit regex pattern: %s", connection.JUnitRegex)
+	} else {
+		logger.Debug("Using default JUnit regex pattern: %s", tasks.DefaultJUnitRegexPattern)
+	}
+
 	taskData := &tasks.TestRegistryTaskData{
 		Options:    &op,
 		Connection: connection,
+		JUnitRegex: junitRegex,
 	}
 
 	return taskData, nil
