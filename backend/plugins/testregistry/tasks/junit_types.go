@@ -135,6 +135,9 @@ type TestSuite struct {
 	// Duration is the time taken in seconds to run all tests in the suite
 	Duration float64 `xml:"time,attr"`
 
+	// Hostname is the name of the host that ran the test suite
+	Hostname string `xml:"hostname,attr,omitempty"`
+
 	// Properties holds other properties of the test suite as a mapping of name to value
 	Properties []*TestSuiteProperty `xml:"properties,omitempty"`
 
