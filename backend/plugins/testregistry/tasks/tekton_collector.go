@@ -324,8 +324,8 @@ func processTektonArtifacts(
 				logger.Warn(err, "failed to save Tekton tasks", "job_id", ciJob.JobId)
 			}
 
-			// Find and process JUnit XML files from artifact
-			if findAndProcessJUnitFiles(taskCtx, artifactPath, ciJob, quayOrg, repoName) {
+			// Find and process JUnit XML files from artifact using configured regex
+			if findAndProcessJUnitFiles(taskCtx, artifactPath, ciJob, quayOrg, repoName, data.JUnitRegex) {
 				stats.junitFoundCount++
 			} else {
 				stats.junitNotFoundCount++

@@ -118,7 +118,8 @@ RUN python3 -m pip install --no-cache --upgrade pip setuptools && \
     python3 -m pip install --no-cache -r python/requirements.txt && \
     python3 -m pip install --upgrade pip
 
-# Setup Python Poetry package manager
+# Setup Python Poetry package manager (pinned to 2.2.1)
+ENV POETRY_VERSION=2.2.1
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="$PATH:/app/.local/bin"
 

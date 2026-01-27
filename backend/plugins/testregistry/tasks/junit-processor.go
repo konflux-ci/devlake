@@ -23,6 +23,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"math/big"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -151,12 +152,18 @@ func findExistingTestCase(db dal.Dal, connectionId uint64, jobId, suiteId, testC
 //   - githubOrg: Default GitHub organization (used as fallback)
 //   - repoName: Default repository name (used as fallback)
 //   - ciJob: The CI job model
+//   - junitRegex: Compiled regex pattern for matching JUnit file names (uses default if nil)
 //
 // Returns:
 //   - bool: true if JUnit XML was found and parsed successfully, false otherwise
-func fetchAndPrintJUnitSuites(taskCtx plugin.SubTaskContext, job *ProwJob, githubOrg, repoName string, ciJob *models.TestRegistryCIJob) bool {
+func fetchAndPrintJUnitSuites(taskCtx plugin.SubTaskContext, job *ProwJob, githubOrg, repoName string, ciJob *models.TestRegistryCIJob, junitRegex *regexp.Regexp) bool {
 	logger := taskCtx.GetLogger()
 	db := taskCtx.GetDal()
+
+	// Use default regex if not provided
+	if junitRegex == nil {
+		junitRegex = JUnitRegexpSearch
+	}
 
 	// Check if this job is already processed (has test suites in database)
 	if isJobAlreadyProcessed(db, ciJob.ConnectionId, ciJob.JobId) {
@@ -183,8 +190,8 @@ func fetchAndPrintJUnitSuites(taskCtx plugin.SubTaskContext, job *ProwJob, githu
 	// Extract PR number for presubmit jobs
 	pullNumber := extractPullRequestNumber(ciJob)
 
-	// Fetch JUnit XML from GCS
-	suites, xmlFileName := fetchJUnitFromGCS(gcsClient, job, ciJob, jobTypeForGCS, githubOrg, repoName, pullNumber, logger)
+	// Fetch JUnit XML from GCS using configurable regex
+	suites, xmlFileName := fetchJUnitFromGCS(gcsClient, job, ciJob, jobTypeForGCS, githubOrg, repoName, pullNumber, logger, junitRegex)
 
 	// Parse, log, and save suite information
 	return parseAndSaveJUnitSuites(taskCtx, logger, suites, xmlFileName, ciJob, githubOrg, repoName)
@@ -249,6 +256,7 @@ func extractPullRequestNumber(ciJob *models.TestRegistryCIJob) string {
 //   - repoName: Default repository name (used as fallback)
 //   - pullNumber: PR number (for presubmit jobs)
 //   - logger: Logger for debug messages
+//   - junitRegex: Compiled regex pattern for matching JUnit file names
 //
 // Returns:
 //   - []byte: JUnit XML content, or nil if not found
@@ -262,12 +270,13 @@ func fetchJUnitFromGCS(
 	repoName string,
 	pullNumber string,
 	logger log.Logger,
+	junitRegex *regexp.Regexp,
 ) ([]byte, string) {
 	logger.Debug("Searching for JUnit XML in GCS", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "job_type_for_gcs", jobTypeForGCS, "org", githubOrg, "repo", repoName, "pull_number", pullNumber)
 
 	if jobTypeForGCS == "periodic" {
 		// Periodic jobs: empty org/repo/pr
-		return gcsClient.GetJobJunitContent("", "", "", ciJob.JobId, "periodic", ciJob.JobName, JUnitRegexpSearch)
+		return gcsClient.GetJobJunitContent("", "", "", ciJob.JobId, "periodic", ciJob.JobName, junitRegex)
 	}
 
 	// For non-periodic jobs, extract org/repo from Prow job refs
@@ -279,11 +288,11 @@ func fetchJUnitFromGCS(
 			logger.Info("Missing PR number for presubmit job, skipping JUnit fetch", "job_id", ciJob.JobId, "job_name", ciJob.JobName)
 			return nil, ""
 		}
-		return gcsClient.GetJobJunitContent(orgForGCS, repoForGCS, pullNumber, ciJob.JobId, "presubmit", ciJob.JobName, JUnitRegexpSearch)
+		return gcsClient.GetJobJunitContent(orgForGCS, repoForGCS, pullNumber, ciJob.JobId, "presubmit", ciJob.JobName, junitRegex)
 	}
 
 	// Postsubmit: need org and repo, but no PR number
-	return gcsClient.GetJobJunitContent(orgForGCS, repoForGCS, "", ciJob.JobId, "postsubmit", ciJob.JobName, JUnitRegexpSearch)
+	return gcsClient.GetJobJunitContent(orgForGCS, repoForGCS, "", ciJob.JobId, "postsubmit", ciJob.JobName, junitRegex)
 }
 
 // extractOrgRepoForGCS extracts organization and repository names for GCS path construction.

@@ -21,4 +21,5 @@ export { ProjectSelect } from './project-select';
 export { CIToolSelect } from './ci-tool-select';
 export { GitHubOrganization } from './github-organization';
 export { GitHubToken } from './github-token';
+export { JUnitRegex } from './junit-regex';
 

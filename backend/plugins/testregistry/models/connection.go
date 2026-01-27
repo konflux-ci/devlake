@@ -38,6 +38,11 @@ type TestRegistryConnection struct {
 
 	// Tekton CI fields
 	QuayOrganization string `mapstructure:"quayOrganization" json:"quayOrganization" gorm:"column:quay_organization;type:varchar(200)"` // Quay.io organization (required when CI tool is Tekton CI)
+
+	// JUnit XML file matching configuration
+	// Regex pattern to match JUnit XML file names in artifacts
+	// Default: "(devlake-|e2e|qd-report-)[0-9a-z-]+\\.(xml|junit)" - matches files starting with "devlake-", "e2e", or "qd-report-"
+	JUnitRegex string `mapstructure:"junitRegex" json:"junitRegex" gorm:"column:junit_regex;type:varchar(500)"` // Regex pattern for JUnit file matching (optional, uses default if empty)
 }
 
 func (TestRegistryConnection) TableName() string {

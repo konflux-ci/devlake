@@ -24,7 +24,8 @@ import {
   ProjectSelect, 
   CIToolSelect, 
   GitHubOrganization, 
-  GitHubToken 
+  GitHubToken,
+  JUnitRegex,
 } from './connection-fields';
 
 export const TestRegistryConfig: IPluginConfig = {
@@ -57,15 +58,15 @@ export const TestRegistryConfig: IPluginConfig = {
             // Clear conditional fields and their errors based on selected CI tool
             if (value === 'Openshift CI') {
               setValues({ quayOrganization: '' });
-              // Clear Quay errors
-              setErrors({ quayOrganization: '' });
+              // Clear Quay errors, keep junitRegex as it's common to both
+              setErrors({ quayOrganization: '', junitRegex: '' });
             } else if (value === 'Tekton CI') {
               setValues({ githubOrganization: '', githubToken: '' });
-              // Clear GitHub errors
-              setErrors({ githubOrganization: '', githubToken: '' });
+              // Clear GitHub errors, keep junitRegex as it's common to both
+              setErrors({ githubOrganization: '', githubToken: '', junitRegex: '' });
             } else {
               // No CI tool selected - clear all conditional field errors
-              setErrors({ quayOrganization: '', githubOrganization: '', githubToken: '' });
+              setErrors({ quayOrganization: '', githubOrganization: '', githubToken: '', junitRegex: '' });
             }
           }}
           setError={(error: string) => setErrors({ ciTool: error })}
@@ -92,19 +93,35 @@ export const TestRegistryConfig: IPluginConfig = {
                 setValue={(value: string) => setValues({ githubToken: value })}
                 setError={(error: string) => setErrors({ githubToken: error })}
               />
+              <JUnitRegex
+                initialValue={initialValues?.junitRegex ?? values?.junitRegex ?? ''}
+                value={values?.junitRegex ?? ''}
+                error={errors?.junitRegex ?? ''}
+                setValue={(value: string) => setValues({ junitRegex: value })}
+                setError={(error: string) => setErrors({ junitRegex: error })}
+              />
             </>
           );
         }
 
         if (ciTool === 'Tekton CI') {
           return (
-            <QuayOrganization
-              initialValue={initialValues?.quayOrganization ?? values?.quayOrganization ?? ''}
-              value={values?.quayOrganization ?? ''}
-              error={errors?.quayOrganization ?? ''}
-              setValue={(value: string) => setValues({ quayOrganization: value })}
-              setError={(error: string) => setErrors({ quayOrganization: error })}
-            />
+            <>
+              <QuayOrganization
+                initialValue={initialValues?.quayOrganization ?? values?.quayOrganization ?? ''}
+                value={values?.quayOrganization ?? ''}
+                error={errors?.quayOrganization ?? ''}
+                setValue={(value: string) => setValues({ quayOrganization: value })}
+                setError={(error: string) => setErrors({ quayOrganization: error })}
+              />
+              <JUnitRegex
+                initialValue={initialValues?.junitRegex ?? values?.junitRegex ?? ''}
+                value={values?.junitRegex ?? ''}
+                error={errors?.junitRegex ?? ''}
+                setValue={(value: string) => setValues({ junitRegex: value })}
+                setError={(error: string) => setErrors({ junitRegex: error })}
+              />
+            </>
           );
         }
 

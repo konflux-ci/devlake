@@ -18,6 +18,8 @@ limitations under the License.
 package tasks
 
 import (
+	"regexp"
+
 	"github.com/apache/incubator-devlake/plugins/testregistry/models"
 )
 
@@ -30,4 +32,8 @@ type TestRegistryOptions struct {
 type TestRegistryTaskData struct {
 	Options    *TestRegistryOptions
 	Connection *models.TestRegistryConnection
+
+	// JUnitRegex is the compiled regex pattern for matching JUnit XML files
+	// This is compiled once during task initialization and reused throughout collection
+	JUnitRegex *regexp.Regexp
 }

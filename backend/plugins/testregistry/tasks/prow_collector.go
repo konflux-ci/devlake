@@ -193,9 +193,9 @@ func (stats *collectionStats) processJobs(
 
 		stats.savedCount++
 
-		// Fetch and log JUnit test suites
+		// Fetch and log JUnit test suites using configured regex
 		logger.Debug("Attempting to fetch JUnit XML for job", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "trigger_type", ciJob.TriggerType)
-		if fetchAndPrintJUnitSuites(taskCtx, &job, githubOrg, repoName, ciJob) {
+		if fetchAndPrintJUnitSuites(taskCtx, &job, githubOrg, repoName, ciJob, data.JUnitRegex) {
 			stats.junitFoundCount++
 		} else {
 			stats.junitNotFoundCount++
