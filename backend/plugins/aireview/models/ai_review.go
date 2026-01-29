@@ -42,7 +42,7 @@ type AiReview struct {
 
 	// Review metadata
 	ReviewId    string    `gorm:"type:varchar(255)"` // Original review/comment ID from source
-	Body        string    `gorm:"type:text"`         // Full review body
+	Body        string    `gorm:"type:longtext"`     // Full review body
 	Summary     string    `gorm:"type:text"`         // AI-generated summary if available
 	CreatedDate time.Time `gorm:"index"`
 	UpdatedDate *time.Time
@@ -78,6 +78,7 @@ func (AiReview) TableName() string {
 const (
 	AiToolCodeRabbit   = "coderabbit"
 	AiToolCursorBugbot = "cursor_bugbot"
+	AiToolQodo         = "qodo"
 	AiToolSonarQube    = "sonarqube"
 	AiToolCopilot      = "copilot"
 )

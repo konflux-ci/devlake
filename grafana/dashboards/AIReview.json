@@ -40,7 +40,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# AI Code Review Analytics\n\nThis dashboard shows metrics from AI-powered code review tools (CodeRabbit, Cursor Bugbot, etc.) extracted from pull request comments.",
+        "content": "# AI Code Review Analytics\n\nThis dashboard shows metrics from AI-powered code review tools (CodeRabbit, Qodo, Cursor Bugbot, etc.) extracted from pull request comments.\n\nUse the **Repository** dropdown above to filter by specific repo.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -91,7 +91,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as total_reviews FROM _tool_aireview_reviews",
+          "rawSql": "SELECT COUNT(*) as total_reviews FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
           "refId": "A"
         }
       ],
@@ -142,7 +142,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as high_risk FROM _tool_aireview_reviews WHERE risk_level = 'high'",
+          "rawSql": "SELECT COUNT(*) as high_risk FROM _tool_aireview_reviews WHERE risk_level = 'high' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
           "refId": "A"
         }
       ],
@@ -193,7 +193,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as medium_risk FROM _tool_aireview_reviews WHERE risk_level = 'medium'",
+          "rawSql": "SELECT COUNT(*) as medium_risk FROM _tool_aireview_reviews WHERE risk_level = 'medium' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
           "refId": "A"
         }
       ],
@@ -244,7 +244,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) as low_risk FROM _tool_aireview_reviews WHERE risk_level = 'low'",
+          "rawSql": "SELECT COUNT(*) as low_risk FROM _tool_aireview_reviews WHERE risk_level = 'low' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
           "refId": "A"
         }
       ],
@@ -344,7 +344,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT risk_level, COUNT(*) as count FROM _tool_aireview_reviews GROUP BY risk_level",
+          "rawSql": "SELECT risk_level, COUNT(*) as count FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) GROUP BY risk_level",
           "refId": "A"
         }
       ],
@@ -415,7 +415,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT ai_tool, COUNT(*) as count FROM _tool_aireview_reviews GROUP BY ai_tool",
+          "rawSql": "SELECT ai_tool, COUNT(*) as count FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) GROUP BY ai_tool",
           "refId": "A"
         }
       ],
@@ -486,7 +486,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT review_state, COUNT(*) as count FROM _tool_aireview_reviews GROUP BY review_state",
+          "rawSql": "SELECT review_state, COUNT(*) as count FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) GROUP BY review_state",
           "refId": "A"
         }
       ],
@@ -632,7 +632,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT \n  DATE(created_date) as time,\n  risk_level,\n  COUNT(*) as count\nFROM _tool_aireview_reviews\nWHERE created_date >= DATE_SUB(NOW(), INTERVAL 90 DAY)\nGROUP BY DATE(created_date), risk_level\nORDER BY time",
+          "rawSql": "SELECT \n  DATE(created_date) as time,\n  risk_level,\n  COUNT(*) as count\nFROM _tool_aireview_reviews\nWHERE created_date >= DATE_SUB(NOW(), INTERVAL 90 DAY)\n  AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\nGROUP BY DATE(created_date), risk_level\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -726,20 +726,93 @@
                     "url": "${__value.text}"
                   }
                 ]
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "displayName",
+                "value": "PR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "summary"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 350
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "details"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View full review",
+                    "url": "/d/ai-review-dashboard?var-review_id=${__data.fields.id}&${__url_time_range}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 10,
+        "h": 12,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 29
       },
       "id": 10,
       "options": {
-        "cellHeight": "sm",
+        "cellHeight": "md",
         "footer": {
           "countRows": false,
           "fields": "",
@@ -759,7 +832,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT \n  created_date,\n  ai_tool,\n  risk_level,\n  review_state,\n  issues_found,\n  suggestions_count,\n  LEFT(summary, 100) as summary,\n  source_url\nFROM _tool_aireview_reviews\nORDER BY created_date DESC\nLIMIT 100",
+          "rawSql": "SELECT \n  id,\n  'Details' as details,\n  created_date,\n  ai_tool,\n  risk_level,\n  review_state,\n  issues_found,\n  suggestions_count,\n  LEFT(summary, 200) as summary,\n  source_url\nFROM _tool_aireview_reviews\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\nORDER BY created_date DESC\nLIMIT 100",
           "refId": "A"
         }
       ],
@@ -790,7 +863,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 33
+        "y": 23
       },
       "id": 11,
       "options": {
@@ -810,7 +883,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT ROUND(AVG(issues_found), 1) as avg_issues FROM _tool_aireview_reviews",
+          "rawSql": "SELECT ROUND(AVG(issues_found), 1) as avg_issues FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
           "refId": "A"
         }
       ],
@@ -841,7 +914,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 23
       },
       "id": 12,
       "options": {
@@ -861,19 +934,124 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT ROUND(AVG(suggestions_count), 1) as avg_suggestions FROM _tool_aireview_reviews",
+          "rawSql": "SELECT ROUND(AVG(suggestions_count), 1) as avg_suggestions FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
           "refId": "A"
         }
       ],
       "title": "Avg Suggestions per Review",
       "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 13,
+      "options": {
+        "afterRender": "",
+        "content": "{{#each data}}\n{{{body}}}\n{{/each}}",
+        "contentPartials": [],
+        "defaultContent": "*Click a row in the Recent AI Reviews table above to view its content here*",
+        "editor": {
+          "format": "auto",
+          "language": "markdown"
+        },
+        "externalStyles": [],
+        "helpers": "",
+        "renderMode": "allRows",
+        "status": "none",
+        "styles": "pre { white-space: pre-wrap; word-wrap: break-word; }",
+        "wrap": true
+      },
+      "pluginVersion": "5.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT REPLACE(REPLACE(body, '\\\\n', '\n'), '\\\\r', '') as body FROM _tool_aireview_reviews WHERE id = ${review_id:sqlstring} LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Review Body (Markdown)",
+      "type": "marcusolsson-dynamictext-panel"
     }
   ],
   "refresh": "",
   "schemaVersion": 39,
   "tags": ["ai", "code-review", "aireview"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": "mysql",
+        "definition": "SELECT r.name AS __text, ar.repo_id AS __value FROM _tool_aireview_reviews ar JOIN repos r ON ar.repo_id = r.id GROUP BY ar.repo_id, r.name ORDER BY r.name",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT r.name AS __text, ar.repo_id AS __value FROM _tool_aireview_reviews ar JOIN repos r ON ar.repo_id = r.id GROUP BY ar.repo_id, r.name ORDER BY r.name",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT ai_tool FROM _tool_aireview_reviews ORDER BY ai_tool",
+        "hide": 0,
+        "includeAll": true,
+        "label": "AI Tool",
+        "multi": true,
+        "name": "ai_tool",
+        "options": [],
+        "query": "SELECT DISTINCT ai_tool FROM _tool_aireview_reviews ORDER BY ai_tool",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": "mysql",
+        "definition": "SELECT id AS __text, id AS __value FROM _tool_aireview_reviews LIMIT 1",
+        "hide": 2,
+        "includeAll": false,
+        "label": "Review ID",
+        "multi": false,
+        "name": "review_id",
+        "options": [],
+        "query": "SELECT CONCAT(DATE_FORMAT(created_date, '%Y-%m-%d'), ' - ', ai_tool, ' - ', LEFT(summary, 50)) AS __text, id AS __value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) ORDER BY created_date DESC LIMIT 50",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-90d",

@@ -55,6 +55,8 @@ type AiReviewTaskData struct {
 	CodeRabbitPatternRegex    *regexp.Regexp
 	CursorBugbotUsernameRegex *regexp.Regexp
 	CursorBugbotPatternRegex  *regexp.Regexp
+	QodoUsernameRegex         *regexp.Regexp
+	QodoPatternRegex          *regexp.Regexp
 	AiCommitPatternsRegex     []*regexp.Regexp
 	AiPrLabelPatternRegex     *regexp.Regexp
 	RiskHighPatternRegex      *regexp.Regexp
@@ -115,6 +117,20 @@ func CompilePatterns(taskData *AiReviewTaskData) errors.Error {
 		taskData.CursorBugbotPatternRegex, err = regexp.Compile(config.CursorBugbotPattern)
 		if err != nil {
 			return errors.BadInput.Wrap(err, "invalid cursorBugbotPattern")
+		}
+	}
+
+	// Qodo patterns
+	if config.QodoEnabled && config.QodoUsername != "" {
+		taskData.QodoUsernameRegex, err = regexp.Compile("(?i)" + regexp.QuoteMeta(config.QodoUsername))
+		if err != nil {
+			return errors.BadInput.Wrap(err, "invalid qodoUsername pattern")
+		}
+	}
+	if config.QodoEnabled && config.QodoPattern != "" {
+		taskData.QodoPatternRegex, err = regexp.Compile(config.QodoPattern)
+		if err != nil {
+			return errors.BadInput.Wrap(err, "invalid qodoPattern")
 		}
 	}
 

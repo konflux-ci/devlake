@@ -39,7 +39,7 @@ type aiReview20260127 struct {
 	AiTool           string `gorm:"type:varchar(100)"`
 	AiToolUser       string `gorm:"type:varchar(255)"`
 	ReviewId         string `gorm:"type:varchar(255)"`
-	Body             string `gorm:"type:text"`
+	Body             string `gorm:"type:longtext"`
 	Summary          string `gorm:"type:text"`
 	CreatedDate      time.Time
 	UpdatedDate      *time.Time
@@ -157,6 +157,9 @@ type aiReviewScopeConfig20260127 struct {
 	CursorBugbotEnabled   bool   `gorm:"type:boolean"`
 	CursorBugbotUsername  string `gorm:"type:varchar(255)"`
 	CursorBugbotPattern   string `gorm:"type:varchar(500)"`
+	QodoEnabled           bool   `gorm:"type:boolean"`
+	QodoUsername          string `gorm:"type:varchar(255)"`
+	QodoPattern           string `gorm:"type:varchar(500)"`
 	AiCommitPatterns      string `gorm:"type:text"`
 	AiPrLabelPattern      string `gorm:"type:varchar(500)"`
 	RiskHighPattern       string `gorm:"type:varchar(500)"`

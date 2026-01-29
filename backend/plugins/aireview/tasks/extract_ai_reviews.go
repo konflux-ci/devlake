@@ -142,7 +142,7 @@ func ExtractAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 			EffortMinutes:    reviewMetrics.EffortMinutes,
 			ReviewState:      detectReviewState(comment.Body, comment.Status),
 			SourcePlatform:   detectSourcePlatform(comment.PullRequestId),
-			SourceUrl:        comment.PrUrl,
+			SourceUrl:        buildCommentUrl(comment.PrUrl, comment.Id),
 		}
 
 		batch = append(batch, aiReview)
@@ -185,6 +185,16 @@ func detectAiTool(data *AiReviewTaskData, accountId, body string) (string, bool)
 		}
 		if data.CursorBugbotPatternRegex != nil && data.CursorBugbotPatternRegex.MatchString(body) {
 			return models.AiToolCursorBugbot, true
+		}
+	}
+
+	// Check Qodo (formerly Codium)
+	if data.Options.ScopeConfig.QodoEnabled {
+		if data.QodoUsernameRegex != nil && data.QodoUsernameRegex.MatchString(accountId) {
+			return models.AiToolQodo, true
+		}
+		if data.QodoPatternRegex != nil && data.QodoPatternRegex.MatchString(body) {
+			return models.AiToolQodo, true
 		}
 	}
 
@@ -272,24 +282,235 @@ func parseReviewMetrics(body string) ReviewMetrics {
 	return metrics
 }
 
-// extractSummary extracts a summary from the review body
+// extractSummary extracts a clean markdown summary from the review body
 func extractSummary(body string) string {
-	// Look for summary sections
-	summaryRe := regexp.MustCompile(`(?is)(summary|overview|walkthrough)[:\s]*(.{1,500})`)
-	if match := summaryRe.FindStringSubmatch(body); len(match) > 2 {
-		summary := strings.TrimSpace(match[2])
-		// Truncate at first double newline or 500 chars
-		if idx := strings.Index(summary, "\n\n"); idx > 0 {
-			summary = summary[:idx]
+	// First, convert HTML to markdown
+	cleaned := htmlToMarkdown(body)
+
+	// Try to extract specific sections based on AI tool format
+	var summaryParts []string
+
+	// Qodo format: Extract key sections
+	if strings.Contains(cleaned, "PR Reviewer Guide") || strings.Contains(cleaned, "Estimated effort") {
+		// Extract effort estimate
+		effortRe := regexp.MustCompile(`(?i)\*\*Estimated effort[^*]*\*\*[:\s]*(\d+)`)
+		if match := effortRe.FindStringSubmatch(cleaned); len(match) > 1 {
+			summaryParts = append(summaryParts, "Effort: "+match[1]+"/5")
 		}
-		return summary
+
+		// Extract security status
+		if strings.Contains(cleaned, "No security concerns") {
+			summaryParts = append(summaryParts, "Security: OK")
+		} else if strings.Contains(cleaned, "security") {
+			summaryParts = append(summaryParts, "Security: Review needed")
+		}
+
+		// Extract focus area titles (bold items after "Recommended focus areas")
+		focusRe := regexp.MustCompile(`\*\*([^*]+)\*\*`)
+		focusMatches := focusRe.FindAllStringSubmatch(cleaned, -1)
+		for _, match := range focusMatches {
+			title := strings.TrimSpace(match[1])
+			// Skip generic headers
+			if title != "" && !strings.Contains(strings.ToLower(title), "estimated effort") &&
+				!strings.Contains(strings.ToLower(title), "security") &&
+				!strings.Contains(strings.ToLower(title), "ticket") &&
+				!strings.Contains(strings.ToLower(title), "recommended focus") &&
+				len(title) < 100 {
+				summaryParts = append(summaryParts, title)
+				if len(summaryParts) >= 4 {
+					break
+				}
+			}
+		}
 	}
 
-	// Fallback: first 500 chars
-	if len(body) > 500 {
-		return body[:500] + "..."
+	// CodeRabbit format: Look for "Walkthrough" section
+	if len(summaryParts) == 0 && strings.Contains(cleaned, "Walkthrough") {
+		walkRe := regexp.MustCompile(`(?is)Walkthrough\s*\n+(.+?)(\n\n|$)`)
+		if match := walkRe.FindStringSubmatch(cleaned); len(match) > 1 {
+			summaryParts = append(summaryParts, strings.TrimSpace(match[1]))
+		}
 	}
-	return body
+
+	// CodeRabbit: Look for potential issue
+	if strings.Contains(cleaned, "Potential issue") {
+		// Find the main recommendation after "Potential issue"
+		issueRe := regexp.MustCompile(`(?is)Potential issue.*?\*\*([^*]+)\*\*`)
+		if match := issueRe.FindStringSubmatch(cleaned); len(match) > 1 {
+			summaryParts = append(summaryParts, "Issue: "+strings.TrimSpace(match[1]))
+		}
+	}
+
+	// Generic: Look for summary/overview sections
+	if len(summaryParts) == 0 {
+		summaryRe := regexp.MustCompile(`(?i)(summary|overview)[:\s]+(.{10,300})`)
+		if match := summaryRe.FindStringSubmatch(cleaned); len(match) > 2 {
+			summaryParts = append(summaryParts, strings.TrimSpace(match[2]))
+		}
+	}
+
+	// Fallback: first meaningful paragraph
+	if len(summaryParts) == 0 {
+		paragraphs := regexp.MustCompile(`\n\s*\n`).Split(cleaned, -1)
+		for _, p := range paragraphs {
+			p = strings.TrimSpace(p)
+			// Skip headers, short lines, URLs, and metadata
+			if len(p) > 30 && len(p) < 500 &&
+				!strings.HasPrefix(p, "#") &&
+				!strings.HasPrefix(p, "http") &&
+				!strings.HasPrefix(p, "[") &&
+				!strings.Contains(p, "```") {
+				summaryParts = append(summaryParts, p)
+				break
+			}
+		}
+	}
+
+	// Build summary
+	summary := strings.Join(summaryParts, " | ")
+
+	// Final fallback
+	if summary == "" {
+		// Take first 300 chars, avoiding URLs
+		for _, line := range strings.Split(cleaned, "\n") {
+			line = strings.TrimSpace(line)
+			if len(line) > 20 && !strings.HasPrefix(line, "http") && !strings.HasPrefix(line, "[") {
+				summary = line
+				break
+			}
+		}
+	}
+
+	// Truncate if too long
+	if len(summary) > 500 {
+		if idx := strings.LastIndex(summary[:500], ". "); idx > 200 {
+			summary = summary[:idx+1]
+		} else if idx := strings.LastIndex(summary[:500], " | "); idx > 100 {
+			summary = summary[:idx]
+		} else {
+			summary = summary[:497] + "..."
+		}
+	}
+
+	return strings.TrimSpace(summary)
+}
+
+// htmlToMarkdown converts HTML elements to markdown equivalents while preserving structure
+func htmlToMarkdown(body string) string {
+	// Replace escaped newlines
+	body = strings.ReplaceAll(body, "\\n", "\n")
+	body = strings.ReplaceAll(body, "\\r", "")
+
+	// Remove HTML comments first
+	commentRe := regexp.MustCompile(`<!--.*?-->`)
+	body = commentRe.ReplaceAllString(body, "")
+
+	// Handle nested tags: <a><strong>text</strong></a> -> extract text first
+	// Convert links with nested content - capture everything between <a> and </a>
+	nestedLinkRe := regexp.MustCompile(`(?is)<a\s+href=['"]([^'"]+)['"][^>]*>(.*?)</a>`)
+	body = nestedLinkRe.ReplaceAllStringFunc(body, func(match string) string {
+		parts := nestedLinkRe.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+		url := parts[1]
+		text := parts[2]
+		// Strip any HTML tags from the link text
+		text = regexp.MustCompile(`<[^>]+>`).ReplaceAllString(text, "")
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return ""
+		}
+		return "[" + text + "](" + url + ")"
+	})
+
+	// Convert <strong> and <b> to **bold**
+	strongRe := regexp.MustCompile(`(?is)<(?:strong|b)>(.*?)</(?:strong|b)>`)
+	body = strongRe.ReplaceAllString(body, "**$1**")
+
+	// Convert <em> and <i> to *italic*
+	emRe := regexp.MustCompile(`(?is)<(?:em|i)>(.*?)</(?:em|i)>`)
+	body = emRe.ReplaceAllString(body, "*$1*")
+
+	// Convert <code> to `code`
+	codeRe := regexp.MustCompile(`(?is)<code>(.*?)</code>`)
+	body = codeRe.ReplaceAllString(body, "`$1`")
+
+	// Convert <br> and <br/> to newlines
+	brRe := regexp.MustCompile(`(?i)<br\s*/?>`)
+	body = brRe.ReplaceAllString(body, "\n")
+
+	// Extract content from <details><summary>...</summary>content</details>
+	// Handle summary with nested HTML
+	detailsRe := regexp.MustCompile(`(?is)<details>\s*<summary>(.*?)</summary>\s*(.*?)\s*</details>`)
+	body = detailsRe.ReplaceAllStringFunc(body, func(match string) string {
+		parts := detailsRe.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+		title := parts[1]
+		content := parts[2]
+		// Clean up the title - remove HTML tags but keep markdown
+		title = regexp.MustCompile(`<[^>]+>`).ReplaceAllString(title, "")
+		title = strings.TrimSpace(title)
+		content = strings.TrimSpace(content)
+		if title == "" {
+			return content
+		}
+		return "\n**" + title + "**\n" + content + "\n"
+	})
+
+	// Remove remaining <summary> tags
+	summaryTagRe := regexp.MustCompile(`(?i)</?summary>`)
+	body = summaryTagRe.ReplaceAllString(body, "")
+
+	// Convert simple tables: extract cell content
+	tdRe := regexp.MustCompile(`(?is)<t[dh][^>]*>(.*?)</t[dh]>`)
+	body = tdRe.ReplaceAllStringFunc(body, func(match string) string {
+		content := tdRe.FindStringSubmatch(match)
+		if len(content) > 1 {
+			return strings.TrimSpace(content[1]) + "\n"
+		}
+		return ""
+	})
+
+	// Remove table structure tags
+	tableTagsRe := regexp.MustCompile(`(?i)</?(?:table|tr|thead|tbody|tfoot)[^>]*>`)
+	body = tableTagsRe.ReplaceAllString(body, "\n")
+
+	// Remove any remaining HTML tags
+	htmlRe := regexp.MustCompile(`<[^>]+>`)
+	body = htmlRe.ReplaceAllString(body, "")
+
+	// Clean up HTML entities
+	body = strings.ReplaceAll(body, "&nbsp;", " ")
+	body = strings.ReplaceAll(body, "&lt;", "<")
+	body = strings.ReplaceAll(body, "&gt;", ">")
+	body = strings.ReplaceAll(body, "&amp;", "&")
+	body = strings.ReplaceAll(body, "&quot;", "\"")
+
+	// Collapse multiple blank lines
+	blankLinesRe := regexp.MustCompile(`\n{3,}`)
+	body = blankLinesRe.ReplaceAllString(body, "\n\n")
+
+	// Clean up lines - remove empty ones but preserve structure
+	lines := strings.Split(body, "\n")
+	var cleanedLines []string
+	prevEmpty := false
+	for _, line := range lines {
+		line = strings.TrimRight(line, " \t")
+		if line == "" {
+			if !prevEmpty {
+				cleanedLines = append(cleanedLines, "")
+				prevEmpty = true
+			}
+		} else {
+			cleanedLines = append(cleanedLines, line)
+			prevEmpty = false
+		}
+	}
+
+	return strings.TrimSpace(strings.Join(cleanedLines, "\n"))
 }
 
 // detectRiskLevel analyzes the review body for risk indicators
@@ -340,6 +561,33 @@ func detectSourcePlatform(prId string) string {
 		return "gitlab"
 	}
 	return "unknown"
+}
+
+// buildCommentUrl constructs a direct URL to the comment
+// commentId format: "github:GithubPrComment:1:123456789" or "gitlab:GitlabMrComment:1:123456"
+func buildCommentUrl(prUrl, commentId string) string {
+	if prUrl == "" {
+		return ""
+	}
+
+	// Extract the numeric comment ID from the DevLake ID
+	parts := strings.Split(commentId, ":")
+	if len(parts) < 4 {
+		return prUrl
+	}
+	numericId := parts[len(parts)-1]
+
+	// GitHub format: {pr_url}#issuecomment-{id}
+	if strings.Contains(commentId, "github") || strings.Contains(commentId, "Github") {
+		return prUrl + "#issuecomment-" + numericId
+	}
+
+	// GitLab format: {mr_url}#note_{id}
+	if strings.Contains(commentId, "gitlab") || strings.Contains(commentId, "Gitlab") {
+		return prUrl + "#note_" + numericId
+	}
+
+	return prUrl
 }
 
 // saveBatch saves a batch of AI reviews to the database

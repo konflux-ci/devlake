@@ -75,7 +75,38 @@ podman exec devlake-mysql-1 mysql -u merico -pmerico lake \
 
 ### Scope Config
 
-Customize AI tool detection patterns:
+Customize AI tool detection patterns. You can manage scope configs via the API:
+
+```bash
+# Get default scope config (for reference)
+curl -s http://localhost:8080/plugins/aireview/scope-configs/default | jq
+
+# List all scope configs
+curl -s http://localhost:8080/plugins/aireview/scope-configs | jq
+
+# Create a new scope config
+curl -X POST http://localhost:8080/plugins/aireview/scope-configs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Team Config",
+    "codeRabbitEnabled": true,
+    "codeRabbitUsername": "coderabbitai",
+    "cursorBugbotEnabled": true,
+    "cursorBugbotUsername": "cursor-bugbot"
+  }'
+
+# Update a scope config
+curl -X PATCH http://localhost:8080/plugins/aireview/scope-configs/1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "riskHighPattern": "(?i)(critical|security|urgent)"
+  }'
+
+# Delete a scope config
+curl -X DELETE http://localhost:8080/plugins/aireview/scope-configs/1
+```
+
+Scope config fields:
 
 ```json
 {
@@ -122,12 +153,69 @@ curl -X POST http://localhost:8080/pipelines \
   }'
 ```
 
+## REST API Reference
+
+The plugin provides several API endpoints for querying data.
+
+### Query AI Reviews
+
+```bash
+# List reviews (with pagination and filtering)
+curl -s "http://localhost:8080/plugins/aireview/reviews?projectName=my-project&page=1&pageSize=20" | jq
+
+# Get a specific review
+curl -s "http://localhost:8080/plugins/aireview/reviews/REVIEW_ID" | jq
+
+# Filter by risk level or AI tool
+curl -s "http://localhost:8080/plugins/aireview/reviews?riskLevel=high&aiTool=coderabbit" | jq
+```
+
+### Get Statistics
+
+```bash
+# Get aggregated stats for a project
+curl -s "http://localhost:8080/plugins/aireview/stats?projectName=my-project" | jq
+
+# Response includes totals and breakdowns by risk level and AI tool
+```
+
+### Query Findings
+
+```bash
+# List findings with filters
+curl -s "http://localhost:8080/plugins/aireview/findings?category=security&severity=critical" | jq
+```
+
+### Trigger Re-Analysis
+
+Use this after changing scope config patterns or adding new AI tools:
+
+```bash
+# Generate pipeline configuration for a project
+curl -X POST http://localhost:8080/plugins/aireview/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"projectName": "my-project", "scopeConfigId": 1}' | jq
+
+# The response contains a pipeline plan you can submit:
+curl -X POST http://localhost:8080/pipelines \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "AI Review Analysis - my-project",
+    "plan": [[{
+      "plugin": "aireview",
+      "options": {"projectName": "my-project", "scopeConfigId": 1},
+      "subtasks": ["extractAiReviews", "extractAiReviewFindings", "calculateFailurePredictions", "calculatePredictionMetrics"]
+    }]]
+  }'
+```
+
 ## Supported AI Tools
 
-| Tool | Default Username | Detection Pattern |
-|------|------------------|-------------------|
-| CodeRabbit | `coderabbitai` | Summary by CodeRabbit, Walkthrough |
-| Cursor Bugbot | `cursor-bugbot` | (disabled by default) |
+| Tool | Default Username | Detection Pattern | Default |
+|------|------------------|-------------------|---------|
+| CodeRabbit | `coderabbitai` | Summary by CodeRabbit, Walkthrough | Enabled |
+| Qodo | `qodo-merge` | PR Reviewer Guide, Estimated effort to review | Enabled |
+| Cursor Bugbot | `cursor-bugbot` | cursor, bugbot | Disabled |
 
 ## Troubleshooting
 

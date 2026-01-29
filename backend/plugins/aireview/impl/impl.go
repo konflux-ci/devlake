@@ -20,11 +20,13 @@ package impl
 import (
 	"encoding/json"
 
+	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	coreModels "github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/plugins/aireview/api"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
 	"github.com/apache/incubator-devlake/plugins/aireview/models/migrationscripts"
 	"github.com/apache/incubator-devlake/plugins/aireview/tasks"
@@ -33,15 +35,23 @@ import (
 // Verify interface implementation
 var _ interface {
 	plugin.PluginMeta
+	plugin.PluginInit
 	plugin.PluginTask
 	plugin.PluginModel
 	plugin.PluginMetric
 	plugin.PluginMigration
+	plugin.PluginApi
 	plugin.MetricPluginBlueprintV200
 } = (*AiReview)(nil)
 
 // AiReview is the main plugin struct
 type AiReview struct{}
+
+// Init initializes the plugin
+func (p AiReview) Init(basicRes context.BasicRes) errors.Error {
+	api.Init(basicRes, p)
+	return nil
+}
 
 func (p AiReview) Description() string {
 	return "Extract and analyze AI-generated code reviews from pull requests to calculate AI predicted failure metrics"
@@ -151,7 +161,35 @@ func (p AiReview) RootPkgPath() string {
 }
 
 func (p AiReview) ApiResources() map[string]map[string]plugin.ApiResourceHandler {
-	return nil
+	return map[string]map[string]plugin.ApiResourceHandler{
+		"reviews": {
+			"GET": api.GetReviews,
+		},
+		"reviews/:id": {
+			"GET": api.GetReview,
+		},
+		"stats": {
+			"GET": api.GetReviewStats,
+		},
+		"findings": {
+			"GET": api.GetFindings,
+		},
+		"scope-configs": {
+			"GET":  api.GetScopeConfigs,
+			"POST": api.CreateScopeConfig,
+		},
+		"scope-configs/default": {
+			"GET": api.GetDefaultScopeConfig,
+		},
+		"scope-configs/:id": {
+			"GET":    api.GetScopeConfig,
+			"PATCH":  api.UpdateScopeConfig,
+			"DELETE": api.DeleteScopeConfig,
+		},
+		"analyze": {
+			"POST": api.GenerateAnalysisPipeline,
+		},
+	}
 }
 
 func (p AiReview) MigrationScripts() []plugin.MigrationScript {
