@@ -32,7 +32,7 @@ export const TestRegistryConfig: IPluginConfig = {
   plugin: 'testregistry',
   name: 'Test Registry',
   icon: ({ color }) => <Icon fill={color} />,
-  sort: 101,
+  sort: 17,  // Between Testmo (17) and ZenTao (18)
   connection: {
     docLink: '',
     fields: [
