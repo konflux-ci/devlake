@@ -166,3 +166,10 @@ venv
 /backend/plugins/gitextractor/parser/demo_repo/
 
 __debug_bin*
+
+# AI assistant runtime data
+.claude-flow/
+.hive-mind/
+
+# Sensitive files
+cookies.txt

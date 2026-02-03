@@ -145,6 +145,23 @@ func extractIssues(data *JiraTaskData, mappings *typeMappings, apiIssue *apiv2mo
 		}
 
 	}
+	// Extract epic key from custom field if configured (e.g., customfield_12313140 for Red Hat Jira)
+	// This allows linking issues to their parent epic/feature via a custom field
+	if data.Options.ScopeConfig != nil && data.Options.ScopeConfig.EpicKeyField != "" {
+		unknownEpicKey := apiIssue.Fields.AllFields[data.Options.ScopeConfig.EpicKeyField]
+		switch ek := unknownEpicKey.(type) {
+		case string:
+			// Direct string value (e.g., "KONFLUX-6531")
+			issue.EpicKey = ek
+		case map[string]interface{}:
+			// Object format like {"key": "KONFLUX-6531", "id": "123", ...}
+			if key, ok := ek["key"].(string); ok {
+				issue.EpicKey = key
+			}
+		case nil:
+			// Field is not set, keep existing EpicKey from standard epic field
+		}
+	}
 	// default due date field is "duedate"
 	dueDateField := "duedate"
 	if data.Options.ScopeConfig != nil && data.Options.ScopeConfig.DueDateField != "" {
