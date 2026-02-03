@@ -832,7 +832,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT \n  id,\n  'Details' as details,\n  created_date,\n  ai_tool,\n  risk_level,\n  review_state,\n  issues_found,\n  suggestions_count,\n  LEFT(summary, 200) as summary,\n  source_url\nFROM _tool_aireview_reviews\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\nORDER BY created_date DESC\nLIMIT 100",
+          "rawSql": "SELECT \n  id,\n  'Details' as details,\n  created_date,\n  ai_tool,\n  risk_level,\n  effort_rating,\n  review_state,\n  issues_found,\n  suggestions_count,\n  LEFT(summary, 200) as summary,\n  source_url\nFROM _tool_aireview_reviews\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\nORDER BY created_date DESC\nLIMIT 100",
           "refId": "A"
         }
       ],
@@ -861,7 +861,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 12,
+        "w": 6,
         "x": 0,
         "y": 23
       },
@@ -887,7 +887,7 @@
           "refId": "A"
         }
       ],
-      "title": "Avg Issues Found per Review",
+      "title": "Avg Issues Found",
       "type": "stat"
     },
     {
@@ -912,8 +912,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 12,
-        "x": 12,
+        "w": 6,
+        "x": 6,
         "y": 23
       },
       "id": 12,
@@ -938,8 +938,180 @@
           "refId": "A"
         }
       ],
-      "title": "Avg Suggestions per Review",
+      "title": "Avg Suggestions",
       "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 5,
+          "min": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "orange",
+                "value": 4
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 23
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ROUND(AVG(effort_rating), 1) as avg_effort_rating FROM _tool_aireview_reviews WHERE effort_rating > 0 AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Effort Rating (1-5)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "passed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inconclusive"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 23
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT \n  SUM(pre_merge_checks_passed) as passed,\n  SUM(pre_merge_checks_failed) as failed,\n  SUM(pre_merge_checks_inconclusive) as inconclusive\nFROM _tool_aireview_reviews \nWHERE (pre_merge_checks_passed > 0 OR pre_merge_checks_failed > 0 OR pre_merge_checks_inconclusive > 0)\n  AND repo_id IN (${repo_id:sqlstring}) \n  AND ai_tool IN (${ai_tool:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Pre-merge Checks",
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {}
+        }
+      ],
+      "type": "piechart"
     },
     {
       "datasource": "mysql",

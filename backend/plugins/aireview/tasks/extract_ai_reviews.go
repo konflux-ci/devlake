@@ -122,27 +122,31 @@ func ExtractAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 
 		// Create AI review record
 		aiReview := &models.AiReview{
-			Id:               reviewId,
-			PullRequestId:    comment.PullRequestId,
-			RepoId:           repoId,
-			AiTool:           aiTool,
-			AiToolUser:       comment.AccountId,
-			ReviewId:         comment.Id,
-			Body:             comment.Body,
-			Summary:          extractSummary(comment.Body),
-			CreatedDate:      comment.CreatedDate,
-			RiskLevel:        riskLevel,
-			RiskScore:        riskScore,
-			RiskConfidence:   reviewMetrics.Confidence,
-			IssuesFound:      reviewMetrics.IssuesFound,
-			SuggestionsCount: reviewMetrics.SuggestionsCount,
-			FilesReviewed:    reviewMetrics.FilesReviewed,
-			LinesReviewed:    reviewMetrics.LinesReviewed,
-			EffortComplexity: reviewMetrics.Complexity,
-			EffortMinutes:    reviewMetrics.EffortMinutes,
-			ReviewState:      detectReviewState(comment.Body, comment.Status),
-			SourcePlatform:   detectSourcePlatform(comment.PullRequestId),
-			SourceUrl:        buildCommentUrl(comment.PrUrl, comment.Id),
+			Id:                         reviewId,
+			PullRequestId:              comment.PullRequestId,
+			RepoId:                     repoId,
+			AiTool:                     aiTool,
+			AiToolUser:                 comment.AccountId,
+			ReviewId:                   comment.Id,
+			Body:                       comment.Body,
+			Summary:                    extractSummary(comment.Body),
+			CreatedDate:                comment.CreatedDate,
+			RiskLevel:                  riskLevel,
+			RiskScore:                  riskScore,
+			RiskConfidence:             reviewMetrics.Confidence,
+			IssuesFound:                reviewMetrics.IssuesFound,
+			SuggestionsCount:           reviewMetrics.SuggestionsCount,
+			FilesReviewed:              reviewMetrics.FilesReviewed,
+			LinesReviewed:              reviewMetrics.LinesReviewed,
+			EffortComplexity:           reviewMetrics.Complexity,
+			EffortRating:               reviewMetrics.EffortRating,
+			EffortMinutes:              reviewMetrics.EffortMinutes,
+			PreMergeChecksPassed:       reviewMetrics.PreMergeChecksPassed,
+			PreMergeChecksFailed:       reviewMetrics.PreMergeChecksFailed,
+			PreMergeChecksInconclusive: reviewMetrics.PreMergeChecksInconclusive,
+			ReviewState:                detectReviewState(comment.Body, comment.Status),
+			SourcePlatform:             detectSourcePlatform(comment.PullRequestId),
+			SourceUrl:                  buildCommentUrl(comment.PrUrl, comment.Id),
 		}
 
 		batch = append(batch, aiReview)
@@ -209,19 +213,42 @@ func generateReviewId(prId, commentId, aiTool string) string {
 
 // ReviewMetrics holds parsed metrics from review content
 type ReviewMetrics struct {
-	IssuesFound      int
-	SuggestionsCount int
-	FilesReviewed    int
-	LinesReviewed    int
-	Complexity       string
-	EffortMinutes    int
-	Confidence       int
+	IssuesFound                int
+	SuggestionsCount           int
+	FilesReviewed              int
+	LinesReviewed              int
+	Complexity                 string
+	EffortRating               int // 1-5 scale numeric rating
+	EffortMinutes              int
+	Confidence                 int
+	PreMergeChecksPassed       int
+	PreMergeChecksFailed       int
+	PreMergeChecksInconclusive int
 }
 
 // parseReviewMetrics extracts metrics from review body
 func parseReviewMetrics(body string) ReviewMetrics {
 	metrics := ReviewMetrics{
 		Confidence: 70, // Default confidence
+	}
+
+	// Parse CodeRabbit numeric effort rating (e.g., "🎯 3 (Moderate)" or "🎯 3")
+	// This format appears in CodeRabbit reviews
+	effortRatingRe := regexp.MustCompile(`🎯\s*(\d)(?:\s*\([^)]+\))?`)
+	if match := effortRatingRe.FindStringSubmatch(body); len(match) > 1 {
+		if val, err := strconv.Atoi(match[1]); err == nil && val >= 1 && val <= 5 {
+			metrics.EffortRating = val
+		}
+	}
+
+	// Parse Qodo effort rating (e.g., "Estimated effort to review: 3" or with emoji dots)
+	if metrics.EffortRating == 0 {
+		qodoEffortRe := regexp.MustCompile(`(?i)estimated effort[^:]*:\s*(\d)`)
+		if match := qodoEffortRe.FindStringSubmatch(body); len(match) > 1 {
+			if val, err := strconv.Atoi(match[1]); err == nil && val >= 1 && val <= 5 {
+				metrics.EffortRating = val
+			}
+		}
 	}
 
 	// Parse effort/complexity (CodeRabbit format)
@@ -238,13 +265,29 @@ func parseReviewMetrics(body string) ReviewMetrics {
 		}
 	}
 
-	// Parse time estimate (e.g., "~12 minutes")
-	timeRe := regexp.MustCompile(`~?(\d+)\s*minutes?`)
+	// Infer complexity from effort rating if not explicitly stated
+	if metrics.Complexity == "" && metrics.EffortRating > 0 {
+		switch {
+		case metrics.EffortRating <= 2:
+			metrics.Complexity = "simple"
+		case metrics.EffortRating <= 3:
+			metrics.Complexity = "moderate"
+		default:
+			metrics.Complexity = "complex"
+		}
+	}
+
+	// Parse time estimate (e.g., "~12 minutes" or "⏱️ ~20 minutes")
+	timeRe := regexp.MustCompile(`(?:⏱️\s*)?~?(\d+)\s*minutes?`)
 	if match := timeRe.FindStringSubmatch(body); len(match) > 1 {
 		if val, err := strconv.Atoi(match[1]); err == nil {
 			metrics.EffortMinutes = val
 		}
 	}
+
+	// Parse pre-merge check results (CodeRabbit format: "2 passed, 1 inconclusive")
+	// Also handles: "✅ 2 checks passed" or "❌ 1 check failed"
+	parsePreMergeChecks(body, &metrics)
 
 	// Count issue patterns
 	issuePatterns := []string{
@@ -280,6 +323,34 @@ func parseReviewMetrics(body string) ReviewMetrics {
 	}
 
 	return metrics
+}
+
+// parsePreMergeChecks extracts pre-merge check results from CodeRabbit format
+// Handles formats like: "2 passed, 1 inconclusive" or "✅ 2 checks passed"
+func parsePreMergeChecks(body string, metrics *ReviewMetrics) {
+	// CodeRabbit format: "N passed" or "✅ N checks passed" or "N checks passed"
+	passedRe := regexp.MustCompile(`(?i)(?:✅\s*)?(\d+)\s*(?:checks?\s+)?passed`)
+	if match := passedRe.FindStringSubmatch(body); len(match) > 1 {
+		if val, err := strconv.Atoi(match[1]); err == nil {
+			metrics.PreMergeChecksPassed = val
+		}
+	}
+
+	// CodeRabbit format: "N failed" or "❌ N checks failed" or "N checks failed"
+	failedRe := regexp.MustCompile(`(?i)(?:❌\s*)?(\d+)\s*(?:checks?\s+)?failed`)
+	if match := failedRe.FindStringSubmatch(body); len(match) > 1 {
+		if val, err := strconv.Atoi(match[1]); err == nil {
+			metrics.PreMergeChecksFailed = val
+		}
+	}
+
+	// CodeRabbit format: "N inconclusive"
+	inconclusiveRe := regexp.MustCompile(`(?i)(\d+)\s*(?:checks?\s+)?inconclusive`)
+	if match := inconclusiveRe.FindStringSubmatch(body); len(match) > 1 {
+		if val, err := strconv.Atoi(match[1]); err == nil {
+			metrics.PreMergeChecksInconclusive = val
+		}
+	}
 }
 
 // extractSummary extracts a clean markdown summary from the review body

@@ -610,3 +610,145 @@ func TestQodoPatternMatching(t *testing.T) {
 		})
 	}
 }
+
+func TestParseReviewMetrics_EffortRating(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           string
+		wantRating     int
+		wantComplexity string
+	}{
+		{
+			name:           "CodeRabbit effort rating with complexity",
+			body:           "🎯 3 (Moderate) | ⏱️ ~20 minutes",
+			wantRating:     3,
+			wantComplexity: "moderate",
+		},
+		{
+			name:           "CodeRabbit effort rating only",
+			body:           "Review effort: 🎯 4",
+			wantRating:     4,
+			wantComplexity: "complex", // inferred from rating >= 4
+		},
+		{
+			name:           "CodeRabbit simple rating",
+			body:           "🎯 1 (Simple)",
+			wantRating:     1,
+			wantComplexity: "simple",
+		},
+		{
+			name:           "Qodo effort estimate format",
+			body:           "⏱️ Estimated effort to review: 3 🔵🔵🔵⚪⚪",
+			wantRating:     3,
+			wantComplexity: "moderate", // inferred from rating 3
+		},
+		{
+			name:           "Qodo table format",
+			body:           "<tr><td><strong>Estimated effort to review</strong>: 2</td></tr>",
+			wantRating:     2,
+			wantComplexity: "simple", // inferred from rating <= 2
+		},
+		{
+			name:           "No effort rating",
+			body:           "This is a regular review comment",
+			wantRating:     0,
+			wantComplexity: "",
+		},
+		{
+			name:           "Effort rating 5 (complex)",
+			body:           "🎯 5 (Very Complex)",
+			wantRating:     5,
+			wantComplexity: "complex",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics := parseReviewMetrics(tt.body)
+			assert.Equal(t, tt.wantRating, metrics.EffortRating)
+			if tt.wantComplexity != "" {
+				assert.Equal(t, tt.wantComplexity, metrics.Complexity)
+			}
+		})
+	}
+}
+
+func TestParseReviewMetrics_PreMergeChecks(t *testing.T) {
+	tests := []struct {
+		name             string
+		body             string
+		wantPassed       int
+		wantFailed       int
+		wantInconclusive int
+	}{
+		{
+			name:             "CodeRabbit pre-merge checks all present",
+			body:             "Pre-merge checks: 2 passed, 1 failed, 1 inconclusive",
+			wantPassed:       2,
+			wantFailed:       1,
+			wantInconclusive: 1,
+		},
+		{
+			name:             "CodeRabbit with emojis",
+			body:             "✅ 3 checks passed | ❌ 1 check failed",
+			wantPassed:       3,
+			wantFailed:       1,
+			wantInconclusive: 0,
+		},
+		{
+			name:             "Only passed checks",
+			body:             "All checks passed: 5 passed",
+			wantPassed:       5,
+			wantFailed:       0,
+			wantInconclusive: 0,
+		},
+		{
+			name:             "Inconclusive only",
+			body:             "Status: 2 inconclusive",
+			wantPassed:       0,
+			wantFailed:       0,
+			wantInconclusive: 2,
+		},
+		{
+			name:             "No check information",
+			body:             "This is a regular review",
+			wantPassed:       0,
+			wantFailed:       0,
+			wantInconclusive: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics := parseReviewMetrics(tt.body)
+			assert.Equal(t, tt.wantPassed, metrics.PreMergeChecksPassed)
+			assert.Equal(t, tt.wantFailed, metrics.PreMergeChecksFailed)
+			assert.Equal(t, tt.wantInconclusive, metrics.PreMergeChecksInconclusive)
+		})
+	}
+}
+
+func TestParseReviewMetrics_CodeRabbitRealWorld(t *testing.T) {
+	// Test with realistic CodeRabbit output format
+	realCodeRabbitBody := `## Summary by CodeRabbit
+
+🎯 3 (Moderate) | ⏱️ ~20 minutes
+
+**Pre-merge checks**: 2 passed, 1 inconclusive
+
+### Walkthrough
+The changes introduce new handlers for authentication.
+
+### Changes
+- Added JWT validation
+- Updated middleware configuration
+`
+
+	metrics := parseReviewMetrics(realCodeRabbitBody)
+
+	assert.Equal(t, 3, metrics.EffortRating)
+	assert.Equal(t, 20, metrics.EffortMinutes)
+	assert.Equal(t, "moderate", metrics.Complexity)
+	assert.Equal(t, 2, metrics.PreMergeChecksPassed)
+	assert.Equal(t, 1, metrics.PreMergeChecksInconclusive)
+}

@@ -58,9 +58,15 @@ type AiReview struct {
 	FilesReviewed    int // Number of files reviewed
 	LinesReviewed    int // Lines of code reviewed
 
-	// Effort estimation (from CodeRabbit)
+	// Effort estimation (from CodeRabbit/Qodo)
 	EffortComplexity string `gorm:"type:varchar(50)"` // simple, moderate, complex
+	EffortRating     int    // 1-5 scale numeric rating (e.g., from "🎯 3 (Moderate)")
 	EffortMinutes    int    // Estimated review time in minutes
+
+	// Pre-merge check results (from CodeRabbit)
+	PreMergeChecksPassed       int `gorm:"default:0"` // Number of checks passed
+	PreMergeChecksFailed       int `gorm:"default:0"` // Number of checks failed
+	PreMergeChecksInconclusive int `gorm:"default:0"` // Number of inconclusive checks
 
 	// Review outcome
 	ReviewState string `gorm:"type:varchar(50)"` // approved, changes_requested, commented
