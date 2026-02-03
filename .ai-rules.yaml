@@ -1,0 +1,26 @@
+# AI Rules Configuration
+# This file configures dotai to sync rules from a central repository.
+# Run 'dotai sync' to generate configuration files.
+# Run 'dotai check' in CI to detect drift.
+
+# Central repository containing shared AI assistant rules
+source: git@gitlab.cee.redhat.com:devtools/ai-rules.git
+
+# Pinned version (git tag or commit hash)
+# Update this to pull new rules, then run 'dotai sync'
+version: v0.2.5
+
+# Role-based profiles to include (e.g., backend, frontend, typescript)
+# Profiles are loaded in alphabetical order
+profiles:
+  - go
+
+# AI tools to generate configuration for
+tools:
+  - claude
+  - cursor
+
+# Remove orphaned skills not in the central repository during sync
+# Set to true if you want dotai to clean up skills no longer in the source
+# Default is false to preserve locally-added skills (e.g., from Claude Flow)
+# prune: false
