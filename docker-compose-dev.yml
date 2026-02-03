@@ -95,6 +95,8 @@ services:
       LOGGING_DIR: /app/logs
       TZ: UTC
       ENCRYPTION_SECRET: "SMOZVSJZAXOADJDZTMTWLEOJVSIHPWFMNONSWZWVIHDDMLTYLAXXXTRRVDDSMICPOZTCSREVORSVYQBFGYNIAPXVHIPIVLNLEKAIFWVWMLNMFOXESQDRGHRYYJRKJBQT"
+      # Run 4 pipelines in parallel
+      PIPELINE_MAX_PARALLEL: "4"
       # LOGOUT_URI: https://xxx.amazoncognito.com/logout?client_id=yyy&logout_uri=http%3A%2F%2Flocalhost%3A4180%2Foauth2%2Fsign_out
     depends_on:
       - mysql
