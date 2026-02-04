@@ -30,6 +30,7 @@ services:
     command: --character-set-server=utf8mb4
       --collation-server=utf8mb4_bin
       --skip-log-bin
+      --sql-mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
 
   postgres:
     image: postgres:14.2
