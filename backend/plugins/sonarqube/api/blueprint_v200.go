@@ -126,8 +126,29 @@ func GetApiProject(
 	projectKey string,
 	apiClient plugin.ApiClient,
 ) (*models.SonarqubeApiProject, errors.Error) {
+	// Get the endpoint from apiClient data (set by PrepareApiClient)
+	endpointData := apiClient.GetData(models.ENDPOINT)
+	if endpointData == nil {
+		return nil, errors.Default.New("endpoint not found in apiClient data")
+	}
+	endpoint := endpointData.(string)
+
+	// Check if this is SonarCloud
+	if endpoint == "https://sonarcloud.io/api/" {
+		// SonarCloud: use authenticated API with projects/search
+		return getApiProjectCloud(projectKey, apiClient)
+	}
+	// SonarQube Server: use authenticated API with components/search
+	return getApiProjectServer(projectKey, apiClient)
+}
+
+// getApiProjectCloud fetches project details using authenticated API with projects/search (for SonarCloud)
+func getApiProjectCloud(
+	projectKey string,
+	apiClient plugin.ApiClient,
+) (*models.SonarqubeApiProject, errors.Error) {
 	var resData struct {
-		Data []models.SonarqubeApiProject `json:"components"`
+		Components []models.SonarqubeApiProject `json:"components"`
 	}
 	query := url.Values{}
 	query.Set("q", projectKey)
@@ -142,8 +163,43 @@ func GetApiProject(
 	if err != nil {
 		return nil, err
 	}
-	if len(resData.Data) > 0 {
-		return &resData.Data[0], nil
+	// Find exact match for the project key
+	for _, project := range resData.Components {
+		if project.ProjectKey == projectKey {
+			return &project, nil
+		}
+	}
+	return nil, errors.BadInput.New(fmt.Sprintf("Cannot find project: %s", projectKey))
+}
+
+// getApiProjectServer fetches project details using authenticated API with components/search (for SonarQube Server)
+// Uses components/search endpoint which doesn't require "Administer System" permission
+func getApiProjectServer(
+	projectKey string,
+	apiClient plugin.ApiClient,
+) (*models.SonarqubeApiProject, errors.Error) {
+	var resData struct {
+		Components []models.SonarqubeApiProject `json:"components"`
+	}
+	query := url.Values{}
+	query.Set("qualifiers", "TRK")
+	query.Set("q", projectKey)
+	res, err := apiClient.Get("components/search", query, nil)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.HttpStatus(res.StatusCode).New(fmt.Sprintf("unexpected status code when requesting project detail from %s", res.Request.URL.String()))
+	}
+	err = helper.UnmarshalResponse(res, &resData)
+	if err != nil {
+		return nil, err
+	}
+	// Find exact match for the project key
+	for _, project := range resData.Components {
+		if project.ProjectKey == projectKey {
+			return &project, nil
+		}
 	}
 	return nil, errors.BadInput.New(fmt.Sprintf("Cannot find project: %s", projectKey))
 }
