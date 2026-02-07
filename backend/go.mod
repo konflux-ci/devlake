@@ -18,7 +18,7 @@ require (
 	github.com/magiconair/properties v1.8.5
 	github.com/merico-dev/graphql v0.0.0-20240807070533-1cafa544cd5d
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/panjf2000/ants/v2 v2.4.6
+	github.com/panjf2000/ants/v2 v2.11.5
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/afero v1.6.0 // indirect
