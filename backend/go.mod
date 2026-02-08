@@ -33,7 +33,7 @@ require (
 	github.com/viant/afs v1.16.0
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20221028150844-83b7d23a625f
-	golang.org/x/oauth2 v0.13.0
+	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sync v0.8.0
 	gorm.io/datatypes v1.0.1
 	gorm.io/driver/mysql v1.5.1
