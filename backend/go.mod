@@ -13,7 +13,7 @@ require (
 	github.com/gocarina/gocsv v0.0.0-20220707092902-b9da1f06c77e
 	github.com/google/uuid v1.4.0
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
-	github.com/lib/pq v1.10.2
+	github.com/lib/pq v1.11.2
 	github.com/libgit2/git2go/v33 v33.0.6
 	github.com/magiconair/properties v1.8.5
 	github.com/merico-dev/graphql v0.0.0-20240807070533-1cafa544cd5d
