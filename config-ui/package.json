@@ -27,7 +27,7 @@
     "@reduxjs/toolkit": "^2.2.1",
     "ahooks": "^3.7.10",
     "antd": "^5.14.2",
-    "axios": "^1.6.7",
+    "axios": "^1.13.5",
     "classnames": "^2.5.1",
     "cron-parser": "^4.9.0",
     "cron-validate": "^1.4.5",
