@@ -30,6 +30,7 @@ services:
     command: --character-set-server=utf8mb4
       --collation-server=utf8mb4_bin
       --skip-log-bin
+      --sql-mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
 
   postgres:
     image: postgres:14.2
@@ -68,6 +69,7 @@ services:
     environment:
       GF_SERVER_ROOT_URL: "http://localhost:4000/grafana"
       GF_USERS_DEFAULT_THEME: "light"
+      GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel"
       MYSQL_URL: mysql:3306
       MYSQL_DATABASE: lake
       MYSQL_USER: merico
@@ -95,6 +97,8 @@ services:
       LOGGING_DIR: /app/logs
       TZ: UTC
       ENCRYPTION_SECRET: "SMOZVSJZAXOADJDZTMTWLEOJVSIHPWFMNONSWZWVIHDDMLTYLAXXXTRRVDDSMICPOZTCSREVORSVYQBFGYNIAPXVHIPIVLNLEKAIFWVWMLNMFOXESQDRGHRYYJRKJBQT"
+      # Run 4 pipelines in parallel
+      PIPELINE_MAX_PARALLEL: "4"
       # LOGOUT_URI: https://xxx.amazoncognito.com/logout?client_id=yyy&logout_uri=http%3A%2F%2Flocalhost%3A4180%2Foauth2%2Fsign_out
     depends_on:
       - mysql
