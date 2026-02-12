@@ -72,6 +72,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     export PKG_CONFIG_PATH=/usr/local/deps/target/lib/pkgconfig && \
     export CGO_ENABLED=1 && \
     export GOARCH=amd64 && \
+    export GOMAXPROCS=4 && \
     DEVLAKE_PLUGINS="$GO_PLUGINS" make all
 
 # remove symlink in lib, we will recreate in final image

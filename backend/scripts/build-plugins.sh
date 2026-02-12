@@ -67,7 +67,7 @@ PIDS=""
 for PLUG in $PLUGINS; do
     NAME=$(basename $PLUG)
     echo "Building plugin $NAME to bin/plugins/$NAME/$NAME.so with args: $*  --gcflags="$GCFLAGS""
-    go build -buildmode=plugin --gcflags="$GCFLAGS" -o $PLUGIN_OUTPUT_DIR/$NAME/$NAME.so $PLUG/*.go &
+    go build -p 4 -buildmode=plugin --gcflags="$GCFLAGS" -o $PLUGIN_OUTPUT_DIR/$NAME/$NAME.so $PLUG/*.go &
     PIDS="$PIDS $!"
     # avoid too many processes causing signal killed
     COUNT=$(echo "$PIDS" | wc -w)
