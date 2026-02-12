@@ -606,6 +606,17 @@ spec:
       optional: true
     - name: netrc
       optional: true
+  taskRunSpecs:
+    - pipelineTaskName: build-container
+      stepSpecs:
+        - name: build
+          computeResources:
+            requests:
+              memory: 10Gi
+              cpu: "2"
+            limits:
+              memory: 10Gi
+              cpu: "2"
   taskRunTemplate:
     serviceAccountName: build-pipeline-devlake-backend-d41aa
   workspaces:
