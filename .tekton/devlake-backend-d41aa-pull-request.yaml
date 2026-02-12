@@ -612,11 +612,11 @@ spec:
         - name: build
           computeResources:
             requests:
-              memory: 10Gi
-              cpu: "2"
+              memory: 16Gi
+              cpu: "6"
             limits:
-              memory: 10Gi
-              cpu: "2"
+              memory: 16Gi
+              cpu: "6"
   taskRunTemplate:
     serviceAccountName: build-pipeline-devlake-backend-d41aa
   workspaces:
