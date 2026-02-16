@@ -131,7 +131,7 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
-	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
