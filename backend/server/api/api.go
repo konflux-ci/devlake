@@ -93,8 +93,6 @@ func CreateApiServer() *gin.Engine {
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
 		// Expose these headers
 		ExposeHeaders: []string{"Content-Length"},
-		// Allow credentials
-		AllowCredentials: true,
 		// Cache for 2 hours
 		MaxAge: 2 * time.Hour,
 	}))
