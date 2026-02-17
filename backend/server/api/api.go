@@ -53,6 +53,23 @@ const DB_MIGRATING = `Database migration is in progress. Please wait until it is
 
 var basicRes context.BasicRes
 
+// parseCORSAllowOrigins splits comma-separated origins so env vars like
+// "https://a.com,https://b.com" (often a single slice element from Viper) become multiple origins.
+func parseCORSAllowOrigins(origins []string) []string {
+	if len(origins) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(origins))
+	for _, s := range origins {
+		for _, part := range strings.Split(s, ",") {
+			if o := strings.TrimSpace(part); o != "" {
+				out = append(out, o)
+			}
+		}
+	}
+	return out
+}
+
 func Init() {
 	// Initialize services
 	services.Init()
@@ -82,19 +99,15 @@ func CreateApiServer() *gin.Engine {
 	// Create router
 	router := gin.Default()
 
-	// Enable CORS
+	// Enable CORS (split comma-separated origins: env vars often come as one string)
 	cfg := basicRes.GetConfigReader()
 	router.Use(cors.New(cors.Config{
-		// Allow all origins
-		AllowOrigins: cfg.GetStringSlice("CORS_ALLOW_ORIGIN"),
-		// Allow common methods
+		AllowOrigins: parseCORSAllowOrigins(cfg.GetStringSlice("CORS_ALLOW_ORIGIN")),
 		AllowMethods: []string{"PUT", "PATCH", "POST", "GET", "OPTIONS", "DELETE"},
-		// Allow common headers
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
-		// Expose these headers
-		ExposeHeaders: []string{"Content-Length"},
-		// Cache for 2 hours
-		MaxAge: 2 * time.Hour,
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           2 * time.Hour,
 	}))
 
 	// For both protected and unprotected routes
