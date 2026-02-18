@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/cockroachdb/errors v1.11.1
 	// github.com/gin-contrib/cors v1.6.0
-	github.com/gin-gonic/gin v1.9.1
+	github.com/gin-gonic/gin v1.11.0
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-playground/validator/v10 v10.20.0
