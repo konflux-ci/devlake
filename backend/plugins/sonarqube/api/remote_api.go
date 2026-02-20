@@ -33,7 +33,10 @@ type SonarqubeRemotePagination struct {
 	PageSize int `json:"ps"`
 }
 
-func querySonarqubeProjects(
+// querySonarqubeProjectsServer fetches projects from SonarQube Server using authenticated API client
+// Uses components/search endpoint which doesn't require "Administer System" permission
+// (unlike projects/search which does)
+func querySonarqubeProjectsServer(
 	apiClient plugin.ApiClient,
 	keyword string,
 	page SonarqubeRemotePagination,
@@ -48,11 +51,86 @@ func querySonarqubeProjects(
 	if page.Page == 0 {
 		page.Page = 1
 	}
-	res, err := apiClient.Get("projects/search", url.Values{
+
+	// Use components/search endpoint instead of projects/search
+	// projects/search requires "Administer System" permission
+	// components/search with qualifiers=TRK works with regular user tokens
+	query := url.Values{
+		"qualifiers": {"TRK"},
+		"p":          {fmt.Sprintf("%v", page.Page)},
+		"ps":         {fmt.Sprintf("%v", page.PageSize)},
+	}
+	if keyword != "" {
+		query.Set("q", keyword)
+	}
+
+	res, err := apiClient.Get("components/search", query, nil)
+	if err != nil {
+		return
+	}
+
+	resBody := struct {
+		Paging struct {
+			PageIndex int `json:"pageIndex"`
+			PageSize  int `json:"pageSize"`
+			Total     int `json:"total"`
+		} `json:"paging"`
+		Components []*models.SonarqubeApiProject `json:"components"`
+	}{}
+
+	err = api.UnmarshalResponse(res, &resBody)
+	if err != nil {
+		return
+	}
+
+	for _, project := range resBody.Components {
+		children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.SonarqubeProject]{
+			Type:     api.RAS_ENTRY_TYPE_SCOPE,
+			Id:       fmt.Sprintf("%v", project.ProjectKey),
+			ParentId: nil,
+			Name:     project.Name,
+			FullName: project.Name,
+			Data:     project.ConvertApiScope(),
+		})
+	}
+
+	if resBody.Paging.Total > resBody.Paging.PageIndex*resBody.Paging.PageSize {
+		nextPage = &SonarqubeRemotePagination{
+			Page:     resBody.Paging.PageIndex + 1,
+			PageSize: resBody.Paging.PageSize,
+		}
+	}
+
+	return
+}
+
+// querySonarqubeProjectsCloud fetches projects using the authenticated API client
+// This is used for SonarCloud which requires authentication and organization parameter
+func querySonarqubeProjectsCloud(
+	apiClient plugin.ApiClient,
+	keyword string,
+	page SonarqubeRemotePagination,
+) (
+	children []dsmodels.DsRemoteApiScopeListEntry[models.SonarqubeProject],
+	nextPage *SonarqubeRemotePagination,
+	err errors.Error,
+) {
+	if page.PageSize == 0 {
+		page.PageSize = 100
+	}
+	if page.Page == 0 {
+		page.Page = 1
+	}
+
+	query := url.Values{
 		"p":  {fmt.Sprintf("%v", page.Page)},
 		"ps": {fmt.Sprintf("%v", page.PageSize)},
-		"q":  {keyword},
-	}, nil)
+	}
+	if keyword != "" {
+		query.Set("q", keyword)
+	}
+
+	res, err := apiClient.Get("projects/search", query, nil)
 	if err != nil {
 		return
 	}
@@ -92,6 +170,25 @@ func querySonarqubeProjects(
 	return
 }
 
+// querySonarqubeProjects fetches projects using the appropriate method based on connection type
+func querySonarqubeProjects(
+	connection *models.SonarqubeConnection,
+	apiClient plugin.ApiClient,
+	keyword string,
+	page SonarqubeRemotePagination,
+) (
+	children []dsmodels.DsRemoteApiScopeListEntry[models.SonarqubeProject],
+	nextPage *SonarqubeRemotePagination,
+	err errors.Error,
+) {
+	if connection.IsCloud() {
+		// SonarCloud: use authenticated API with projects/search
+		return querySonarqubeProjectsCloud(apiClient, keyword, page)
+	}
+	// SonarQube Server: use authenticated API with components/search
+	return querySonarqubeProjectsServer(apiClient, keyword, page)
+}
+
 func listSonarqubeRemoteScopes(
 	connection *models.SonarqubeConnection,
 	apiClient plugin.ApiClient,
@@ -102,7 +199,7 @@ func listSonarqubeRemoteScopes(
 	nextPage *SonarqubeRemotePagination,
 	err errors.Error,
 ) {
-	return querySonarqubeProjects(apiClient, "", page)
+	return querySonarqubeProjects(connection, apiClient, "", page)
 }
 
 // RemoteScopes list all available scopes on the remote server
@@ -135,7 +232,22 @@ func searchSonarqubeRemoteProjects(
 		Page:     params.Page,
 		PageSize: params.PageSize,
 	}
-	children, _, err = querySonarqubeProjects(apiClient, params.Search, page)
+	// Get the endpoint from apiClient data (set by PrepareApiClient)
+	endpointData := apiClient.GetData(models.ENDPOINT)
+	if endpointData == nil {
+		err = errors.Default.New("endpoint not found in apiClient data")
+		return
+	}
+	endpoint := endpointData.(string)
+
+	// Check if this is SonarCloud based on endpoint
+	if endpoint == "https://sonarcloud.io/api/" {
+		// SonarCloud: use authenticated API with projects/search
+		children, _, err = querySonarqubeProjectsCloud(apiClient, params.Search, page)
+	} else {
+		// SonarQube Server: use authenticated API with components/search
+		children, _, err = querySonarqubeProjectsServer(apiClient, params.Search, page)
+	}
 	return
 }
 
