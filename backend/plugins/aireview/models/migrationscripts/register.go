@@ -27,5 +27,6 @@ func All() []plugin.MigrationScript {
 		&initSchema{},
 		&addEffortAndChecks{},
 		&addGeminiConfig{},
+		&addReactions{},
 	}
 }

@@ -107,6 +107,7 @@ func (p AiReview) Settings() interface{} {
 func (p AiReview) SubTaskMetas() []plugin.SubTaskMeta {
 	return []plugin.SubTaskMeta{
 		tasks.ExtractAiReviewsMeta,
+		tasks.EnrichReviewReactionsMeta,
 		tasks.ExtractAiReviewFindingsMeta,
 		tasks.CalculateFailurePredictionsMeta,
 		tasks.CalculatePredictionMetricsMeta,
@@ -234,6 +235,7 @@ func (p AiReview) MakeMetricPluginPipelinePlanV200(projectName string, options j
 				Options: opts,
 				Subtasks: []string{
 					tasks.ExtractAiReviewsMeta.Name,
+					tasks.EnrichReviewReactionsMeta.Name,
 					tasks.ExtractAiReviewFindingsMeta.Name,
 					tasks.CalculateFailurePredictionsMeta.Name,
 					tasks.CalculatePredictionMetricsMeta.Name,
