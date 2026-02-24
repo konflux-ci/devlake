@@ -4854,7 +4854,7 @@ __metadata:
 
 "fsevents@patch:fsevents@~2.3.2#~builtin<compat/fsevents>, fsevents@patch:fsevents@~2.3.3#~builtin<compat/fsevents>":
   version: 2.3.3
-  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=18f3a7"
+  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=df0bf1"
   dependencies:
     node-gyp: latest
   conditions: os=darwin
@@ -7735,12 +7735,12 @@ __metadata:
   linkType: hard
 
 "react-medium-image-zoom@npm:^5.1.10":
-  version: 5.1.10
-  resolution: "react-medium-image-zoom@npm:5.1.10"
+  version: 5.4.1
+  resolution: "react-medium-image-zoom@npm:5.4.1"
   peerDependencies:
-    react: ^16.8.0 || ^17.0.0 || ^18.0.0
-    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
-  checksum: 9c2cf83fc63eb705f1696ad6b50c457d8a77f0b458d7d9cc8975f20ebd3ee8ef6fbdc39af145fb9a5fd81191ceb37de1fb362bf67d6d31a183aa407b2a522030
+    react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 955a51c0d05183b846de4012923204a6d8512f8bc3a67720580094c3141cd484dd0895745a578838391c2bd146e97f68b74a99112ddad3efe7d1f19cf1d21f54
   languageName: node
   linkType: hard
 
@@ -8004,7 +8004,7 @@ __metadata:
 
 "resolve@patch:resolve@^1.14.2#~builtin<compat/resolve>, resolve@patch:resolve@^1.19.0#~builtin<compat/resolve>, resolve@patch:resolve@^1.22.4#~builtin<compat/resolve>":
   version: 1.22.8
-  resolution: "resolve@patch:resolve@npm%3A1.22.8#~builtin<compat/resolve>::version=1.22.8&hash=07638b"
+  resolution: "resolve@patch:resolve@npm%3A1.22.8#~builtin<compat/resolve>::version=1.22.8&hash=c3c19d"
   dependencies:
     is-core-module: ^2.13.0
     path-parse: ^1.0.7
@@ -8017,7 +8017,7 @@ __metadata:
 
 "resolve@patch:resolve@^2.0.0-next.4#~builtin<compat/resolve>":
   version: 2.0.0-next.5
-  resolution: "resolve@patch:resolve@npm%3A2.0.0-next.5#~builtin<compat/resolve>::version=2.0.0-next.5&hash=07638b"
+  resolution: "resolve@patch:resolve@npm%3A2.0.0-next.5#~builtin<compat/resolve>::version=2.0.0-next.5&hash=c3c19d"
   dependencies:
     is-core-module: ^2.13.0
     path-parse: ^1.0.7
@@ -8831,7 +8831,7 @@ __metadata:
 
 "typescript@patch:typescript@^5.1.6#~builtin<compat/typescript>":
   version: 5.1.6
-  resolution: "typescript@patch:typescript@npm%3A5.1.6#~builtin<compat/typescript>::version=5.1.6&hash=701156"
+  resolution: "typescript@patch:typescript@npm%3A5.1.6#~builtin<compat/typescript>::version=5.1.6&hash=1f5320"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
