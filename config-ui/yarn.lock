@@ -2599,12 +2599,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^18.19.20":
-  version: 18.19.20
-  resolution: "@types/node@npm:18.19.20"
+"@types/node@npm:^24.0.0":
+  version: 24.10.13
+  resolution: "@types/node@npm:24.10.13"
   dependencies:
-    undici-types: ~5.26.4
-  checksum: 1f12606e0732fbbdfb4df4fd111f47312091dcfa46c4856ce86222530a6045c16f8efb2a38d9b18fbe3e6763cafa2b1e48f0042e9ef51bd1c075547cce5280c5
+    undici-types: ~7.16.0
+  checksum: 254559915b60e204c855d3ea1b94cce187106c49c815a7b8edee1517f8a35301850545a52965e3dd2b5be3b26108e355108bcdb917445e855255a53dbcab3818
   languageName: node
   linkType: hard
 
@@ -3663,7 +3663,7 @@ __metadata:
     "@ant-design/icons": ^5.3.0
     "@reduxjs/toolkit": ^2.2.1
     "@types/file-saver": ^2.0.5
-    "@types/node": ^18.19.20
+    "@types/node": ^24.0.0
     "@types/react": ^18.2.56
     "@types/react-copy-to-clipboard": ^5.0.7
     "@types/react-dom": ^18.2.19
@@ -4854,7 +4854,7 @@ __metadata:
 
 "fsevents@patch:fsevents@~2.3.2#~builtin<compat/fsevents>, fsevents@patch:fsevents@~2.3.3#~builtin<compat/fsevents>":
   version: 2.3.3
-  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=18f3a7"
+  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=df0bf1"
   dependencies:
     node-gyp: latest
   conditions: os=darwin
@@ -8004,7 +8004,7 @@ __metadata:
 
 "resolve@patch:resolve@^1.14.2#~builtin<compat/resolve>, resolve@patch:resolve@^1.19.0#~builtin<compat/resolve>, resolve@patch:resolve@^1.22.4#~builtin<compat/resolve>":
   version: 1.22.8
-  resolution: "resolve@patch:resolve@npm%3A1.22.8#~builtin<compat/resolve>::version=1.22.8&hash=07638b"
+  resolution: "resolve@patch:resolve@npm%3A1.22.8#~builtin<compat/resolve>::version=1.22.8&hash=c3c19d"
   dependencies:
     is-core-module: ^2.13.0
     path-parse: ^1.0.7
@@ -8017,7 +8017,7 @@ __metadata:
 
 "resolve@patch:resolve@^2.0.0-next.4#~builtin<compat/resolve>":
   version: 2.0.0-next.5
-  resolution: "resolve@patch:resolve@npm%3A2.0.0-next.5#~builtin<compat/resolve>::version=2.0.0-next.5&hash=07638b"
+  resolution: "resolve@patch:resolve@npm%3A2.0.0-next.5#~builtin<compat/resolve>::version=2.0.0-next.5&hash=c3c19d"
   dependencies:
     is-core-module: ^2.13.0
     path-parse: ^1.0.7
@@ -8831,7 +8831,7 @@ __metadata:
 
 "typescript@patch:typescript@^5.1.6#~builtin<compat/typescript>":
   version: 5.1.6
-  resolution: "typescript@patch:typescript@npm%3A5.1.6#~builtin<compat/typescript>::version=5.1.6&hash=701156"
+  resolution: "typescript@patch:typescript@npm%3A5.1.6#~builtin<compat/typescript>::version=5.1.6&hash=1f5320"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
@@ -8851,10 +8851,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"undici-types@npm:~5.26.4":
-  version: 5.26.5
-  resolution: "undici-types@npm:5.26.5"
-  checksum: 3192ef6f3fd5df652f2dc1cd782b49d6ff14dc98e5dced492aa8a8c65425227da5da6aafe22523c67f035a272c599bb89cfe803c1db6311e44bed3042fc25487
+"undici-types@npm:~7.16.0":
+  version: 7.16.0
+  resolution: "undici-types@npm:7.16.0"
+  checksum: 1ef68fc6c5bad200c8b6f17de8e5bc5cfdcadc164ba8d7208cd087cfa8583d922d8316a7fd76c9a658c22b4123d3ff847429185094484fbc65377d695c905857
   languageName: node
   linkType: hard
 
