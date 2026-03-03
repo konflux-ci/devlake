@@ -4,6 +4,54 @@
 
 The AI Review plugin extracts and analyzes AI-generated code reviews from pull requests to calculate the "AI Predicted Failure Avoidance" metric. This metric measures whether AI code review tools can effectively predict and flag risky code changes before they reach production.
 
+## Plugin Architecture
+
+This is a **metric/transformer plugin** (not a data source plugin):
+
+- Works on domain layer data from GitHub/GitLab plugins
+- Implements `MetricPluginBlueprintV200` interface
+- Configured via Projects, not Connections
+- Runs after data collection plugins
+
+### Directory Structure
+
+```
+plugins/aireview/
+├── aireview.go                    # Entry point (standalone debugging)
+├── impl/
+│   └── impl.go                    # Plugin implementation (interfaces)
+├── models/
+│   ├── ai_review.go               # AiReview model
+│   ├── ai_review_finding.go       # AiReviewFinding model
+│   ├── ai_failure_prediction.go   # Prediction models
+│   ├── scope_config.go            # Configurable patterns
+│   └── migrationscripts/
+│       └── init_schema.go         # Database migrations
+├── tasks/
+│   ├── task_data.go               # Task options and validation
+│   ├── extract_ai_reviews.go      # Extract AI reviews from comments
+│   ├── extract_ai_review_findings.go
+│   ├── calculate_failure_predictions.go
+│   ├── calculate_prediction_metrics.go
+│   └── extract_ai_reviews_test.go # Unit tests
+└── e2e/
+    ├── aireview_test.go           # E2E tests
+    └── raw_tables/                # Test fixtures (CSVs)
+```
+
+### Interfaces Implemented
+
+```go
+var _ interface {
+    plugin.PluginMeta
+    plugin.PluginTask
+    plugin.PluginModel
+    plugin.PluginMetric
+    plugin.PluginMigration
+    plugin.MetricPluginBlueprintV200
+} = (*AiReview)(nil)
+```
+
 ## Features
 
 - **Multi-platform support**: Works with both GitHub PRs and GitLab MRs

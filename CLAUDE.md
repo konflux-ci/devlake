@@ -642,126 +642,142 @@ Task(
 - Keep TODO.md updated for persistence across sessions.
 - Use clear markers for work-in-progress sections.
 
-# DevLake Local Development
+# DevLake Local Development (AI Reference)
 
-## Container Runtime
+Quick reference for AI agents working on this project.
 
-This project uses **podman** instead of docker. Use `podman` and `podman compose` commands.
+## Environment
 
-## Development Services
+- **Container runtime**: podman (not docker)
+- **Compose file**: `docker-compose-dev.yml`
+- **Database**: MySQL 8, credentials `merico:merico`, database `lake`
+- **Test database**: `lake_test` (auto-created via `scripts/mysql-init.sql`)
+- **MySQL root**: `root:admin` (for admin operations)
+- **Go version**: 1.21+
 
-### Stop Running Services
-
-```bash
-cd /Users/kpiwko/devel/practices-team/devlake
-
-# Stop all devlake services
-podman compose -f docker-compose-dev.yml down
-```
-
-### Rebuild the Backend
-
-```bash
-# Option 1: Build Go binary locally
-cd backend
-go build -o bin/devlake ./cmd/lake-server/
-
-# Option 2: Build the container image
-cd /Users/kpiwko/devel/practices-team/devlake
-podman compose -f docker-compose-dev.yml build devlake
-```
-
-### Start Services
-
-```bash
-cd /Users/kpiwko/devel/practices-team/devlake
-
-# Start all services (MySQL, Grafana, DevLake, Config-UI)
-podman compose -f docker-compose-dev.yml up -d
-
-# Or start just MySQL for local development
-podman compose -f docker-compose-dev.yml up -d mysql
-
-# Then run devlake locally (without container)
-cd backend
-go run ./cmd/lake-server/
-```
-
-### View Logs
-
-```bash
-# View devlake logs
-podman compose -f docker-compose-dev.yml logs -f devlake
-
-# View all logs
-podman compose -f docker-compose-dev.yml logs -f
-```
-
-### Access Services
+## Service URLs
 
 | Service | URL |
 |---------|-----|
 | Config UI | http://localhost:4000 |
 | DevLake API | http://localhost:8080 |
-| Grafana | http://localhost:3002 |
-| MySQL | localhost:3306 (user: merico, pass: merico) |
+| Grafana | http://localhost:4000/grafana/ |
+| MySQL | localhost:3306 |
 
-## Running Tests
+## Custom CA (CEE GitLab)
 
-### Unit Tests
+For internal services using Red Hat CA:
 
 ```bash
-cd backend
-go test ./plugins/aireview/tasks/... -v
+# Export Red Hat IT Root CA (macOS)
+security find-certificate -a -p -c "Red Hat IT Root CA" /Library/Keychains/System.keychain > ./custom-ca.crt
+
+# Set in .env
+CA_CERT_FILE=./custom-ca.crt
+
+# Start with custom CA
+podman compose -f docker-compose-dev.yml -f docker-compose-custom-ca.yml up -d
 ```
 
-### E2E Tests
-
-E2E tests require MySQL running. The `.env` file uses `localhost` for `E2E_DB_URL`:
+## Common Commands
 
 ```bash
-# Ensure MySQL is running
+# Start all services
+podman compose -f docker-compose-dev.yml up -d
+
+# Start just MySQL (for local Go dev)
 podman compose -f docker-compose-dev.yml up -d mysql
 
-# Create test database if needed
-podman compose -f docker-compose-dev.yml exec mysql mysql -umerico -pmerico -e "CREATE DATABASE IF NOT EXISTS lake_test;"
+# Stop services
+podman compose -f docker-compose-dev.yml down
 
-# Run e2e tests
-cd backend
-go test ./plugins/aireview/e2e/... -v
+# Rebuild and restart devlake container
+podman compose -f docker-compose-dev.yml up -d --build devlake
+
+# View logs
+podman compose -f docker-compose-dev.yml logs -f devlake
 ```
 
-### All Plugin Tests
+## Building (from backend/)
 
 ```bash
 cd backend
+make go-dep      # Install dependencies
+make build       # Build everything (plugins + server)
+make build-plugin # Build plugins only
+make run         # Run server
+make dev         # Build and run
+```
+
+## Testing
+
+```bash
+cd backend
+
+# All tests (unit + e2e)
+make test
+
+# Unit tests only
+make unit-test
+
+# E2E tests (requires MySQL running with lake_test)
+export E2E_DB_URL="mysql://merico:merico@localhost:3306/lake_test?charset=utf8mb4&parseTime=True"
+make e2e-test
+
+# Specific plugin tests
 go test ./plugins/aireview/... -v
+
+# Lint and format
+make lint
+make fmt
 ```
 
-## Database Operations
-
-### Connect to MySQL
+## Database
 
 ```bash
+# Connect to MySQL
 podman compose -f docker-compose-dev.yml exec mysql mysql -umerico -pmerico lake
-```
 
-### Check Migrations
-
-```bash
-# List migration history
+# Check migrations
 podman compose -f docker-compose-dev.yml exec mysql mysql -umerico -pmerico lake -e \
   "SELECT * FROM _devlake_migration_history ORDER BY created_at DESC LIMIT 10;"
+
+# Trigger migration after schema changes
+curl -s http://localhost:4000/api/proceed-db-migration
 ```
 
-### Verify aireview Tables
+## Plugin Verification
 
 ```bash
-# Check aireview_reviews table structure
-podman compose -f docker-compose-dev.yml exec mysql mysql -umerico -pmerico lake -e \
-  "DESCRIBE _tool_aireview_reviews;"
+# Check plugin is loaded
+curl -s http://localhost:4000/api/plugins | jq '.[] | select(.plugin == "aireview")'
 
-# Check for new columns (effort_rating, pre_merge_checks_*)
+# Check aireview tables
 podman compose -f docker-compose-dev.yml exec mysql mysql -umerico -pmerico lake -e \
-  "DESCRIBE _tool_aireview_reviews;" | grep -E "effort_rating|pre_merge"
+  "SHOW TABLES LIKE '_tool_aireview%';"
 ```
+
+## Before Running Commands
+
+1. Ensure podman machine is running: `podman machine start`
+2. Check if services are already running: `podman ps`
+3. For E2E tests, MySQL must be running with `lake_test` database
+
+## If E2E tests fail with "Access denied for lake_test"
+
+Existing MySQL volumes may not have `lake_test`. Fix with:
+
+```bash
+podman compose -f docker-compose-dev.yml exec mysql mysql -uroot -padmin -e "
+  CREATE DATABASE IF NOT EXISTS lake_test;
+  GRANT ALL PRIVILEGES ON lake_test.* TO 'merico'@'%';
+  FLUSH PRIVILEGES;
+"
+```
+
+## Project Conventions
+
+- Plugin code: `backend/plugins/<plugin-name>/`
+- Tests next to source: `foo.go` → `foo_test.go`
+- E2E test fixtures: `e2e/raw_tables/*.csv`
+- Migrations: `models/migrationscripts/`
