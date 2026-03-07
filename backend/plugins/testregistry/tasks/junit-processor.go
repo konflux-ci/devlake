@@ -530,6 +530,7 @@ func saveSuiteRecursively(db dal.Dal, logger log.Logger, suite *TestSuite, conne
 			NumSkipped:    suite.NumSkipped,
 			NumFailed:     suite.NumFailed,
 			Duration:      suite.Duration,
+			Hostname:      suite.Hostname,
 			Properties:    propertiesJSON,
 			ParentSuiteId: parentSuiteId,
 		}
