@@ -19,8 +19,6 @@ package tasks
 
 import (
 	"encoding/json"
-	"fmt"
-	"strings"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -109,10 +107,10 @@ func EnrichReviewReactions(taskCtx plugin.SubTaskContext) errors.Error {
 
 		// Build lookup: raw_data_id -> review_id
 		rawIdToReviewId := make(map[uint64]string)
-		rawIds := make([]string, 0, len(links))
+		rawIds := make([]uint64, 0, len(links))
 		for _, link := range links {
 			rawIdToReviewId[link.RawDataId] = link.Id
-			rawIds = append(rawIds, fmt.Sprintf("%d", link.RawDataId))
+			rawIds = append(rawIds, link.RawDataId)
 		}
 
 		// Process in batches of 500
@@ -128,15 +126,11 @@ func EnrichReviewReactions(taskCtx plugin.SubTaskContext) errors.Error {
 			// Note: data column is stored as binary, must convert to utf8mb4 for JSON_EXTRACT
 			// We extract $.reactions as a full JSON object and parse in Go to avoid
 			// MySQL JSON path issues with special-character keys like "+1" and "-1"
-			//nolint:gosec
-			rawSQL := fmt.Sprintf(
-				"SELECT id, JSON_EXTRACT(CONVERT(data USING utf8mb4), '$.reactions') as reactions_json "+
-					"FROM %s WHERE id IN (%s)",
-				rawTable,
-				strings.Join(batch, ","),
+			rows, err := db.Cursor(
+				dal.Select("id, JSON_EXTRACT(CONVERT(data USING utf8mb4), '$.reactions') as reactions_json"),
+				dal.From(rawTable),
+				dal.Where("id IN (?)", batch),
 			)
-
-			rows, err := db.RawCursor(rawSQL)
 			if err != nil {
 				logger.Warn(err, "failed to query reactions from %s, skipping", rawTable)
 				continue
