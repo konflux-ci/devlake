@@ -547,6 +547,75 @@ func TestDetectAiTool_Qodo(t *testing.T) {
 	}
 }
 
+func TestDetectAiTool_Gemini(t *testing.T) {
+	tests := []struct {
+		name      string
+		accountId string
+		body      string
+		wantTool  string
+		wantIsAi  bool
+	}{
+		{
+			name:      "Gemini by GitHub username",
+			accountId: "gemini-code-assist",
+			body:      "Some review comment",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by GitLab username",
+			accountId: "gemini-code-assist-bot",
+			body:      "Some review comment with code assist feedback",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by body pattern - codereviewagent",
+			accountId: "somebot",
+			body:      "Review by codereviewagent: this looks good",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by body pattern - gstatic reference",
+			accountId: "somebot",
+			body:      "![icon](https://www.gstatic.com/codereviewagent/icon.png) Review summary",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by body pattern - gemini mention",
+			accountId: "bot",
+			body:      "Gemini Code Assist has reviewed this merge request",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Not Gemini - regular comment",
+			accountId: "developer",
+			body:      "LGTM, looks good!",
+			wantTool:  "",
+			wantIsAi:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			taskData := &AiReviewTaskData{
+				Options: &AiReviewOptions{
+					ScopeConfig: models.GetDefaultScopeConfig(),
+				},
+			}
+			err := CompilePatterns(taskData)
+			assert.NoError(t, err)
+
+			gotTool, gotIsAi := detectAiTool(taskData, tt.accountId, tt.body)
+			assert.Equal(t, tt.wantTool, gotTool)
+			assert.Equal(t, tt.wantIsAi, gotIsAi)
+		})
+	}
+}
+
 func TestBuildCommentUrl(t *testing.T) {
 	tests := []struct {
 		name      string

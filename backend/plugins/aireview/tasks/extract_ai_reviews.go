@@ -54,9 +54,10 @@ func ExtractAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 		logger.Info("Starting AI review extraction for project: %s", data.Options.ProjectName)
 		// Project mode: join with project_mappings to get all repos in project
 		clauses = []dal.Clause{
-			dal.Select("prc.*, pr.base_repo_id, pr.status as pr_status, pr.merged_date, pr.url as pr_url"),
+			dal.Select("prc.*, pr.base_repo_id, pr.status as pr_status, pr.merged_date, pr.url as pr_url, a.user_name as account_username"),
 			dal.From("pull_request_comments prc"),
 			dal.Join("LEFT JOIN pull_requests pr ON prc.pull_request_id = pr.id"),
+			dal.Join("LEFT JOIN accounts a ON prc.account_id = a.id"),
 			dal.Join("LEFT JOIN project_mapping pm ON pr.base_repo_id = pm.row_id"),
 			dal.Where("pm.project_name = ? AND pm.`table` = ?", data.Options.ProjectName, "repos"),
 		}
@@ -64,9 +65,10 @@ func ExtractAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 		logger.Info("Starting AI review extraction for repo: %s", data.Options.RepoId)
 		// Single repo mode
 		clauses = []dal.Clause{
-			dal.Select("prc.*, pr.base_repo_id, pr.status as pr_status, pr.merged_date, pr.url as pr_url"),
+			dal.Select("prc.*, pr.base_repo_id, pr.status as pr_status, pr.merged_date, pr.url as pr_url, a.user_name as account_username"),
 			dal.From("pull_request_comments prc"),
 			dal.Join("LEFT JOIN pull_requests pr ON prc.pull_request_id = pr.id"),
+			dal.Join("LEFT JOIN accounts a ON prc.account_id = a.id"),
 			dal.Where("pr.base_repo_id = ?", data.Options.RepoId),
 		}
 	}
@@ -85,18 +87,26 @@ func ExtractAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 	for cursor.Next() {
 		var comment struct {
 			code.PullRequestComment
-			BaseRepoId string     `gorm:"column:base_repo_id"`
-			PrStatus   string     `gorm:"column:pr_status"`
-			MergedDate *time.Time `gorm:"column:merged_date"`
-			PrUrl      string     `gorm:"column:pr_url"`
+			BaseRepoId      string     `gorm:"column:base_repo_id"`
+			PrStatus        string     `gorm:"column:pr_status"`
+			MergedDate      *time.Time `gorm:"column:merged_date"`
+			PrUrl           string     `gorm:"column:pr_url"`
+			AccountUsername string     `gorm:"column:account_username"`
 		}
 
 		if err := db.Fetch(cursor, &comment); err != nil {
 			return errors.Default.Wrap(err, "failed to fetch comment")
 		}
 
+		// Use the resolved username from accounts table for reliable tool detection.
+		// Fall back to domain account_id if accounts table entry is missing.
+		username := comment.AccountUsername
+		if username == "" {
+			username = comment.AccountId
+		}
+
 		// Check if this is an AI-generated review
-		aiTool, isAiReview := detectAiTool(data, comment.AccountId, comment.Body)
+		aiTool, isAiReview := detectAiTool(data, username, comment.Body)
 		if !isAiReview {
 			continue
 		}
@@ -126,7 +136,7 @@ func ExtractAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 			PullRequestId:              comment.PullRequestId,
 			RepoId:                     repoId,
 			AiTool:                     aiTool,
-			AiToolUser:                 comment.AccountId,
+			AiToolUser:                 username,
 			ReviewId:                   comment.Id,
 			Body:                       comment.Body,
 			Summary:                    extractSummary(comment.Body),

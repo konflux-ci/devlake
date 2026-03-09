@@ -19,24 +19,26 @@ package tasks
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 )
 
-// reactions holds the parsed GitHub reactions JSON
+// reactions holds the parsed GitHub reactions JSON.
+// GitLab notes do not embed reactions inline, so this only applies to GitHub raw data.
 type reactions struct {
 	TotalCount int `json:"total_count"`
 	ThumbsUp   int `json:"+1"`
 	ThumbsDown int `json:"-1"`
 }
 
-var EnrichReviewReactionsMeta = plugin.SubTaskMeta{
-	Name:             "enrichReviewReactions",
-	EntryPoint:       EnrichReviewReactions,
+var EnrichGithubReviewReactionsMeta = plugin.SubTaskMeta{
+	Name:             "enrichGithubReviewReactions",
+	EntryPoint:       EnrichGithubReviewReactions,
 	EnabledByDefault: true,
-	Description:      "Enrich AI reviews with developer reaction data from raw GitHub API tables",
+	Description:      "Enrich AI reviews with developer reaction data from GitHub raw API tables",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE_REVIEW},
 	Dependencies:     []*plugin.SubTaskMeta{&ExtractAiReviewsMeta},
 }
@@ -48,8 +50,8 @@ type reviewRawLink struct {
 	RawDataId    uint64 `gorm:"column:_raw_data_id"`
 }
 
-// EnrichReviewReactions enriches AI reviews with reaction counts from raw GitHub data
-func EnrichReviewReactions(taskCtx plugin.SubTaskContext) errors.Error {
+// EnrichGithubReviewReactions enriches AI reviews with reaction counts from raw GitHub data
+func EnrichGithubReviewReactions(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
 	data := taskCtx.GetData().(*AiReviewTaskData)
@@ -102,7 +104,13 @@ func EnrichReviewReactions(taskCtx plugin.SubTaskContext) errors.Error {
 	totalWithReactions := 0
 
 	// Step 2: For each raw table, batch-query reaction data
+	// GitLab notes don't embed reactions inline (GitLab uses separate award_emoji API),
+	// so skip GitLab raw tables as they won't have $.reactions in the JSON
 	for rawTable, links := range tableLinks {
+		if strings.Contains(rawTable, "gitlab") {
+			logger.Info("Skipping %d reviews from GitLab raw table %s (reactions not embedded in GitLab notes)", len(links), rawTable)
+			continue
+		}
 		logger.Info("Processing %d reviews from raw table: %s", len(links), rawTable)
 
 		// Build lookup: raw_data_id -> review_id
