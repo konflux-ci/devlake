@@ -157,6 +157,15 @@ func (stats *collectionStats) processJobs(
 	logger := taskCtx.GetLogger()
 	taskCtx.SetProgress(0, len(allJobs))
 
+	// Create GCS client once for the entire task run
+	gcsClient, gcsErr := NewGCSBucketClient(taskCtx.GetContext())
+	if gcsErr != nil {
+		logger.Warn(gcsErr, "failed to create GCS client, JUnit collection will be skipped")
+	}
+	if gcsClient != nil {
+		defer func() { _ = gcsClient.Close() }()
+	}
+
 	for _, job := range allJobs {
 		stats.processedCount++
 
@@ -194,8 +203,12 @@ func (stats *collectionStats) processJobs(
 		stats.savedCount++
 
 		// Fetch and log JUnit test suites using configured regex
+		if gcsClient == nil {
+			stats.junitNotFoundCount++
+			continue
+		}
 		logger.Debug("Attempting to fetch JUnit XML for job", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "trigger_type", ciJob.TriggerType)
-		if fetchAndPrintJUnitSuites(taskCtx, &job, githubOrg, repoName, ciJob, data.JUnitRegex) {
+		if fetchAndPrintJUnitSuites(taskCtx, gcsClient, &job, githubOrg, repoName, ciJob, data.JUnitRegex) {
 			stats.junitFoundCount++
 		} else {
 			stats.junitNotFoundCount++

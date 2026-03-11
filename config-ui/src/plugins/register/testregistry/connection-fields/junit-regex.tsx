@@ -91,10 +91,15 @@ export const JUnitRegex = ({ initialValue, value, error, setValue, setError }: P
       title="JUnit File Pattern"
       description={
         <>
-          Regex pattern to match JUnit XML file names in artifacts. Leave empty to use the default pattern.
+          Regex pattern to match JUnit XML file names in CI artifacts. Leave empty to use the default pattern.
           <br />
           <Text type="secondary" style={{ fontSize: '12px' }}>
             Default: <code>{DEFAULT_JUNIT_REGEX}</code>
+          </Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            Example pattern: <code>[0-9a-z_-]*junit[0-9a-z_-]*\.xml</code> matches{' '}
+            <code>junit_operator.xml</code>, <code>junit_install_status.xml</code>
           </Text>
         </>
       }

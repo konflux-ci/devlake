@@ -26,13 +26,17 @@ import (
 	"github.com/apache/incubator-devlake/core/log"
 )
 
-// DefaultJUnitRegexPattern is the default regex pattern for matching JUnit XML file names
-// Matches files starting with "devlake-", "e2e", or "qd-report-" and ending with .xml or .junit
+// DefaultJUnitRegexPattern is the default regex pattern for matching JUnit XML file names.
+// Matches files starting with "devlake-", "e2e", or "qd-report-" and ending with .xml or .junit.
+// Users can override this per-connection via the junitRegex field.
 const DefaultJUnitRegexPattern = `(devlake-|e2e|qd-report-)[0-9a-z-]+\.(xml|junit)`
 
 // JUnitRegexpSearch is the compiled default regex for backwards compatibility
 // Deprecated: Use GetJUnitRegex(pattern) instead for configurable regex support
 var JUnitRegexpSearch = regexp.MustCompile(DefaultJUnitRegexPattern)
+
+// maxRegexCacheSize limits the number of cached regex patterns to prevent unbounded memory growth
+const maxRegexCacheSize = 100
 
 // regexCache caches compiled regex patterns to avoid recompilation
 var regexCache = struct {
@@ -76,9 +80,11 @@ func GetJUnitRegex(pattern string, logger log.Logger) (*regexp.Regexp, errors.Er
 		return JUnitRegexpSearch, errors.BadInput.Wrap(err, "invalid JUnit regex pattern")
 	}
 
-	// Cache the compiled pattern
+	// Cache the compiled pattern (with size limit)
 	regexCache.Lock()
-	regexCache.patterns[pattern] = compiled
+	if len(regexCache.patterns) < maxRegexCacheSize {
+		regexCache.patterns[pattern] = compiled
+	}
 	regexCache.Unlock()
 
 	return compiled, nil
@@ -197,6 +203,3 @@ type FailureOutput struct {
 	// Output holds verbose failure output from the test
 	Output string `xml:",chardata"`
 }
-
-// TestResult is the result of a test case
-type TestResult string
