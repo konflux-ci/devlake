@@ -808,7 +808,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 33
       },
       "id": 10,
       "options": {
@@ -832,7 +832,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT \n  id,\n  'Details' as details,\n  created_date,\n  ai_tool,\n  risk_level,\n  effort_rating,\n  review_state,\n  issues_found,\n  suggestions_count,\n  LEFT(summary, 200) as summary,\n  source_url\nFROM _tool_aireview_reviews\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\nORDER BY created_date DESC\nLIMIT 100",
+          "rawSql": "SELECT \n  id,\n  'Details' as details,\n  created_date,\n  ai_tool,\n  risk_level,\n  effort_rating,\n  review_state,\n  issues_found,\n  suggestions_count,\n  reactions_thumbs_up,\n  reactions_thumbs_down,\n  LEFT(summary, 200) as summary,\n  source_url\nFROM _tool_aireview_reviews\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\nORDER BY created_date DESC\nLIMIT 100",
           "refId": "A"
         }
       ],
@@ -1116,6 +1116,210 @@
     {
       "datasource": "mysql",
       "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 29
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT SUM(reactions_total_count) as total_reactions FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Reactions",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 29
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ROUND(AVG(reactions_total_count), 1) as avg_reactions FROM _tool_aireview_reviews WHERE reactions_total_count > 0 AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Reactions/Review",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 29
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT SUM(reactions_thumbs_up) as thumbs_up FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Thumbs Up",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 29
+      },
+      "id": 19,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT SUM(reactions_thumbs_down) as thumbs_down FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Thumbs Down",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
         "defaults": {},
         "overrides": []
       },
@@ -1123,7 +1327,7 @@
         "h": 15,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 45
       },
       "id": 13,
       "options": {

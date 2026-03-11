@@ -291,6 +291,41 @@ func TestExtractSummary(t *testing.T) {
 			wantContain: "Effort: 2/5",
 			wantNotContain: "<table>",
 		},
+		{
+			name:        "Gemini PR-level summary extracts content after greeting",
+			body:        "## Summary of Changes\n\nHello @user, I'm Gemini Code Assist[^1]! Here is my review.\n\nThis pull request refactors the authentication module to use JWT tokens instead of session cookies, improving scalability.\n\n### Highlights\n\n* **Token rotation**: Added automatic token refresh logic\n* **Session cleanup**: Removed legacy session store",
+			wantContain: "This pull request refactors the authentication module",
+			wantNotContain: "of Changes",
+		},
+		{
+			name:           "Gemini inline review strips priority badge",
+			body:           "![medium](https://www.gstatic.com/codereviewagent/medium-priority.svg)\n\nThe error returned by `db.Save()` is not checked here, which could silently drop write failures.",
+			wantContain:    "error returned by",
+			wantNotContain: "gstatic.com",
+		},
+		{
+			name:           "Gemini inline review with JSON-quoted body",
+			body:           "\"![medium](https://www.gstatic.com/codereviewagent/medium-priority.svg)\\n\\nThis test uses the `eth4` interface, which is not created in the test setup.\"",
+			wantContain:    "This test uses the",
+			wantNotContain: "gstatic.com",
+		},
+		{
+			name:           "Gemini inline review with multiple badges",
+			body:           "\"![security-high](https://www.gstatic.com/codereviewagent/security-high-priority.svg) ![high](https://www.gstatic.com/codereviewagent/high-priority.svg)\\n\\nA command injection vulnerability exists here.\"",
+			wantContain:    "command injection vulnerability",
+			wantNotContain: "gstatic.com",
+		},
+		{
+			name:        "Gemini PR summary extracts highlights",
+			body:        "## Summary of Changes\n\nHello @dev, I'm Gemini Code Assist[^1]!\n\nThis PR adds retry logic for failed API calls to improve resilience.\n\n### Highlights\n\n* **Exponential backoff**: Implements configurable retry delays\n* **Circuit breaker**: Prevents cascading failures",
+			wantContain: "Exponential backoff",
+		},
+		{
+			name:           "Generic summary regex does not match Gemini heading",
+			body:           "## Summary of Changes\n\nSome unrelated content that is long enough to be a paragraph for extraction purposes.",
+			wantContain:    "Some unrelated content",
+			wantNotContain: "of Changes",
+		},
 	}
 
 	for _, tt := range tests {
@@ -537,6 +572,82 @@ func TestDetectAiTool_Qodo(t *testing.T) {
 				},
 			}
 			// Compile patterns
+			err := CompilePatterns(taskData)
+			assert.NoError(t, err)
+
+			gotTool, gotIsAi := detectAiTool(taskData, tt.accountId, tt.body)
+			assert.Equal(t, tt.wantTool, gotTool)
+			assert.Equal(t, tt.wantIsAi, gotIsAi)
+		})
+	}
+}
+
+func TestDetectAiTool_Gemini(t *testing.T) {
+	tests := []struct {
+		name      string
+		accountId string
+		body      string
+		wantTool  string
+		wantIsAi  bool
+	}{
+		{
+			name:      "Gemini by GitHub username",
+			accountId: "gemini-code-assist",
+			body:      "Some review comment",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by GitLab username",
+			accountId: "gemini-code-assist-bot",
+			body:      "Some review comment with code assist feedback",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by body pattern - codereviewagent",
+			accountId: "somebot",
+			body:      "Review by codereviewagent: this looks good",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by body pattern - gstatic reference",
+			accountId: "somebot",
+			body:      "![icon](https://www.gstatic.com/codereviewagent/icon.png) Review summary",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Gemini by body pattern - greeting phrase",
+			accountId: "bot",
+			body:      "Hello @user, I'm Gemini Code Assist! Here is my review of this pull request.",
+			wantTool:  models.AiToolGemini,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Not Gemini - regular comment",
+			accountId: "developer",
+			body:      "LGTM, looks good!",
+			wantTool:  "",
+			wantIsAi:  false,
+		},
+		{
+			name:      "Not Gemini - human mentioning Gemini Code Assist",
+			accountId: "developer",
+			body:      "Gemini Code Assist has reviewed this merge request and I agree with its findings.",
+			wantTool:  "",
+			wantIsAi:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			taskData := &AiReviewTaskData{
+				Options: &AiReviewOptions{
+					ScopeConfig: models.GetDefaultScopeConfig(),
+				},
+			}
 			err := CompilePatterns(taskData)
 			assert.NoError(t, err)
 

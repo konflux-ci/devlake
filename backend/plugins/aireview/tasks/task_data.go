@@ -57,6 +57,8 @@ type AiReviewTaskData struct {
 	CursorBugbotPatternRegex  *regexp.Regexp
 	QodoUsernameRegex         *regexp.Regexp
 	QodoPatternRegex          *regexp.Regexp
+	GeminiUsernameRegex       *regexp.Regexp
+	GeminiPatternRegex        *regexp.Regexp
 	AiCommitPatternsRegex     []*regexp.Regexp
 	AiPrLabelPatternRegex     *regexp.Regexp
 	RiskHighPatternRegex      *regexp.Regexp
@@ -131,6 +133,20 @@ func CompilePatterns(taskData *AiReviewTaskData) errors.Error {
 		taskData.QodoPatternRegex, err = regexp.Compile(config.QodoPattern)
 		if err != nil {
 			return errors.BadInput.Wrap(err, "invalid qodoPattern")
+		}
+	}
+
+	// Gemini patterns
+	if config.GeminiEnabled && config.GeminiUsername != "" {
+		taskData.GeminiUsernameRegex, err = regexp.Compile("(?i)" + regexp.QuoteMeta(config.GeminiUsername))
+		if err != nil {
+			return errors.BadInput.Wrap(err, "invalid geminiUsername pattern")
+		}
+	}
+	if config.GeminiEnabled && config.GeminiPattern != "" {
+		taskData.GeminiPatternRegex, err = regexp.Compile(config.GeminiPattern)
+		if err != nil {
+			return errors.BadInput.Wrap(err, "invalid geminiPattern")
 		}
 	}
 
