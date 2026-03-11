@@ -33,7 +33,8 @@ const OpenshiftCIBucketName = "test-platform-results"
 
 // GCSBucket wraps a Google Cloud Storage bucket client for accessing Openshift CI test results
 type GCSBucket struct {
-	bkt *storage.BucketHandle
+	client *storage.Client
+	bkt    *storage.BucketHandle
 }
 
 // NewGCSBucketClient creates a new GCS client for accessing Openshift CI bucket
@@ -45,11 +46,29 @@ func NewGCSBucketClient(ctx context.Context) (*GCSBucket, errors.Error) {
 	}
 
 	return &GCSBucket{
-		bkt: client.Bucket(OpenshiftCIBucketName),
+		client: client,
+		bkt:    client.Bucket(OpenshiftCIBucketName),
 	}, nil
 }
 
-// GetJobJunitContent retrieves JUnit XML content from GCS for a specific job
+// Close releases resources held by the GCS client
+func (b *GCSBucket) Close() error {
+	return b.client.Close()
+}
+
+// maxJUnitFilesPerJob limits the number of JUnit files collected per job to prevent excessive memory usage
+const maxJUnitFilesPerJob = 50
+
+// JUnitFile represents a single JUnit XML file fetched from GCS
+type JUnitFile struct {
+	Content []byte
+	Path    string
+}
+
+// GetJobJunitContent retrieves all matching JUnit XML files from GCS for a specific job.
+// It iterates through all objects in the artifact directory and returns every file
+// matching the regex pattern, since jobs can produce multiple JUnit files across subdirectories.
+//
 // Based on the quality-dashboard implementation:
 // https://github.com/konflux-ci/quality-dashboard/blob/main/backend/pkg/connectors/gcs/gcs_authentication.go
 //
@@ -63,58 +82,61 @@ func NewGCSBucketClient(ctx context.Context) (*GCSBucket, errors.Error) {
 //   - fileName: Regex pattern to match the JUnit file name (e.g., regexp.MustCompile(".*junit.*\\.xml"))
 //
 // Returns:
-//   - []byte: File content if found, nil otherwise
-//   - string: Full GCS path of the matched file, empty string if not found
-func (b *GCSBucket) GetJobJunitContent(orgName, repoName, pullNumber, jobId, jobType, jobName string, fileName *regexp.Regexp) ([]byte, string) {
+//   - []JUnitFile: All matching JUnit files with their content and paths (may be partial on error)
+//   - error: Non-nil if the GCS listing was interrupted (partial results may still be usable)
+func (b *GCSBucket) GetJobJunitContent(ctx context.Context, orgName, repoName, pullNumber, jobId, jobType, jobName string, fileName *regexp.Regexp) ([]JUnitFile, error) {
 	query := &storage.Query{}
 
 	// Build GCS path prefix based on job type
 	// For Openshift CI, the structure is:
 	// - presubmit: pr-logs/pull/{org}_{repo}/{pullNumber}/{jobName}/{jobId}/artifacts
-	// - postsubmit: logs/{jobName}/{jobId}
-	// - periodic: logs/{jobName}/{jobId}
+	// - postsubmit: logs/{jobName}/{jobId}/artifacts
+	// - periodic: logs/{jobName}/{jobId}/artifacts
 	// Reference: https://github.com/konflux-ci/quality-dashboard/blob/e846aa2dd9b3c1cad9ac4d16d18ddf677e3e6247/backend/api/server/prow_rotate.go#L64-L67
 	switch jobType {
 	case "presubmit":
-		// Presubmit jobs need org, repo, and PR number in the path
+		// Presubmit jobs: search the artifacts/ directory and its subdirectories
+		// e.g., artifacts/junit_operator.xml, artifacts/step/artifacts/junit/*.xml
 		query.Prefix = fmt.Sprintf("pr-logs/pull/%s_%s/%s/%s/%s/artifacts", orgName, repoName, pullNumber, jobName, jobId)
 	case "postsubmit":
-		// Postsubmit jobs: logs/{jobName}/{jobId}
-		query.Prefix = fmt.Sprintf("logs/%s/%s", jobName, jobId)
+		// Postsubmit jobs: search artifacts/ directory and subdirectories
+		query.Prefix = fmt.Sprintf("logs/%s/%s/artifacts", jobName, jobId)
 	case "periodic":
-		// Periodic jobs: logs/{jobName}/{jobId}
-		query.Prefix = fmt.Sprintf("logs/%s/%s", jobName, jobId)
+		// Periodic jobs: search artifacts/ directory and subdirectories
+		query.Prefix = fmt.Sprintf("logs/%s/%s/artifacts", jobName, jobId)
 	default:
 		// Unknown type, try postsubmit format as fallback
-		query.Prefix = fmt.Sprintf("logs/%s/%s", jobName, jobId)
+		query.Prefix = fmt.Sprintf("logs/%s/%s/artifacts", jobName, jobId)
 	}
 
-	it := b.bkt.Objects(context.Background(), query)
+	var results []JUnitFile
+
+	it := b.bkt.Objects(ctx, query)
 	for {
 		obj, err := it.Next()
 		if err == iterator.Done {
-			// No more objects
 			break
 		}
 		if err != nil {
-			// Error iterating, continue to next
-			continue
+			// Return partial results with the error so caller can log it
+			return results, fmt.Errorf("GCS listing interrupted: %w", err)
 		}
 
 		// Check if file name matches the pattern
 		if fileName != nil && fileName.MatchString(obj.Name) {
-			if b.ContentExists(context.Background(), obj.Name) {
-				content, err := b.GetContent(context.Background(), obj.Name)
-				if err == nil {
-					// Return content and file path
-					// Note: We can only return one match, so we return the first one found
-					return content, obj.Name
-				}
+			content, err := b.GetContent(ctx, obj.Name)
+			if err != nil {
+				// Skip unreadable files — a single failure shouldn't block others
+				continue
+			}
+			results = append(results, JUnitFile{Content: content, Path: obj.Name})
+			if len(results) >= maxJUnitFilesPerJob {
+				break
 			}
 		}
 	}
 
-	return nil, ""
+	return results, nil
 }
 
 // ContentExists checks if a file exists at the given GCS path
@@ -132,7 +154,10 @@ func (b *GCSBucket) ContentExists(ctx context.Context, path string) bool {
 	return err == nil
 }
 
-// GetContent retrieves the content of a file from GCS
+// maxJUnitFileSize limits individual JUnit XML file reads to 10 MB
+const maxJUnitFileSize = 10 * 1024 * 1024
+
+// GetContent retrieves the content of a file from GCS, limited to maxJUnitFileSize bytes
 func (b *GCSBucket) GetContent(ctx context.Context, path string) ([]byte, errors.Error) {
 	if len(path) == 0 {
 		return nil, errors.BadInput.New("missing path to GCS content")
@@ -155,7 +180,7 @@ func (b *GCSBucket) GetContent(ctx context.Context, path string) ([]byte, errors
 	}
 	defer gcsReader.Close()
 
-	content, err := io.ReadAll(gcsReader)
+	content, err := io.ReadAll(io.LimitReader(gcsReader, maxJUnitFileSize))
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error reading GCS content")
 	}

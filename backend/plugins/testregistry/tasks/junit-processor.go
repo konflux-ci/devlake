@@ -18,11 +18,11 @@ limitations under the License.
 package tasks
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -66,73 +66,6 @@ func isJobAlreadyProcessed(db dal.Dal, connectionId uint64, jobId string) bool {
 	return suiteCount > 0
 }
 
-// findExistingSuite checks if a test suite with the same name already exists for this job.
-// This prevents duplicate suites when re-processing the same job.
-//
-// Parameters:
-//   - db: Database connection
-//   - connectionId: The DevLake connection ID
-//   - jobId: The CI job ID
-//   - suiteName: The suite name to check
-//   - parentSuiteId: The parent suite ID (nil for top-level suites)
-//
-// Returns:
-//   - *models.TestSuite: The existing suite if found, nil otherwise
-//   - errors.Error: Any error encountered during the query
-func findExistingSuite(db dal.Dal, connectionId uint64, jobId, suiteName string, parentSuiteId *string) (*models.TestSuite, errors.Error) {
-	var existingSuite models.TestSuite
-	clauses := []dal.Clause{
-		dal.Where("connection_id = ? AND job_id = ? AND name = ?", connectionId, jobId, suiteName),
-	}
-
-	// Match parent suite ID (handle nil case for top-level suites)
-	if parentSuiteId == nil {
-		clauses = append(clauses, dal.Where("parent_suite_id IS NULL"))
-	} else {
-		clauses = append(clauses, dal.Where("parent_suite_id = ?", *parentSuiteId))
-	}
-
-	err := db.First(&existingSuite, clauses...)
-	if err != nil {
-		if db.IsErrorNotFound(err) {
-			return nil, nil // Not found is not an error
-		}
-		return nil, errors.Default.Wrap(err, "failed to query existing suite")
-	}
-
-	return &existingSuite, nil
-}
-
-// findExistingTestCase checks if a test case with the same name and classname already exists in a suite.
-// This prevents duplicate test cases when re-processing the same job.
-//
-// Parameters:
-//   - db: Database connection
-//   - connectionId: The DevLake connection ID
-//   - jobId: The CI job ID
-//   - suiteId: The suite ID
-//   - testCaseName: The test case name
-//   - testCaseClassname: The test case classname
-//
-// Returns:
-//   - *models.TestCase: The existing test case if found, nil otherwise
-//   - errors.Error: Any error encountered during the query
-func findExistingTestCase(db dal.Dal, connectionId uint64, jobId, suiteId, testCaseName, testCaseClassname string) (*models.TestCase, errors.Error) {
-	var existingTestCase models.TestCase
-	err := db.First(&existingTestCase,
-		dal.Where("connection_id = ? AND job_id = ? AND suite_id = ? AND name = ? AND classname = ?",
-			connectionId, jobId, suiteId, testCaseName, testCaseClassname),
-	)
-	if err != nil {
-		if db.IsErrorNotFound(err) {
-			return nil, nil // Not found is not an error
-		}
-		return nil, errors.Default.Wrap(err, "failed to query existing test case")
-	}
-
-	return &existingTestCase, nil
-}
-
 // fetchAndPrintJUnitSuites fetches JUnit XML from GCS and logs test suite information.
 //
 // This function:
@@ -156,7 +89,7 @@ func findExistingTestCase(db dal.Dal, connectionId uint64, jobId, suiteId, testC
 //
 // Returns:
 //   - bool: true if JUnit XML was found and parsed successfully, false otherwise
-func fetchAndPrintJUnitSuites(taskCtx plugin.SubTaskContext, job *ProwJob, githubOrg, repoName string, ciJob *models.TestRegistryCIJob, junitRegex *regexp.Regexp) bool {
+func fetchAndPrintJUnitSuites(taskCtx plugin.SubTaskContext, gcsClient *GCSBucket, job *ProwJob, githubOrg, repoName string, ciJob *models.TestRegistryCIJob, junitRegex *regexp.Regexp) bool {
 	logger := taskCtx.GetLogger()
 	db := taskCtx.GetDal()
 
@@ -171,15 +104,6 @@ func fetchAndPrintJUnitSuites(taskCtx plugin.SubTaskContext, job *ProwJob, githu
 		return true // Return true since we consider it "found" (already in DB)
 	}
 
-	ctx := taskCtx.GetContext()
-
-	// Create GCS client
-	gcsClient, err := NewGCSBucketClient(ctx)
-	if err != nil {
-		logger.Info("failed to create GCS client, skipping JUnit fetch", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "error", err)
-		return false
-	}
-
 	// Determine job type for GCS path construction
 	jobTypeForGCS, err := determineJobTypeForGCS(ciJob, job)
 	if err != nil {
@@ -190,11 +114,25 @@ func fetchAndPrintJUnitSuites(taskCtx plugin.SubTaskContext, job *ProwJob, githu
 	// Extract PR number for presubmit jobs
 	pullNumber := extractPullRequestNumber(ciJob)
 
-	// Fetch JUnit XML from GCS using configurable regex
-	suites, xmlFileName := fetchJUnitFromGCS(gcsClient, job, ciJob, jobTypeForGCS, githubOrg, repoName, pullNumber, logger, junitRegex)
+	// Fetch all JUnit XML files from GCS using configurable regex
+	ctx := taskCtx.GetContext()
+	junitFiles := fetchJUnitFromGCS(ctx, gcsClient, job, ciJob, jobTypeForGCS, githubOrg, repoName, pullNumber, logger, junitRegex)
 
-	// Parse, log, and save suite information
-	return parseAndSaveJUnitSuites(taskCtx, logger, suites, xmlFileName, ciJob, githubOrg, repoName)
+	if len(junitFiles) == 0 {
+		logger.Info("No JUnit XML found for job", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "trigger_type", ciJob.TriggerType)
+		return false
+	}
+
+	logger.Info("Found JUnit XML files for job", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "file_count", len(junitFiles))
+
+	// Parse, log, and save suite information from all files
+	anySuccess := false
+	for _, jf := range junitFiles {
+		if parseAndSaveJUnitSuites(taskCtx, logger, jf.Content, jf.Path, ciJob, githubOrg, repoName) {
+			anySuccess = true
+		}
+	}
+	return anySuccess
 }
 
 // determineJobTypeForGCS maps our trigger type to GCS job type format.
@@ -242,26 +180,12 @@ func extractPullRequestNumber(ciJob *models.TestRegistryCIJob) string {
 	return ""
 }
 
-// fetchJUnitFromGCS fetches JUnit XML content from Google Cloud Storage.
+// fetchJUnitFromGCS fetches all matching JUnit XML files from Google Cloud Storage.
 //
 // For non-periodic jobs, it extracts org/repo from Prow job refs to match quality-dashboard behavior.
 // Reference: https://github.com/konflux-ci/quality-dashboard/blob/e846aa2dd9b3c1cad9ac4d16d18ddf677e3e6247/backend/api/server/prow_rotate.go#L64-L67
-//
-// Parameters:
-//   - gcsClient: The GCS bucket client
-//   - job: The source Prow job (for extracting refs)
-//   - ciJob: The CI job model
-//   - jobTypeForGCS: Job type in GCS format ("presubmit", "postsubmit", or "periodic")
-//   - githubOrg: Default GitHub organization (used as fallback)
-//   - repoName: Default repository name (used as fallback)
-//   - pullNumber: PR number (for presubmit jobs)
-//   - logger: Logger for debug messages
-//   - junitRegex: Compiled regex pattern for matching JUnit file names
-//
-// Returns:
-//   - []byte: JUnit XML content, or nil if not found
-//   - string: Full GCS path of the XML file, or empty string if not found
 func fetchJUnitFromGCS(
+	ctx context.Context,
 	gcsClient *GCSBucket,
 	job *ProwJob,
 	ciJob *models.TestRegistryCIJob,
@@ -271,28 +195,37 @@ func fetchJUnitFromGCS(
 	pullNumber string,
 	logger log.Logger,
 	junitRegex *regexp.Regexp,
-) ([]byte, string) {
+) []JUnitFile {
 	logger.Debug("Searching for JUnit XML in GCS", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "job_type_for_gcs", jobTypeForGCS, "org", githubOrg, "repo", repoName, "pull_number", pullNumber)
 
+	var files []JUnitFile
+	var gcsErr error
+
+	// Periodic jobs: empty org/repo/pr
 	if jobTypeForGCS == "periodic" {
-		// Periodic jobs: empty org/repo/pr
-		return gcsClient.GetJobJunitContent("", "", "", ciJob.JobId, "periodic", ciJob.JobName, junitRegex)
-	}
+		files, gcsErr = gcsClient.GetJobJunitContent(ctx, "", "", "", ciJob.JobId, "periodic", ciJob.JobName, junitRegex)
+	} else {
+		// For non-periodic jobs, extract org/repo from Prow job refs
+		orgForGCS, repoForGCS := extractOrgRepoForGCS(job, githubOrg, repoName, ciJob.JobId, logger)
 
-	// For non-periodic jobs, extract org/repo from Prow job refs
-	orgForGCS, repoForGCS := extractOrgRepoForGCS(job, githubOrg, repoName, ciJob.JobId, logger)
-
-	if jobTypeForGCS == "presubmit" {
 		// Presubmit: need org, repo, and PR number
-		if pullNumber == "" {
-			logger.Info("Missing PR number for presubmit job, skipping JUnit fetch", "job_id", ciJob.JobId, "job_name", ciJob.JobName)
-			return nil, ""
+		if jobTypeForGCS == "presubmit" {
+			if pullNumber == "" {
+				logger.Info("Missing PR number for presubmit job, skipping JUnit fetch", "job_id", ciJob.JobId, "job_name", ciJob.JobName)
+				return nil
+			}
+			files, gcsErr = gcsClient.GetJobJunitContent(ctx, orgForGCS, repoForGCS, pullNumber, ciJob.JobId, "presubmit", ciJob.JobName, junitRegex)
+		} else {
+			// Postsubmit: need org and repo, but no PR number
+			files, gcsErr = gcsClient.GetJobJunitContent(ctx, orgForGCS, repoForGCS, "", ciJob.JobId, "postsubmit", ciJob.JobName, junitRegex)
 		}
-		return gcsClient.GetJobJunitContent(orgForGCS, repoForGCS, pullNumber, ciJob.JobId, "presubmit", ciJob.JobName, junitRegex)
 	}
 
-	// Postsubmit: need org and repo, but no PR number
-	return gcsClient.GetJobJunitContent(orgForGCS, repoForGCS, "", ciJob.JobId, "postsubmit", ciJob.JobName, junitRegex)
+	if gcsErr != nil {
+		logger.Info("GCS listing error (partial results may be returned)", "error", gcsErr, "job_id", ciJob.JobId, "files_found", len(files))
+	}
+
+	return files
 }
 
 // extractOrgRepoForGCS extracts organization and repository names for GCS path construction.
@@ -339,11 +272,20 @@ func parseAndSaveJUnitSuites(taskCtx plugin.SubTaskContext, logger log.Logger, s
 		return false
 	}
 
-	// Parse XML
+	// Parse XML — JUnit files can have either <testsuites> (wrapper) or bare <testsuite> as root
 	var suitesXml TestSuites
 	if err := xml.Unmarshal(suites, &suitesXml); err != nil {
-		logger.Debug("failed to parse JUnit XML: %v", err, "job_id", ciJob.JobId, "xml_file", xmlFileName)
+		logger.Debug("failed to parse JUnit XML", "error", err, "job_id", ciJob.JobId, "xml_file", xmlFileName)
 		return false
+	}
+
+	// If no suites found, try parsing as a single bare <testsuite> root element
+	// (e.g., prowjob_junit.xml uses <testsuite> instead of <testsuites>)
+	if len(suitesXml.Suites) == 0 {
+		var singleSuite TestSuite
+		if err := xml.Unmarshal(suites, &singleSuite); err == nil && singleSuite.Name != "" {
+			suitesXml.Suites = []*TestSuite{&singleSuite}
+		}
 	}
 
 	// Log job context
@@ -389,53 +331,6 @@ func parseAndSaveJUnitSuites(taskCtx plugin.SubTaskContext, logger log.Logger, s
 	return true
 }
 
-// parseAndLogJUnitSuites is kept for backwards compatibility, but now delegates to parseAndSaveJUnitSuites
-// This function is deprecated - use parseAndSaveJUnitSuites instead.
-//
-// Parameters:
-//   - logger: Logger for output
-//   - suites: JUnit XML content (can be nil)
-//   - xmlFileName: Name of the XML file (for logging)
-//   - ciJob: The CI job model
-//   - githubOrg: GitHub organization (for logging)
-//   - repoName: Repository name (for logging)
-//
-// Returns:
-//   - bool: true if JUnit XML was successfully parsed and logged, false otherwise
-func parseAndLogJUnitSuites(logger log.Logger, suites []byte, xmlFileName string, ciJob *models.TestRegistryCIJob, githubOrg, repoName string) bool {
-	// This is a fallback that only logs (no database saving)
-	// It's kept for any code that might still call it directly
-	return parseAndLogJUnitSuitesOnly(logger, suites, xmlFileName, ciJob, githubOrg, repoName)
-}
-
-// parseAndLogJUnitSuitesOnly parses JUnit XML and logs without saving to database
-func parseAndLogJUnitSuitesOnly(logger log.Logger, suites []byte, xmlFileName string, ciJob *models.TestRegistryCIJob, githubOrg, repoName string) bool {
-	if len(suites) == 0 {
-		logger.Info("No JUnit XML found for job", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "trigger_type", ciJob.TriggerType)
-		return false
-	}
-
-	var suitesXml TestSuites
-	if err := xml.Unmarshal(suites, &suitesXml); err != nil {
-		logger.Debug("failed to parse JUnit XML: %v", err, "job_id", ciJob.JobId, "xml_file", xmlFileName)
-		return false
-	}
-
-	if len(suitesXml.Suites) == 0 {
-		logger.Info("No test suites found in JUnit XML", "job_id", ciJob.JobId, "job_name", ciJob.JobName, "xml_file", xmlFileName)
-		return false
-	}
-
-	logger.Info("Processing test suites", "job_id", ciJob.JobId, "total_suites", len(suitesXml.Suites))
-	for idx, suite := range suitesXml.Suites {
-		if suite != nil && suite.Name != "" {
-			logSuiteInfo(logger, suite, ciJob.JobId, idx+1, 0)
-		}
-	}
-
-	return true
-}
-
 // logSuiteInfo logs information about a test suite.
 //
 // Parameters:
@@ -455,18 +350,21 @@ func logSuiteInfo(logger log.Logger, suite *TestSuite, jobId string, suiteIndex 
 		"duration_sec", suite.Duration)
 }
 
-// generateUID generates a unique identifier using crypto/rand
-func generateUID() (string, errors.Error) {
+// generateUID generates a unique identifier for database records using crypto/rand.
+func generateUID() string {
 	b := make([]byte, uidLength)
-	bigInt := big.NewInt(int64(len(uidChars)))
-	for i := range b {
-		num, err := rand.Int(rand.Reader, bigInt)
-		if err != nil {
-			return "", errors.Default.Wrap(err, "failed to generate random number")
+	randomBytes := make([]byte, uidLength)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// crypto/rand.Read only fails on catastrophic system issues; use fallback
+		for i := range b {
+			b[i] = uidChars[0]
 		}
-		b[i] = uidChars[num.Int64()]
+		return string(b)
 	}
-	return string(b), nil
+	for i := range b {
+		b[i] = uidChars[int(randomBytes[i])%len(uidChars)]
+	}
+	return string(b)
 }
 
 // saveSuiteRecursively saves a test suite and all its nested suites and test cases to the database.
@@ -489,57 +387,41 @@ func saveSuiteRecursively(db dal.Dal, logger log.Logger, suite *TestSuite, conne
 		return 0, 0
 	}
 
-	// Check if this suite already exists
-	existingSuite, err := findExistingSuite(db, connectionId, jobId, suite.Name, parentSuiteId)
-	if err != nil {
-		logger.Warn(err, "failed to check existing suite", "suite_name", suite.Name, "job_id", jobId)
-		return 0, 0
+	// Always create a new suite — dedup across JUnit files is intentionally skipped so that
+	// suites with the same name from different files (e.g., same test suite run with different
+	// parameters) are stored independently. The job-level isJobAlreadyProcessed check prevents
+	// re-processing across blueprint runs.
+	suiteId := generateUID()
+
+	// Convert properties to JSON string
+	propertiesJSON := ""
+	if len(suite.Properties) > 0 {
+		propertiesBytes, err := json.Marshal(suite.Properties)
+		if err != nil {
+			logger.Debug("failed to marshal suite properties", "suite_name", suite.Name, "job_id", jobId, "error", err)
+		} else {
+			propertiesJSON = string(propertiesBytes)
+		}
 	}
 
-	var suiteId string
-	if existingSuite != nil {
-		// Suite already exists, use its ID and skip saving
-		suiteId = existingSuite.SuiteId
-		logger.Debug("Suite already exists, skipping save", "suite_id", suiteId, "suite_name", suite.Name, "job_id", jobId)
-	} else {
-		// Generate unique ID for new suite
-		suiteId, err = generateUID()
-		if err != nil {
-			logger.Warn(err, "failed to generate suite UID", "suite_name", suite.Name, "job_id", jobId)
-			return 0, 0
-		}
+	// Create database model
+	testSuite := &models.TestSuite{
+		ConnectionId:  connectionId,
+		JobId:         jobId,
+		SuiteId:       suiteId,
+		Name:          suite.Name,
+		NumTests:      suite.NumTests,
+		NumSkipped:    suite.NumSkipped,
+		NumFailed:     suite.NumFailed,
+		Duration:      suite.Duration,
+		Properties:    propertiesJSON,
+		ParentSuiteId: parentSuiteId,
+	}
 
-		// Convert properties to JSON string
-		propertiesJSON := ""
-		if len(suite.Properties) > 0 {
-			propertiesBytes, err := json.Marshal(suite.Properties)
-			if err != nil {
-				logger.Debug("failed to marshal suite properties", "suite_name", suite.Name, "job_id", jobId, "error", err)
-			} else {
-				propertiesJSON = string(propertiesBytes)
-			}
-		}
-
-		// Create database model
-		testSuite := &models.TestSuite{
-			ConnectionId:  connectionId,
-			JobId:         jobId,
-			SuiteId:       suiteId,
-			Name:          suite.Name,
-			NumTests:      suite.NumTests,
-			NumSkipped:    suite.NumSkipped,
-			NumFailed:     suite.NumFailed,
-			Duration:      suite.Duration,
-			Properties:    propertiesJSON,
-			ParentSuiteId: parentSuiteId,
-		}
-
-		// Save suite to database
-		err = db.CreateOrUpdate(testSuite)
-		if err != nil {
-			logger.Warn(err, "failed to save test suite", "suite_id", suiteId, "suite_name", suite.Name, "job_id", jobId)
-			return 0, 0
-		}
+	// Save suite to database
+	if err := db.CreateOrUpdate(testSuite); err != nil {
+		logger.Warn(err, "failed to save test suite", "suite_id", suiteId, "suite_name", suite.Name, "job_id", jobId)
+		return 0, 0
 	}
 
 	suiteCount := 1
@@ -580,23 +462,9 @@ func saveSuiteRecursively(db dal.Dal, logger log.Logger, suite *TestSuite, conne
 // Returns:
 //   - errors.Error: Any error encountered during saving, or nil if successful
 func saveTestCase(db dal.Dal, logger log.Logger, testCase *TestCase, connectionId uint64, jobId, suiteId string) errors.Error {
-	// Check if this test case already exists
-	existingTestCase, err := findExistingTestCase(db, connectionId, jobId, suiteId, testCase.Name, testCase.Classname)
-	if err != nil {
-		return errors.Default.Wrap(err, fmt.Sprintf("failed to check existing test case %s", testCase.Name))
-	}
-
-	if existingTestCase != nil {
-		// Test case already exists, skip saving
-		logger.Debug("Test case already exists, skipping save", "test_case_id", existingTestCase.TestCaseId, "name", testCase.Name, "job_id", jobId)
-		return nil
-	}
-
-	// Generate unique ID for new test case
-	testCaseId, err := generateUID()
-	if err != nil {
-		return errors.Default.Wrap(err, "failed to generate test case UID")
-	}
+	// Always create a new test case — each suite has a unique ID so test cases are
+	// naturally scoped to their source JUnit file. No cross-file dedup needed.
+	testCaseId := generateUID()
 
 	// Determine test case status
 	status := "passed"
@@ -633,8 +501,7 @@ func saveTestCase(db dal.Dal, logger log.Logger, testCase *TestCase, connectionI
 	}
 
 	// Save test case to database
-	err = db.CreateOrUpdate(testCaseModel)
-	if err != nil {
+	if err := db.CreateOrUpdate(testCaseModel); err != nil {
 		return errors.Default.Wrap(err, fmt.Sprintf("failed to save test case %s", testCase.Name))
 	}
 
