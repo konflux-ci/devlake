@@ -60,8 +60,11 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Determine branch (main or master) from scope config or default to main
+	// Use branch from repo scope, falling back to "main"
 	branch := "main"
+	if data.Repo != nil && data.Repo.Branch != "" {
+		branch = data.Repo.Branch
+	}
 
 	// Use sync policy time range, default to last 90 days
 	var cutoffDate time.Time

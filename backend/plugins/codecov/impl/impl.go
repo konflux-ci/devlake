@@ -192,9 +192,18 @@ func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 
 	taskCtx.GetLogger().Info("[Codecov] API client initialized with rate limiter (5000 req/hour)")
 
+	// Load the CodecovRepo scope to get branch and other metadata
+	repo := &models.CodecovRepo{}
+	err = db.First(repo, dal.Where("connection_id = ? AND codecov_id = ?", op.ConnectionId, op.FullName))
+	if err != nil {
+		taskCtx.GetLogger().Warn(err, "unable to load CodecovRepo scope for %s, branch will default to 'main'", op.FullName)
+		repo = nil
+	}
+
 	return &tasks.CodecovTaskData{
 		Options:   op,
 		ApiClient: asyncApiClient,
+		Repo:      repo,
 	}, nil
 }
 

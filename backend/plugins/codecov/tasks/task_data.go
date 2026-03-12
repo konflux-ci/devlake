@@ -33,6 +33,7 @@ type CodecovOptions struct {
 type CodecovTaskData struct {
 	Options   *CodecovOptions
 	ApiClient *helper.ApiAsyncClient
+	Repo      *models.CodecovRepo
 }
 
 // CodecovApiParams matches the models.CodecovApiParams
