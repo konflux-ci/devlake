@@ -80,7 +80,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -131,7 +133,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -182,7 +186,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -233,7 +239,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -330,7 +338,9 @@
         },
         "pieType": "pie",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": true
         },
@@ -401,7 +411,9 @@
         },
         "pieType": "pie",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": true
         },
@@ -472,7 +484,9 @@
         },
         "pieType": "pie",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": true
         },
@@ -816,7 +830,9 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "showHeader": true,
@@ -872,7 +888,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -923,7 +941,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -989,7 +1009,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1086,7 +1108,9 @@
         },
         "pieType": "donut",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": true
         },
@@ -1146,7 +1170,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1197,7 +1223,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1248,7 +1276,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1299,7 +1329,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1357,11 +1389,908 @@
       ],
       "title": "Review Body (Markdown)",
       "type": "marcusolsson-dynamictext-panel"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 62
+      },
+      "id": 20,
+      "title": "AI Prediction vs CI Reality",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "grafana"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 63
+      },
+      "id": 32,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "### How to read this section\n\nThis section correlates AI code review risk assessments with OpenShift CI (Prow) presubmit test results. A PR is considered \"CI failed\" if any non-flaky test case failed on its presubmit runs. Infrastructure failures and flaky tests (tests that also fail on periodic/push runs) are excluded.\n\n**Important:** This shows *correlation*, not causation. CI test failures on a PR may not be directly caused by the PR's code change \u2014 presubmit jobs run broad integration/e2e tests that exercise the entire platform. The metrics are most useful as *trend signals* over time: improving precision/recall suggests AI tools are becoming better predictors of problematic changes.\n\nOnly PRs that have **both** an AI review and OCP CI job results are included. Repos without OCP CI jobs or without AI review bots are excluded.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": "mysql",
+      "type": "stat",
+      "title": "True Positives (TP)",
+      "description": "AI flagged risky AND CI tests failed \u2014 correct predictions",
+      "id": 21,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 67
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name) SELECT COUNT(*) AS true_positives FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository WHERE rv.flagged_risky = 1 AND ci.ci_failed = 1"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "stat",
+      "title": "False Positives (FP)",
+      "description": "AI flagged risky BUT CI tests passed \u2014 false alarms",
+      "id": 22,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 67
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name) SELECT COUNT(*) AS false_positives FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository WHERE rv.flagged_risky = 1 AND ci.ci_failed = 0"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "stat",
+      "title": "False Negatives (FN)",
+      "description": "AI did NOT flag risky BUT CI tests failed \u2014 missed failures",
+      "id": 23,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 67
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name) SELECT COUNT(*) AS false_negatives FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository WHERE rv.flagged_risky = 0 AND ci.ci_failed = 1"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "stat",
+      "title": "True Negatives (TN)",
+      "description": "AI did NOT flag risky AND CI tests passed \u2014 expected behavior",
+      "id": 24,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 67
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name) SELECT COUNT(*) AS true_negatives FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository WHERE rv.flagged_risky = 0 AND ci.ci_failed = 0"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "gauge",
+      "title": "Precision",
+      "description": "TP / (TP + FP) \u2014 How accurate are AI risk flags?",
+      "id": 25,
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 71
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 40
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name), counts AS (SELECT SUM(CASE WHEN rv.flagged_risky = 1 AND ci.ci_failed = 1 THEN 1 ELSE 0 END) AS tp, SUM(CASE WHEN rv.flagged_risky = 1 AND ci.ci_failed = 0 THEN 1 ELSE 0 END) AS fp FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository) SELECT ROUND(tp * 100.0 / NULLIF(tp + fp, 0), 1) AS precision_pct FROM counts"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "gauge",
+      "title": "Recall",
+      "description": "TP / (TP + FN) \u2014 How many real failures does AI catch?",
+      "id": 26,
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 71
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 40
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name), counts AS (SELECT SUM(CASE WHEN rv.flagged_risky = 1 AND ci.ci_failed = 1 THEN 1 ELSE 0 END) AS tp, SUM(CASE WHEN rv.flagged_risky = 0 AND ci.ci_failed = 1 THEN 1 ELSE 0 END) AS fn FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository) SELECT ROUND(tp * 100.0 / NULLIF(tp + fn, 0), 1) AS recall_pct FROM counts"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "gauge",
+      "title": "Accuracy",
+      "description": "(TP + TN) / Total \u2014 Overall prediction correctness",
+      "id": 27,
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 71
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 40
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name), counts AS (SELECT SUM(CASE WHEN rv.flagged_risky = 1 AND ci.ci_failed = 1 THEN 1 ELSE 0 END) AS tp, SUM(CASE WHEN rv.flagged_risky = 0 AND ci.ci_failed = 0 THEN 1 ELSE 0 END) AS tn, COUNT(*) AS total FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository) SELECT ROUND((tp + tn) * 100.0 / NULLIF(total, 0), 1) AS accuracy_pct FROM counts"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "table",
+      "title": "True Positives: AI Flagged Risky + CI Failed",
+      "description": "PRs where AI correctly predicted risk \u2014 validated by CI test failures",
+      "id": 28,
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pr_url"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open PR",
+                    "url": "${__value.text}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "displayName",
+                "value": "PR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pr_title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed_jobs"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "md",
+        "footer": {
+          "countRows": true,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": true
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "last_ci_run"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed, GROUP_CONCAT(DISTINCT CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN j.job_name END SEPARATOR ', ') AS failed_jobs, MAX(j.finished_at) AS last_ci_run FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository) SELECT CONCAT('#', pr.pull_request_key) AS pr_number, r.name AS repository, LEFT(pr.title, 80) AS pr_title, CASE MAX(FIELD(ar.risk_level, 'low', 'medium', 'high', 'critical')) WHEN 1 THEN 'low' WHEN 2 THEN 'medium' WHEN 3 THEN 'high' WHEN 4 THEN 'critical' END AS risk_level, MAX(ar.risk_score) AS risk_score, GROUP_CONCAT(DISTINCT ar.ai_tool SEPARATOR ', ') AS ai_tools, DATE_FORMAT(MAX(ar.created_date), '%Y-%m-%d') AS review_date, ci.failed_jobs, DATE_FORMAT(ci.last_ci_run, '%Y-%m-%d %H:%i') AS last_ci_run, pr.url AS pr_url FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id INNER JOIN pr_ci ci ON pr.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(r.name, '/', -1) = ci.repository WHERE (ar.risk_level IN ('high','critical') OR ar.risk_score >= 70) AND ci.ci_failed = 1 AND ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name, pr.title, pr.url, ci.failed_jobs, ci.last_ci_run ORDER BY ci.last_ci_run DESC LIMIT 50"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "table",
+      "title": "False Negatives: AI Missed + CI Failed",
+      "description": "PRs where AI did NOT flag risk but CI tests failed \u2014 what AI should learn from",
+      "id": 29,
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 86
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pr_url"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open PR",
+                    "url": "${__value.text}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "displayName",
+                "value": "PR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pr_title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed_jobs"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "md",
+        "footer": {
+          "countRows": true,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": true
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "last_ci_run"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed, GROUP_CONCAT(DISTINCT CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN j.job_name END SEPARATOR ', ') AS failed_jobs, MAX(j.finished_at) AS last_ci_run FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository) SELECT pr_number, repository, pr_title, risk_level, risk_score, ai_tools, review_date, failed_jobs, last_ci_run, pr_url FROM (SELECT CONCAT('#', pr.pull_request_key) AS pr_number, r.name AS repository, LEFT(pr.title, 80) AS pr_title, CASE MAX(FIELD(COALESCE(ar.risk_level, ''), 'low', 'medium', 'high', 'critical')) WHEN 1 THEN 'low' WHEN 2 THEN 'medium' WHEN 3 THEN 'high' WHEN 4 THEN 'critical' ELSE 'none' END AS risk_level, MAX(ar.risk_score) AS risk_score, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS was_flagged, GROUP_CONCAT(DISTINCT ar.ai_tool SEPARATOR ', ') AS ai_tools, DATE_FORMAT(MAX(ar.created_date), '%Y-%m-%d') AS review_date, ci.failed_jobs, DATE_FORMAT(ci.last_ci_run, '%Y-%m-%d %H:%i') AS last_ci_run, pr.url AS pr_url FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id INNER JOIN pr_ci ci ON pr.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(r.name, '/', -1) = ci.repository WHERE ci.ci_failed = 1 AND ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name, pr.title, pr.url, ci.failed_jobs, ci.last_ci_run) deduped WHERE was_flagged = 0 ORDER BY last_ci_run DESC LIMIT 50"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "timeseries",
+      "title": "Prediction Accuracy Over Time",
+      "description": "Weekly trend of precision, recall, and accuracy",
+      "id": 30,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 96
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "time_series",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed, MAX(j.finished_at) AS last_ci_run FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository), pr_review AS (SELECT pr.pull_request_key, r.name AS repo_name, MAX(CASE WHEN ar.risk_level IN ('high','critical') OR ar.risk_score >= 70 THEN 1 ELSE 0 END) AS flagged_risky FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name), weekly AS (SELECT DATE(DATE_SUB(ci.last_ci_run, INTERVAL WEEKDAY(ci.last_ci_run) DAY)) AS week_start, SUM(CASE WHEN rv.flagged_risky = 1 AND ci.ci_failed = 1 THEN 1 ELSE 0 END) AS tp, SUM(CASE WHEN rv.flagged_risky = 1 AND ci.ci_failed = 0 THEN 1 ELSE 0 END) AS fp, SUM(CASE WHEN rv.flagged_risky = 0 AND ci.ci_failed = 1 THEN 1 ELSE 0 END) AS fn, SUM(CASE WHEN rv.flagged_risky = 0 AND ci.ci_failed = 0 THEN 1 ELSE 0 END) AS tn, COUNT(*) AS total FROM pr_review rv INNER JOIN pr_ci ci ON rv.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(rv.repo_name, '/', -1) = ci.repository WHERE ci.last_ci_run IS NOT NULL GROUP BY week_start) SELECT week_start AS time, ROUND((tp + tn) * 100.0 / NULLIF(total, 0), 1) AS accuracy, ROUND(tp * 100.0 / NULLIF(tp + fp, 0), 1) AS `precision`, ROUND(tp * 100.0 / NULLIF(tp + fn, 0), 1) AS recall FROM weekly ORDER BY week_start"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "type": "barchart",
+      "title": "CI Failure Rate by AI Risk Level",
+      "description": "Does higher AI risk correlate with more CI failures? (excluding flaky tests)",
+      "id": 31,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 104
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Failure Rate %",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "total_prs"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "barRadius": 0.1,
+        "barWidth": 0.7,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "refId": "A",
+          "rawSql": "WITH flaky_tests AS (SELECT DISTINCT tc.name, j.repository FROM ci_test_cases tc JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id WHERE tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), pr_ci AS (SELECT j.pull_request_number, j.repository, MAX(CASE WHEN tc.status = 'failed' AND ft.name IS NULL THEN 1 ELSE 0 END) AS ci_failed FROM ci_test_jobs j JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id LEFT JOIN flaky_tests ft ON tc.name = ft.name AND j.repository = ft.repository WHERE j.trigger_type = 'pull_request' AND j.pull_request_number IS NOT NULL AND $__timeFilter(j.finished_at) GROUP BY j.pull_request_number, j.repository) SELECT risk_level, COUNT(*) AS total_prs, ROUND(SUM(ci_failed) * 100.0 / NULLIF(COUNT(*), 0), 1) AS failure_rate_pct FROM (SELECT pr.pull_request_key, r.name AS repo_name, CASE MAX(FIELD(ar.risk_level, 'low', 'medium', 'high', 'critical')) WHEN 1 THEN 'low' WHEN 2 THEN 'medium' WHEN 3 THEN 'high' WHEN 4 THEN 'critical' END AS risk_level, ci.ci_failed FROM _tool_aireview_reviews ar JOIN pull_requests pr ON ar.pull_request_id = pr.id JOIN repos r ON ar.repo_id = r.id INNER JOIN pr_ci ci ON pr.pull_request_key = ci.pull_request_number AND SUBSTRING_INDEX(r.name, '/', -1) = ci.repository WHERE ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND ar.risk_level IS NOT NULL AND ar.risk_level != '' AND $__timeFilter(ar.created_date) GROUP BY pr.pull_request_key, r.name, ci.ci_failed) deduped GROUP BY risk_level ORDER BY FIELD(risk_level, 'low', 'medium', 'high', 'critical')"
+        }
+      ]
     }
   ],
   "refresh": "",
   "schemaVersion": 39,
-  "tags": ["ai", "code-review", "aireview"],
+  "tags": [
+    "ai",
+    "code-review",
+    "aireview"
+  ],
   "templating": {
     "list": [
       {
