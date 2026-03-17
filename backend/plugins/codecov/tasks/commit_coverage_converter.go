@@ -129,6 +129,12 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 				OverallCoverage:  totals.Totals.Coverage,
 				ModifiedCoverage: modifiedCoverage,
 				FilesChanged:     filesChanged,
+				LinesCovered:     totals.Totals.Hits,
+				LinesTotal:       totals.Totals.Lines,
+				LinesMissed:      totals.Totals.Misses,
+				Hits:             totals.Totals.Hits,
+				Partials:         totals.Totals.Partials,
+				Misses:           totals.Totals.Misses,
 				MethodsCovered:   methodsCovered,
 				MethodsTotal:     methodsTotal,
 			}

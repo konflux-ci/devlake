@@ -33,6 +33,12 @@ type CodecovCommitCoverage struct {
 	OverallCoverage  float64    `json:"overallCoverage"`
 	ModifiedCoverage float64    `json:"modifiedCoverage"`
 	FilesChanged     int        `json:"filesChanged"`
+	LinesCovered     int        `json:"linesCovered"`
+	LinesTotal       int        `json:"linesTotal"`
+	LinesMissed      int        `json:"linesMissed"`
+	Hits             int        `json:"hits"`
+	Partials         int        `json:"partials"`
+	Misses           int        `json:"misses"`
 	MethodsCovered   int        `json:"methodsCovered"`
 	MethodsTotal     int        `json:"methodsTotal"`
 }
