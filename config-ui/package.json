@@ -33,7 +33,7 @@
     "cron-validate": "^1.4.5",
     "dayjs": "^1.11.10",
     "file-saver": "^2.0.5",
-    "lodash": "^4.17.21",
+    "lodash": "^4.17.23",
     "miller-columns-select": "1.4.1",
     "react": "^18.2.0",
     "react-copy-to-clipboard": "^5.1.0",
