@@ -21,11 +21,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
 )
@@ -34,238 +34,407 @@ var CalculateFailurePredictionsMeta = plugin.SubTaskMeta{
 	Name:             "calculateFailurePredictions",
 	EntryPoint:       CalculateFailurePredictions,
 	EnabledByDefault: true,
-	Description:      "Calculate AI failure prediction outcomes based on PR outcomes",
+	Description:      "Calculate AI failure prediction outcomes against actual CI test results",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE_REVIEW},
 	Dependencies:     []*plugin.SubTaskMeta{&ExtractAiReviewsMeta},
 }
 
-// CalculateFailurePredictions tracks AI prediction accuracy against actual outcomes
+// prAiSummary holds the aggregated AI review outcome for one (PR, AI tool) pair.
+type prAiSummary struct {
+	PullRequestId  string
+	PullRequestKey string
+	RepoId         string
+	RepoShortName  string
+	AiTool         string
+	MaxRiskScore   int
+}
+
+// prCiKey identifies a PR in the ci_test_jobs table.
+type prCiKey struct {
+	PullRequestNumber string
+	Repository        string
+}
+
+// CalculateFailurePredictions joins AI risk assessments with actual CI test outcomes.
+//
+// Algorithm:
+//  1. Determine which CI source(s) to use from scope config (test_cases / job_result / both).
+//  2. Load all AI-reviewed PRs for the repo, grouped by (PR, AI tool).
+//  3. For each enabled source, load CI outcomes and persist one AiFailurePrediction
+//     per (PR, AI tool, CI source).
 func CalculateFailurePredictions(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
 	data := taskCtx.GetData().(*AiReviewTaskData)
 
-	observationDays := data.Options.ScopeConfig.ObservationWindowDays
-	if observationDays == 0 {
-		observationDays = 14 // Default 14 days
+	warningThreshold := data.Options.ScopeConfig.WarningThreshold
+	if warningThreshold == 0 {
+		warningThreshold = 50
 	}
 
-	logger.Info("Calculating failure predictions for repo: %s (window: %d days)", data.Options.RepoId, observationDays)
+	ciFailureSource := data.Options.ScopeConfig.CiFailureSource
+	if ciFailureSource == "" {
+		ciFailureSource = models.CiSourceJobResult
+	}
 
-	// Get merged PRs with AI reviews
-	cursor, err := db.Cursor(
-		dal.Select("pr.*, ar.ai_tool, ar.risk_score, ar.risk_level, ar.created_date as review_created_date"),
-		dal.From("pull_requests pr"),
-		dal.Join("LEFT JOIN _tool_aireview_reviews ar ON pr.id = ar.pull_request_id"),
-		dal.Where("pr.base_repo_id = ? AND pr.status = ?", data.Options.RepoId, "MERGED"),
-	)
+	sources := []string{ciFailureSource}
+	if ciFailureSource == models.CiSourceBoth {
+		sources = []string{models.CiSourceTestCases, models.CiSourceJobResult}
+	}
+
+	logger.Info("Calculating failure predictions for repo %s (warning_threshold=%d, ci_source=%s)",
+		data.Options.RepoId, warningThreshold, ciFailureSource)
+
+	// Load AI-reviewed PR summaries (same for all sources).
+	prSummaries, err := loadAiReviewPrSummaries(db, data.Options.RepoId, data.Options.ProjectName)
 	if err != nil {
-		return errors.Default.Wrap(err, "failed to query merged PRs")
+		return err
 	}
-	defer cursor.Close()
+	if len(prSummaries) == 0 {
+		logger.Info("No AI-reviewed PRs found for repo %s", data.Options.RepoId)
+		return nil
+	}
+	logger.Info("Loaded %d (PR, AI tool) pairs", len(prSummaries))
 
-	batchSize := 100
-	batch := make([]*models.AiFailurePrediction, 0, batchSize)
-	processedPrs := 0
+	repoShortNames := uniqueRepoShortNames(prSummaries)
 
-	for cursor.Next() {
-		var prData struct {
-			code.PullRequest
-			AiTool            string     `gorm:"column:ai_tool"`
-			RiskScore         int        `gorm:"column:risk_score"`
-			RiskLevel         string     `gorm:"column:risk_level"`
-			ReviewCreatedDate *time.Time `gorm:"column:review_created_date"`
-		}
-
-		if err := db.Fetch(cursor, &prData); err != nil {
-			return errors.Default.Wrap(err, "failed to fetch PR data")
-		}
-
-		// Skip if no merge date
-		if prData.MergedDate == nil {
-			continue
-		}
-
-		// Calculate observation window
-		observationEnd := prData.MergedDate.Add(time.Duration(observationDays) * 24 * time.Hour)
-		now := time.Now()
-
-		// Check if observation window has completed
-		observationComplete := now.After(observationEnd)
-
-		// Determine if AI flagged as risky
-		wasFlaggedRisky := prData.RiskLevel == models.RiskLevelHigh ||
-			prData.RiskLevel == models.RiskLevelCritical ||
-			prData.RiskScore >= 70
-
-		// Check for CI failures (from cicd domain tables)
-		hadCiFailure, ciFailureAt := checkCiFailures(db, prData.Id, *prData.MergedDate, observationEnd)
-
-		// Check for bugs reported (from issues domain tables)
-		hadBugReported, bugReportedAt, bugIssueId := checkBugReports(db, prData.Id, *prData.MergedDate, observationEnd)
-
-		// Check for rollbacks
-		hadRollback, rollbackAt := checkRollbacks(db, prData.Id, *prData.MergedDate, observationEnd)
-
-		// Determine outcome (only if observation complete)
-		predictionOutcome := ""
-		if observationComplete {
-			actualFailure := hadCiFailure || hadBugReported || hadRollback
-			predictionOutcome = calculateOutcome(wasFlaggedRisky, actualFailure)
-		}
-
-		// Generate prediction ID
-		predictionId := generatePredictionId(prData.Id, prData.AiTool)
-
-		prediction := &models.AiFailurePrediction{
-			Id:                    predictionId,
-			PullRequestId:         prData.Id,
-			RepoId:                data.Options.RepoId,
-			AiTool:                prData.AiTool,
-			WasFlaggedRisky:       wasFlaggedRisky,
-			RiskScore:             prData.RiskScore,
-			PrMergedAt:            prData.MergedDate,
-			HadCiFailure:          hadCiFailure,
-			CiFailureAt:           ciFailureAt,
-			HadBugReported:        hadBugReported,
-			BugReportedAt:         bugReportedAt,
-			BugIssueId:            bugIssueId,
-			HadRollback:           hadRollback,
-			RollbackAt:            rollbackAt,
-			PredictionOutcome:     predictionOutcome,
-			ObservationWindowDays: observationDays,
-			ObservationEndDate:    observationEnd,
-			CreatedAt:             time.Now(),
-		}
-
-		if prData.ReviewCreatedDate != nil {
-			prediction.FlaggedAt = *prData.ReviewCreatedDate
-		}
-
-		batch = append(batch, prediction)
-		processedPrs++
-
-		if len(batch) >= batchSize {
-			if err := savePredictionsBatch(db, batch); err != nil {
-				return err
+	// Pre-build flaky sets for whichever sources are needed.
+	var flakyTests map[prCiKey]bool
+	var flakyJobs map[string]bool
+	for _, source := range sources {
+		switch source {
+		case models.CiSourceTestCases:
+			if flakyTests == nil {
+				flakyTests, err = buildFlakyTestSet(db)
+				if err != nil {
+					return err
+				}
+				logger.Info("Loaded %d flaky test entries", len(flakyTests))
 			}
-			batch = make([]*models.AiFailurePrediction, 0, batchSize)
+		case models.CiSourceJobResult:
+			if flakyJobs == nil {
+				flakyJobs, err = buildFlakyJobSet(db)
+				if err != nil {
+					return err
+				}
+				logger.Info("Loaded %d flaky job entries", len(flakyJobs))
+			}
 		}
 	}
 
-	// Save remaining batch
-	if len(batch) > 0 {
-		if err := savePredictionsBatch(db, batch); err != nil {
+	now := time.Now()
+	totalWritten := 0
+
+	for _, source := range sources {
+		var ciOutcomes map[prCiKey]ciOutcomeEntry
+		switch source {
+		case models.CiSourceTestCases:
+			ciOutcomes, err = loadCiOutcomesByTestCases(db, repoShortNames, flakyTests)
+		case models.CiSourceJobResult:
+			ciOutcomes, err = loadCiOutcomesByJobResult(db, repoShortNames, flakyJobs)
+		}
+		if err != nil {
 			return err
 		}
+		logger.Info("Source %s: loaded CI outcomes for %d (PR, repo) pairs", source, len(ciOutcomes))
+
+		batch := make([]*models.AiFailurePrediction, 0, 100)
+		for i := range prSummaries {
+			ps := &prSummaries[i]
+			ciKey := prCiKey{PullRequestNumber: ps.PullRequestKey, Repository: ps.RepoShortName}
+			outcome, hasCiData := ciOutcomes[ciKey]
+
+			wasFlaggedRisky := ps.MaxRiskScore >= warningThreshold
+			hadCiFailure := hasCiData && outcome.HadNonFlakyFailure
+
+			predictionOutcome := calculateOutcome(wasFlaggedRisky, hadCiFailure)
+
+			batch = append(batch, &models.AiFailurePrediction{
+				Id:                    generatePredictionId(ps.PullRequestId, ps.AiTool, source),
+				PullRequestId:         ps.PullRequestId,
+				PullRequestKey:        ps.PullRequestKey,
+				RepoId:                ps.RepoId,
+				RepoShortName:         ps.RepoShortName,
+				AiTool:                ps.AiTool,
+				CiFailureSource:       source,
+				WasFlaggedRisky:       wasFlaggedRisky,
+				RiskScore:             ps.MaxRiskScore,
+				HadCiFailure:          hadCiFailure,
+				PredictionOutcome:     predictionOutcome,
+				ObservationWindowDays: 0,
+				CreatedAt:             now,
+			})
+
+			if len(batch) >= 100 {
+				if saveErr := savePredictionsBatch(db, batch); saveErr != nil {
+					return saveErr
+				}
+				batch = batch[:0]
+			}
+		}
+
+		if len(batch) > 0 {
+			if saveErr := savePredictionsBatch(db, batch); saveErr != nil {
+				return saveErr
+			}
+		}
+		totalWritten += len(prSummaries)
 	}
 
-	logger.Info("Completed failure prediction calculation: %d PRs processed", processedPrs)
+	logger.Info("Completed failure prediction calculation: %d predictions written", totalWritten)
 	return nil
 }
 
-// checkCiFailures checks for CI failures after PR merge
-func checkCiFailures(db dal.Dal, prId string, mergedAt, observationEnd time.Time) (bool, *time.Time) {
-	// Query cicd_pipeline_commits joined with cicd_pipelines for failures
-	var result struct {
-		FailedAt *time.Time `gorm:"column:finished_date"`
+// buildFlakyTestSet returns a set of (testName, repository) pairs that failed
+// on periodic or push runs in the last 30 days. Used by loadCiOutcomesByTestCases
+// to exclude environment-flaky test failures from PR outcome determination.
+func buildFlakyTestSet(db dal.Dal) (map[prCiKey]bool, errors.Error) {
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+
+	var rows []struct {
+		Name       string `gorm:"column:name"`
+		Repository string `gorm:"column:repository"`
 	}
 
-	err := db.First(&result,
-		dal.Select("cp.finished_date"),
-		dal.From("cicd_pipeline_commits cpc"),
-		dal.Join("JOIN cicd_pipelines cp ON cpc.pipeline_id = cp.id"),
-		dal.Where("cpc.commit_sha IN (SELECT merge_commit_sha FROM pull_requests WHERE id = ?)", prId),
-		dal.Where("cp.status = ?", "FAILURE"),
-		dal.Where("cp.finished_date BETWEEN ? AND ?", mergedAt, observationEnd),
-		dal.Orderby("cp.finished_date ASC"),
-		dal.Limit(1),
+	err := db.All(&rows,
+		dal.Select("DISTINCT tc.name, j.repository"),
+		dal.From("ci_test_cases tc"),
+		dal.Join("JOIN ci_test_jobs j ON tc.connection_id = j.connection_id AND tc.job_id = j.job_id"),
+		dal.Where("tc.status = 'failed' AND j.trigger_type IN ('periodic', 'push') AND j.finished_at >= ?", thirtyDaysAgo),
 	)
-
-	if err != nil || result.FailedAt == nil {
-		return false, nil
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to build flaky test set")
 	}
 
-	return true, result.FailedAt
+	flakyTests := make(map[prCiKey]bool, len(rows))
+	for _, r := range rows {
+		flakyTests[prCiKey{PullRequestNumber: r.Name, Repository: r.Repository}] = true
+	}
+	return flakyTests, nil
 }
 
-// checkBugReports checks for bug reports linked to the PR
-func checkBugReports(db dal.Dal, prId string, mergedAt, observationEnd time.Time) (bool, *time.Time, string) {
-	// Query issues that reference this PR
-	var result struct {
-		IssueId   string     `gorm:"column:id"`
-		CreatedAt *time.Time `gorm:"column:created_date"`
+// buildFlakyJobSet returns a set of "job_name|repository" keys for CI jobs that
+// failed on periodic or push runs in the last 30 days. Used by loadCiOutcomesByJobResult
+// to exclude environment-flaky job failures from PR outcome determination.
+func buildFlakyJobSet(db dal.Dal) (map[string]bool, errors.Error) {
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+
+	var rows []struct {
+		JobName    string `gorm:"column:job_name"`
+		Repository string `gorm:"column:repository"`
 	}
 
-	// Check pull_request_issues table for linked issues
-	err := db.First(&result,
-		dal.Select("i.id, i.created_date"),
-		dal.From("pull_request_issues pri"),
-		dal.Join("JOIN issues i ON pri.issue_id = i.id"),
-		dal.Where("pri.pull_request_id = ?", prId),
-		dal.Where("i.type = ?", "BUG"),
-		dal.Where("i.created_date BETWEEN ? AND ?", mergedAt, observationEnd),
-		dal.Orderby("i.created_date ASC"),
-		dal.Limit(1),
+	err := db.All(&rows,
+		dal.Select("DISTINCT job_name, repository"),
+		dal.From("ci_test_jobs"),
+		dal.Where("result != 'SUCCESS' AND trigger_type IN ('periodic', 'push') AND finished_at >= ?", thirtyDaysAgo),
 	)
-
-	if err != nil || result.CreatedAt == nil {
-		return false, nil, ""
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to build flaky job set")
 	}
 
-	return true, result.CreatedAt, result.IssueId
+	flakyJobs := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		flakyJobs[r.JobName+"|"+r.Repository] = true
+	}
+	return flakyJobs, nil
 }
 
-// checkRollbacks checks for rollback commits
-func checkRollbacks(db dal.Dal, _ string, mergedAt, observationEnd time.Time) (bool, *time.Time) {
-	// Look for revert commits in the repository
-	var result struct {
-		RollbackAt *time.Time `gorm:"column:authored_date"`
+// loadAiReviewPrSummaries returns one row per (pull_request_id, ai_tool) with
+// the max risk_score and the PR key / repo short name needed to join CI data.
+// Supports both single-repo mode (repoId set) and project mode (projectName set).
+func loadAiReviewPrSummaries(db dal.Dal, repoId, projectName string) ([]prAiSummary, errors.Error) {
+	var rows []struct {
+		PullRequestId  string `gorm:"column:pull_request_id"`
+		PullRequestKey string `gorm:"column:pull_request_key"`
+		RepoId         string `gorm:"column:repo_id"`
+		RepoShortName  string `gorm:"column:repo_short_name"`
+		AiTool         string `gorm:"column:ai_tool"`
+		MaxRiskScore   int    `gorm:"column:max_risk_score"`
 	}
 
-	// Query commits with "revert" in message that reference the merged commit
-	err := db.First(&result,
-		dal.Select("c.authored_date"),
-		dal.From("commits c"),
-		dal.Join("JOIN pull_request_commits prc ON c.sha = prc.commit_sha"),
-		dal.Where("c.message LIKE ?", "%revert%"),
-		dal.Where("c.authored_date BETWEEN ? AND ?", mergedAt, observationEnd),
-		dal.Orderby("c.authored_date ASC"),
-		dal.Limit(1),
-	)
-
-	if err != nil || result.RollbackAt == nil {
-		return false, nil
+	var clauses []dal.Clause
+	if repoId != "" {
+		clauses = []dal.Clause{
+			dal.Select("ar.pull_request_id, pr.pull_request_key, ar.repo_id, SUBSTRING_INDEX(r.name, '/', -1) AS repo_short_name, ar.ai_tool, MAX(ar.risk_score) AS max_risk_score"),
+			dal.From("_tool_aireview_reviews ar"),
+			dal.Join("JOIN pull_requests pr ON ar.pull_request_id = pr.id"),
+			dal.Join("JOIN repos r ON ar.repo_id = r.id"),
+			dal.Where("ar.repo_id = ? AND ar.body NOT LIKE '%Review skipped%'", repoId),
+			dal.Groupby("ar.pull_request_id, pr.pull_request_key, ar.repo_id, repo_short_name, ar.ai_tool"),
+		}
+	} else {
+		clauses = []dal.Clause{
+			dal.Select("ar.pull_request_id, pr.pull_request_key, ar.repo_id, SUBSTRING_INDEX(r.name, '/', -1) AS repo_short_name, ar.ai_tool, MAX(ar.risk_score) AS max_risk_score"),
+			dal.From("_tool_aireview_reviews ar"),
+			dal.Join("JOIN pull_requests pr ON ar.pull_request_id = pr.id"),
+			dal.Join("JOIN repos r ON ar.repo_id = r.id"),
+			dal.Join("JOIN project_mapping pm ON ar.repo_id = pm.row_id AND pm.`table` = 'repos'"),
+			dal.Where("pm.project_name = ? AND ar.body NOT LIKE '%Review skipped%'", projectName),
+			dal.Groupby("ar.pull_request_id, pr.pull_request_key, ar.repo_id, repo_short_name, ar.ai_tool"),
+		}
 	}
 
-	return true, result.RollbackAt
+	err := db.All(&rows, clauses...)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to load AI review PR summaries")
+	}
+
+	summaries := make([]prAiSummary, len(rows))
+	for i, r := range rows {
+		summaries[i] = prAiSummary{
+			PullRequestId:  r.PullRequestId,
+			PullRequestKey: r.PullRequestKey,
+			RepoId:         r.RepoId,
+			RepoShortName:  r.RepoShortName,
+			AiTool:         r.AiTool,
+			MaxRiskScore:   r.MaxRiskScore,
+		}
+	}
+	return summaries, nil
 }
 
-// calculateOutcome determines the prediction outcome (TP, FP, FN, TN)
+// ciOutcomeEntry records whether a PR had at least one non-flaky CI failure.
+type ciOutcomeEntry struct {
+	HadNonFlakyFailure bool
+}
+
+// loadCiOutcomesByTestCases joins ci_test_jobs with ci_test_cases and returns
+// a map indicating whether each PR had a non-flaky test-case-level failure.
+// Requires ci_test_cases to be populated (needs full testregistry collection).
+func loadCiOutcomesByTestCases(db dal.Dal, repoShortNames []string, flakyTests map[prCiKey]bool) (map[prCiKey]ciOutcomeEntry, errors.Error) {
+	if len(repoShortNames) == 0 {
+		return map[prCiKey]ciOutcomeEntry{}, nil
+	}
+
+	var rows []struct {
+		PullRequestNumber int64  `gorm:"column:pull_request_number"`
+		Repository        string `gorm:"column:repository"`
+		TestName          string `gorm:"column:test_name"`
+		Status            string `gorm:"column:status"`
+	}
+
+	err := db.All(&rows,
+		dal.Select("j.pull_request_number, j.repository, tc.name AS test_name, tc.status"),
+		dal.From("ci_test_jobs j"),
+		dal.Join("JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id"),
+		dal.Where("j.trigger_type = 'pull_request' AND j.pull_request_number > 0 AND j.repository IN ?", repoShortNames),
+	)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to load CI test case outcomes")
+	}
+
+	outcomes := make(map[prCiKey]ciOutcomeEntry)
+	for _, r := range rows {
+		key := prCiKey{
+			PullRequestNumber: strconv.FormatInt(r.PullRequestNumber, 10),
+			Repository:        r.Repository,
+		}
+		if _, exists := outcomes[key]; !exists {
+			outcomes[key] = ciOutcomeEntry{}
+		}
+		if r.Status != "failed" {
+			continue
+		}
+		// Check if this failed test is flaky.
+		flakyKey := prCiKey{PullRequestNumber: r.TestName, Repository: r.Repository}
+		if flakyTests[flakyKey] {
+			continue
+		}
+		entry := outcomes[key]
+		entry.HadNonFlakyFailure = true
+		outcomes[key] = entry
+	}
+	return outcomes, nil
+}
+
+// ciJobRow is one row from the ci_test_jobs table.
+type ciJobRow struct {
+	PullRequestNumber int64  `gorm:"column:pull_request_number"`
+	Repository        string `gorm:"column:repository"`
+	JobName           string `gorm:"column:job_name"`
+	Result            string `gorm:"column:result"`
+}
+
+// loadCiOutcomesByJobResult queries ci_test_jobs.result for PR-triggered jobs
+// and returns a map indicating whether each PR had a non-flaky job-level failure.
+// Works without ci_test_cases being populated.
+func loadCiOutcomesByJobResult(db dal.Dal, repoShortNames []string, flakyJobs map[string]bool) (map[prCiKey]ciOutcomeEntry, errors.Error) {
+	if len(repoShortNames) == 0 {
+		return map[prCiKey]ciOutcomeEntry{}, nil
+	}
+
+	var rows []ciJobRow
+	err := db.All(&rows,
+		dal.Select("pull_request_number, repository, job_name, result"),
+		dal.From("ci_test_jobs"),
+		dal.Where("trigger_type = 'pull_request' AND pull_request_number > 0 AND repository IN ?", repoShortNames),
+	)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to load CI job outcomes")
+	}
+
+	outcomes := make(map[prCiKey]ciOutcomeEntry)
+	for _, r := range rows {
+		key := prCiKey{
+			PullRequestNumber: strconv.FormatInt(r.PullRequestNumber, 10),
+			Repository:        r.Repository,
+		}
+		if _, exists := outcomes[key]; !exists {
+			outcomes[key] = ciOutcomeEntry{}
+		}
+		if r.Result == "SUCCESS" {
+			continue
+		}
+		// Check if this job is known to be flaky on non-PR runs.
+		flakyKey := r.JobName + "|" + r.Repository
+		if flakyJobs[flakyKey] {
+			continue
+		}
+		entry := outcomes[key]
+		entry.HadNonFlakyFailure = true
+		outcomes[key] = entry
+	}
+	return outcomes, nil
+}
+
+// uniqueRepoShortNames returns the distinct repo short names from the summaries.
+func uniqueRepoShortNames(summaries []prAiSummary) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0)
+	for _, s := range summaries {
+		if s.RepoShortName != "" && !seen[s.RepoShortName] {
+			seen[s.RepoShortName] = true
+			result = append(result, s.RepoShortName)
+		}
+	}
+	return result
+}
+
+// calculateOutcome determines the confusion-matrix label for a prediction.
 func calculateOutcome(wasFlaggedRisky, actualFailure bool) string {
 	if wasFlaggedRisky && actualFailure {
-		return models.PredictionTP // True Positive
+		return models.PredictionTP
 	}
 	if wasFlaggedRisky && !actualFailure {
-		return models.PredictionFP // False Positive
+		return models.PredictionFP
 	}
 	if !wasFlaggedRisky && actualFailure {
-		return models.PredictionFN // False Negative
+		return models.PredictionFN
 	}
-	return models.PredictionTN // True Negative
+	return models.PredictionTN
 }
 
-// generatePredictionId creates a deterministic ID for a prediction
-func generatePredictionId(prId, aiTool string) string {
-	hash := sha256.Sum256([]byte(fmt.Sprintf("%s:%s", prId, aiTool)))
+// generatePredictionId creates a deterministic ID for a prediction.
+func generatePredictionId(prId, aiTool, ciFailureSource string) string {
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%s", prId, aiTool, ciFailureSource)))
 	return "aipred:" + hex.EncodeToString(hash[:16])
 }
 
-// savePredictionsBatch saves a batch of predictions to the database
+// savePredictionsBatch upserts a batch of predictions.
 func savePredictionsBatch(db dal.Dal, batch []*models.AiFailurePrediction) errors.Error {
-	for _, prediction := range batch {
-		err := db.CreateOrUpdate(prediction)
-		if err != nil {
+	for _, p := range batch {
+		if err := db.CreateOrUpdate(p); err != nil {
 			return errors.Default.Wrap(err, "failed to save failure prediction")
 		}
 	}

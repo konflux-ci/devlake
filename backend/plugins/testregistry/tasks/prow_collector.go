@@ -231,41 +231,66 @@ func setupRawDataCollection(taskCtx plugin.SubTaskContext, data *TestRegistryTas
 	})
 }
 
-// fetchProwJobsFromAPI retrieves all Prow jobs from the Openshift CI API
-//
-// Returns:
-//   - []ProwJob: List of all Prow jobs from the API
-//   - errors.Error: Any error encountered during fetching or parsing
+const (
+	prowMaxRetries    = 5
+	prowRetryBaseWait = 10 * time.Second
+)
+
+// isTransientStatusCode returns true for HTTP status codes that warrant a retry.
+func isTransientStatusCode(code int) bool {
+	return code == http.StatusBadGateway ||
+		code == http.StatusServiceUnavailable ||
+		code == http.StatusGatewayTimeout ||
+		code == http.StatusTooManyRequests
+}
+
+// fetchProwJobsFromAPI retrieves all Prow jobs from the Openshift CI API.
+// Transient errors (502, 503, 504, 429) are retried up to prowMaxRetries times
+// with exponential backoff starting at prowRetryBaseWait.
 func fetchProwJobsFromAPI(taskCtx plugin.SubTaskContext) ([]ProwJob, errors.Error) {
-	// Create API client
+	logger := taskCtx.GetLogger()
+
 	apiClient, err := helper.NewApiClient(taskCtx.GetContext(), ProwBaseURL, nil, 0, "", taskCtx)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "failed to create API client for Prow")
 	}
 
-	// Fetch Prow jobs
-	resp, err := apiClient.Get(ProwJobsPath, nil, nil)
-	if err != nil {
-		return nil, errors.Default.Wrap(err, "failed to fetch Prow jobs")
+	var lastErr errors.Error
+	for attempt := 1; attempt <= prowMaxRetries; attempt++ {
+		resp, fetchErr := apiClient.Get(ProwJobsPath, nil, nil)
+		if fetchErr != nil {
+			lastErr = errors.Default.Wrap(fetchErr, "failed to fetch Prow jobs")
+			logger.Warn(lastErr, "Prow API request failed (attempt %d/%d), retrying in %s", attempt, prowMaxRetries, prowRetryBaseWait)
+			time.Sleep(prowRetryBaseWait * time.Duration(attempt))
+			continue
+		}
+
+		if isTransientStatusCode(resp.StatusCode) {
+			lastErr = errors.Default.New(fmt.Sprintf("Prow API returned status %d", resp.StatusCode))
+			wait := prowRetryBaseWait * time.Duration(attempt)
+			logger.Warn(lastErr, "Prow API transient error (attempt %d/%d), retrying in %s", attempt, prowMaxRetries, wait)
+			time.Sleep(wait)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.Default.New(fmt.Sprintf("Prow API returned status %d", resp.StatusCode))
+		}
+
+		// Parse response — Prow API returns {"items": [...]} format.
+		var results map[string][]ProwJob
+		if parseErr := helper.UnmarshalResponse(resp, &results); parseErr != nil {
+			return nil, errors.Default.Wrap(parseErr, "failed to parse Prow jobs response")
+		}
+
+		allJobs := results["items"]
+		if allJobs == nil {
+			allJobs = []ProwJob{}
+		}
+		return allJobs, nil
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Default.New(fmt.Sprintf("Prow API returned status %d", resp.StatusCode))
-	}
-
-	// Parse response - Prow API returns {"items": [...]} format
-	var results map[string][]ProwJob
-	if err := helper.UnmarshalResponse(resp, &results); err != nil {
-		return nil, errors.Default.Wrap(err, "failed to parse Prow jobs response")
-	}
-
-	// Extract items from response
-	allJobs := results["items"]
-	if allJobs == nil {
-		allJobs = []ProwJob{} // Handle case where "items" key doesn't exist
-	}
-
-	return allJobs, nil
+	return nil, errors.Default.Wrap(lastErr, fmt.Sprintf("Prow API failed after %d attempts", prowMaxRetries))
 }
 
 // saveRawJobData saves the raw Prow job JSON to the raw data table

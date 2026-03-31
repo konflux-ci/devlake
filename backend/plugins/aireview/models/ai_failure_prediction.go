@@ -34,11 +34,20 @@ type AiFailurePrediction struct {
 	// Foreign key to pull_requests domain table
 	PullRequestId string `gorm:"index;type:varchar(255)"`
 
+	// PR number (pull_requests.pull_request_key) — used to join with ci_test_jobs.pull_request_number
+	PullRequestKey string `gorm:"index;type:varchar(255)"`
+
 	// Repository reference
 	RepoId string `gorm:"index;type:varchar(255)"`
 
+	// Short repo name (after '/') — used to join with ci_test_jobs.repository
+	RepoShortName string `gorm:"type:varchar(255)"`
+
 	// AI tool that made the prediction
 	AiTool string `gorm:"type:varchar(100)"`
+
+	// Which CI data source was used: "test_cases" or "job_result"
+	CiFailureSource string `gorm:"type:varchar(20);index"`
 
 	// Prediction data
 	WasFlaggedRisky bool      // Did AI flag this PR as risky?
@@ -91,8 +100,9 @@ type AiPredictionMetrics struct {
 	Id string `gorm:"primaryKey;type:varchar(255)"`
 
 	// Scope
-	RepoId string `gorm:"index;type:varchar(255)"`
-	AiTool string `gorm:"type:varchar(100)"`
+	RepoId          string `gorm:"index;type:varchar(255)"`
+	AiTool          string `gorm:"type:varchar(100)"`
+	CiFailureSource string `gorm:"type:varchar(20);index"`
 
 	// Time period
 	PeriodStart time.Time `gorm:"index"`
@@ -106,10 +116,19 @@ type AiPredictionMetrics struct {
 	TrueNegatives  int
 
 	// Calculated metrics
-	Precision float64 // TP / (TP + FP)
-	Recall    float64 // TP / (TP + FN)
-	Accuracy  float64 // (TP + TN) / Total
-	F1Score   float64 // 2 * (Precision * Recall) / (Precision + Recall)
+	Precision   float64 // TP / (TP + FP)
+	Recall      float64 // TP / (TP + FN)
+	Accuracy    float64 // (TP + TN) / Total
+	F1Score     float64 // 2 * (Precision * Recall) / (Precision + Recall)
+	Specificity float64 // TN / (TN + FP)
+	FprPct      float64 // FP / (FP + TN) × 100
+
+	// Area under curve metrics (computed at thresholds 0, 10, 20, 50, 80, 100)
+	PrAuc  float64 // Precision-Recall AUC
+	RocAuc float64 // ROC AUC
+
+	// The warning_threshold used when computing confusion matrix for this record
+	WarningThreshold int
 
 	// Sample sizes
 	TotalPrs    int

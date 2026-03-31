@@ -28,5 +28,7 @@ func All() []plugin.MigrationScript {
 		&addEffortAndChecks{},
 		&addGeminiConfig{},
 		&addReactions{},
+		&addCiPredictionFields{},
+		&addCiFailureSource{},
 	}
 }
