@@ -28,10 +28,6 @@ func All() []plugin.MigrationScript {
 		&addEffortAndChecks{},
 		&addGeminiConfig{},
 		&addReactions{},
-		&addCiPredictionFields{},
-		&addCiFailureSource{},
-		&addCiBackfillConfig{},
-		&cleanupNullCiSourcePredictions{},
-		&addPrMetadataToPredictions{},
+		&addCiPredictionSupport{},
 	}
 }
