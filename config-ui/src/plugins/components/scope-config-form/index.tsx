@@ -118,18 +118,21 @@ export const ScopeConfigForm = ({
 
   return (
     <Flex vertical gap="middle">
-      <Alert
-        message={
-          <>
-            To learn about how {config.name} transformation is used in DevLake,
-            {/* @ts-ignore */}
-            <ExternalLink link={DOC_URL.PLUGIN[config.plugin.toLocaleUpperCase()].TRANSFORMATION}>
-              check out this doc
-            </ExternalLink>
-            .
-          </>
-        }
-      />
+      {/* @ts-ignore */}
+      {DOC_URL.PLUGIN[config.plugin.toLocaleUpperCase()]?.TRANSFORMATION && (
+        <Alert
+          message={
+            <>
+              To learn about how {config.name} transformation is used in DevLake,
+              {/* @ts-ignore */}
+              <ExternalLink link={DOC_URL.PLUGIN[config.plugin.toLocaleUpperCase()].TRANSFORMATION}>
+                check out this doc
+              </ExternalLink>
+              .
+            </>
+          }
+        />
+      )}
       {step === 1 && (
         <>
           <Card>

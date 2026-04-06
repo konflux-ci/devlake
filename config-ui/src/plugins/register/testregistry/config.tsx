@@ -133,4 +133,8 @@ export const TestRegistryConfig: IPluginConfig = {
   dataScope: {
     title: 'Scopes',
   },
+  scopeConfig: {
+    entities: ['CICD'],
+    transformation: {},
+  },
 };

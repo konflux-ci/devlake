@@ -23,9 +23,6 @@ import (
 
 type TestRegistryScopeConfig struct {
 	common.ScopeConfig `mapstructure:",squash" json:",inline" gorm:"embedded"`
-
-	// Configuration for test artifact processing
-	// Add custom fields here as needed for test registry configuration
 }
 
 func (TestRegistryScopeConfig) TableName() string {

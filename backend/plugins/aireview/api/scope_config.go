@@ -122,8 +122,30 @@ func CreateScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutpu
 		return nil, errors.BadInput.Wrap(err, "failed to decode scope config")
 	}
 
-	// Create in database
-	dbErr := db.Create(config)
+	// Upsert by name: if a scope config with the same name already exists, update it.
+	// This handles the common case where name="" and the unique index would otherwise reject the insert.
+	var existing models.AiReviewScopeConfig
+	dbErr := db.First(&existing, dal.Where("name = ?", config.Name))
+	if dbErr == nil {
+		config.ID = existing.ID
+		dbErr = db.Update(config)
+		if dbErr != nil {
+			return nil, errors.Default.Wrap(dbErr, "failed to update scope config")
+		}
+		return &plugin.ApiResourceOutput{
+			Body:   config,
+			Status: http.StatusOK,
+		}, nil
+	}
+
+	// Only fall through to Create when the lookup returned "not found".
+	// Any other error (connection failure, etc.) must be surfaced immediately.
+	if !db.IsErrorNotFound(dbErr) {
+		return nil, errors.Default.Wrap(dbErr, "failed to look up scope config by name")
+	}
+
+	// No existing record — create new
+	dbErr = db.Create(config)
 	if dbErr != nil {
 		return nil, errors.Default.Wrap(dbErr, "failed to create scope config")
 	}

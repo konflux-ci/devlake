@@ -21,6 +21,7 @@ import (
 	"regexp"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/gcshelper"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
 )
@@ -49,6 +50,11 @@ type AiReviewOptions struct {
 // AiReviewTaskData contains shared data for subtasks
 type AiReviewTaskData struct {
 	Options *AiReviewOptions
+
+	// GcsStoreOverride allows tests to inject a fake GCS store instead of
+	// opening a real connection to the public Openshift CI bucket.
+	// If nil, FetchMissingCiJobs opens a real GCS client.
+	GcsStoreOverride gcshelper.HistoryStore
 
 	// Compiled regex patterns
 	CodeRabbitUsernameRegex   *regexp.Regexp

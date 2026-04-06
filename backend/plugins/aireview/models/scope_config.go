@@ -57,9 +57,36 @@ type AiReviewScopeConfig struct {
 	// Failure tracking configuration
 	ObservationWindowDays int `mapstructure:"observationWindowDays" json:"observationWindowDays"` // Default 14 days
 
+	// CI failure prediction threshold: PRs with risk_score >= this are "flagged risky"
+	// Used by calculateFailurePredictions to classify TP/FP/FN/TN against actual CI outcomes
+	WarningThreshold int `mapstructure:"warningThreshold" json:"warningThreshold"` // Default 50
+
+	// CiFailureSource controls which CI data is used to determine actual failures.
+	// "test_cases": join ci_test_cases with flaky-test quarantine (accurate, needs full collection)
+	// "job_result": use ci_test_jobs.result directly (fast, works without artifact collection)
+	// "both": compute predictions for both sources (stored with ci_failure_source tag)
+	CiFailureSource string `mapstructure:"ciFailureSource" json:"ciFailureSource" gorm:"type:varchar(20);default:'both'"`
+
 	// Issue linking patterns (for tracking post-merge bugs)
 	BugLinkPattern string `mapstructure:"bugLinkPattern" json:"bugLinkPattern" gorm:"type:varchar(500)"`
+
+	// CiBackfillEnabled enables fetching CI job results from GCS for PRs that
+	// have AI reviews but no CI data. Disabled by default because it requires
+	// network access to the public Openshift CI GCS bucket.
+	CiBackfillEnabled bool `mapstructure:"ciBackfillEnabled" json:"ciBackfillEnabled" gorm:"type:boolean;default:false"`
+
+	// CiBackfillDays controls how many days back to backfill CI data from GCS.
+	// 0 (the default) disables backfill. The task derives enabled/disabled from
+	// this value: CiBackfillDays > 0 means backfill is active.
+	CiBackfillDays int `mapstructure:"ciBackfillDays" json:"ciBackfillDays" gorm:"default:0"`
 }
+
+// CI failure source constants
+const (
+	CiSourceTestCases = "test_cases" // Use ci_test_cases with flaky-test quarantine
+	CiSourceJobResult = "job_result" // Use ci_test_jobs.result directly
+	CiSourceBoth      = "both"       // Compute predictions for both sources
+)
 
 func (AiReviewScopeConfig) TableName() string {
 	return "_tool_aireview_scope_configs"
@@ -86,6 +113,8 @@ func GetDefaultScopeConfig() *AiReviewScopeConfig {
 		RiskMediumPattern:     `(?i)(warning|medium|moderate)`,
 		RiskLowPattern:        `(?i)(minor|low|info|suggestion)`,
 		ObservationWindowDays: 14,
+		WarningThreshold:      50,
+		CiFailureSource:       CiSourceBoth,
 		BugLinkPattern:        `(?i)(fixes|closes|resolves)\s*#(\d+)`,
 	}
 }

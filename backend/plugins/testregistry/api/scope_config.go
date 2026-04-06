@@ -41,3 +41,7 @@ func DeleteScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutpu
 func GetScopeConfigList(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	return dsHelper.ScopeConfigApi.GetAll(input)
 }
+
+func GetProjectsByScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ScopeConfigApi.GetProjectsByScopeConfig(input)
+}
