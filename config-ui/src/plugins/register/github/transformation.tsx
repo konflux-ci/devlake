@@ -206,7 +206,7 @@ const renderCollapseItems = ({
             label={
               <>
                 <span style={{ marginRight: 4 }}>Issue Severity</span>
-                <HelpTooltip content="Labels that match the RegEx will be set as the serverity of an issue." />
+                <HelpTooltip content="Labels that match the RegEx will be set as the severity of an issue." />
               </>
             }
           >
@@ -441,6 +441,39 @@ const renderCollapseItems = ({
               }
             />
             for calculation
+          </div>
+          <h3 style={{ marginBottom: 16, marginTop: 16 }}>
+            <span>PR Size Exclusions</span>
+          </h3>
+          <div style={{ margin: '8px 0' }}>
+            <span>Exclude file extensions (comma-separated, e.g. .md,.txt,.json)</span>
+            <Input
+              style={{ width: 360, margin: '0 8px' }}
+              placeholder=".md,.txt,.json"
+              value={(transformation.prSizeExcludedFileExtensions || []).join(',')}
+              onChange={(e) => {
+                // Don't filter during onChange to allow typing commas freely
+                const extensions = e.target.value
+                  .split(',')
+                  .map((s: string) => s.trim());
+                onChangeTransformation({
+                  ...transformation,
+                  prSizeExcludedFileExtensions: extensions,
+                });
+              }}
+              onBlur={(e) => {
+                // Clean up empty entries when user leaves the field
+                const extensions = e.target.value
+                  .split(',')
+                  .map((s: string) => s.trim())
+                  .filter((s: string) => s.length > 0);
+                onChangeTransformation({
+                  ...transformation,
+                  prSizeExcludedFileExtensions: extensions,
+                });
+              }}
+            />
+            <HelpTooltip content="These extensions are ignored when computing PR Size (additions/deletions)." />
           </div>
         </>
       ),
