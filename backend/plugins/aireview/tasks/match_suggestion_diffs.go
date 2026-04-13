@@ -24,6 +24,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
 )
@@ -60,12 +61,21 @@ type suggestionFinding struct {
 	AiToolUser        string    `gorm:"column:ai_tool_user"`
 }
 
+// commitFilePatch holds a file's patch content from a commit
+type commitFilePatch struct {
+	CommitSha string
+	FilePath  string
+	Patch     string
+}
+
 // matchResult holds the result of matching a suggestion against commits
 type matchResult struct {
 	FindingId    string
 	Matched      bool
 	Method       string
-	Score        int
+	Score        float64
+	LinesMatched int
+	LinesTotal   int
 	CommitSha    string
 	MatchedFile  string
 }
@@ -108,9 +118,10 @@ func MatchSuggestionDiffs(taskCtx plugin.SubTaskContext) errors.Error {
 		findingsByPR[f.PullRequestId] = append(findingsByPR[f.PullRequestId], f)
 	}
 
-	// Step 4: For each PR, load commits and match
+	// Step 4: For each PR, load commits, patches, and match
 	totalMatched := 0
-	reviewAcceptedCounts := make(map[string]int) // ai_review_id -> count of diff-accepted
+	reviewAcceptedCounts := make(map[string]int)       // ai_review_id -> count of diff-accepted
+	reviewAcceptedScores := make(map[string][]float64)  // ai_review_id -> list of match scores
 
 	for prId, prFindings := range findingsByPR {
 		// Get commits for this PR
@@ -134,12 +145,34 @@ func MatchSuggestionDiffs(taskCtx plugin.SubTaskContext) errors.Error {
 			continue
 		}
 
+		// Try to load commit patches from raw data for line-by-line comparison
+		patches := loadCommitPatches(db, commitShas, logger)
+
+		// If commit_files is sparse, supplement from raw patch data
+		if len(fileChanges) < len(patches) {
+			existingKeys := make(map[string]bool)
+			for _, fc := range fileChanges {
+				existingKeys[fc.CommitSha+":"+fc.FilePath] = true
+			}
+			for _, p := range patches {
+				key := p.CommitSha + ":" + p.FilePath
+				if !existingKeys[key] {
+					fileChanges = append(fileChanges, commitFileChange{
+						CommitSha: p.CommitSha,
+						FilePath:  p.FilePath,
+					})
+					existingKeys[key] = true
+				}
+			}
+		}
+
 		// Match each finding
 		for _, finding := range prFindings {
-			result := matchFinding(finding, commits, fileChanges)
+			result := matchFinding(finding, commits, fileChanges, patches)
 			if result.Matched {
 				totalMatched++
 				reviewAcceptedCounts[finding.AiReviewId]++
+				reviewAcceptedScores[finding.AiReviewId] = append(reviewAcceptedScores[finding.AiReviewId], result.Score)
 
 				updateErr := db.UpdateColumns(
 					&models.AiReviewFinding{},
@@ -147,6 +180,8 @@ func MatchSuggestionDiffs(taskCtx plugin.SubTaskContext) errors.Error {
 						{ColumnName: "suggestion_diff_matched", Value: true},
 						{ColumnName: "suggestion_match_method", Value: result.Method},
 						{ColumnName: "suggestion_match_score", Value: result.Score},
+						{ColumnName: "suggestion_lines_matched", Value: result.LinesMatched},
+						{ColumnName: "suggestion_lines_total", Value: result.LinesTotal},
 						{ColumnName: "matched_commit_sha", Value: result.CommitSha},
 						{ColumnName: "matched_file_path", Value: result.MatchedFile},
 					},
@@ -159,12 +194,23 @@ func MatchSuggestionDiffs(taskCtx plugin.SubTaskContext) errors.Error {
 		}
 	}
 
-	// Step 5: Update review-level diff-accepted counts
+	// Step 5: Update review-level diff-accepted counts and average percentages
 	for reviewId, count := range reviewAcceptedCounts {
+		avgPct := 0.0
+		scores := reviewAcceptedScores[reviewId]
+		if len(scores) > 0 {
+			sum := 0.0
+			for _, s := range scores {
+				sum += s
+			}
+			avgPct = sum / float64(len(scores))
+		}
+
 		updateErr := db.UpdateColumns(
 			&models.AiReview{},
 			[]dal.DalSet{
 				{ColumnName: "suggestions_diff_accepted", Value: count},
+				{ColumnName: "suggestions_diff_accept_pct", Value: avgPct},
 			},
 			dal.Where("id = ?", reviewId),
 		)
@@ -254,7 +300,7 @@ func loadCommitFiles(db dal.Dal, commitShas []string) ([]commitFileChange, error
 
 // matchFinding attempts to match a suggestion finding against PR commits.
 // Returns the best match found across all strategies.
-func matchFinding(finding suggestionFinding, commits []prCommit, fileChanges []commitFileChange) matchResult {
+func matchFinding(finding suggestionFinding, commits []prCommit, fileChanges []commitFileChange, patches []commitFilePatch) matchResult {
 	result := matchResult{FindingId: finding.Id}
 
 	// Get the file path for this finding
@@ -269,6 +315,15 @@ func matchFinding(finding suggestionFinding, commits []prCommit, fileChanges []c
 		commitFiles[fc.CommitSha] = append(commitFiles[fc.CommitSha], fc)
 	}
 
+	// Build patch index: "commitSha:filePath" -> patch
+	patchIndex := make(map[string]string)
+	for _, p := range patches {
+		patchIndex[p.CommitSha+":"+p.FilePath] = p.Patch
+	}
+
+	// Parse suggested lines (non-trivial only)
+	suggestedLines := nonTrivialLines(finding.SuggestedCode)
+
 	// Filter to commits after the suggestion was made
 	suggestionTime := finding.ReviewCreatedDate
 	if suggestionTime.IsZero() {
@@ -276,29 +331,33 @@ func matchFinding(finding suggestionFinding, commits []prCommit, fileChanges []c
 	}
 
 	// Strategy 1: Check for "Apply suggestion" commit messages
+	// The GitHub "Apply suggestion" button applies the exact code, so 100%.
 	for _, commit := range commits {
 		if commit.AuthoredDate.Before(suggestionTime) {
 			continue
 		}
 		if isApplySuggestionCommit(commit.Message, finding.AiToolUser) {
-			// Check if this commit touches the right file
 			if filePath != "" {
 				for _, fc := range commitFiles[commit.CommitSha] {
 					if filePathsMatch(fc.FilePath, filePath) {
 						result.Matched = true
 						result.Method = "diff_commit_msg"
-						result.Score = 95
+						result.Score = 100.0
+						result.LinesMatched = len(suggestedLines)
+						result.LinesTotal = len(suggestedLines)
 						result.CommitSha = commit.CommitSha
 						result.MatchedFile = fc.FilePath
 						return result
 					}
 				}
 			}
-			// Even without file path match, "Apply suggestion" commit is strong signal
+			// Without file match, still strong signal — assume full apply
 			if len(commitFiles[commit.CommitSha]) == 1 {
 				result.Matched = true
 				result.Method = "diff_commit_msg"
-				result.Score = 85
+				result.Score = 100.0
+				result.LinesMatched = len(suggestedLines)
+				result.LinesTotal = len(suggestedLines)
 				result.CommitSha = commit.CommitSha
 				result.MatchedFile = commitFiles[commit.CommitSha][0].FilePath
 				return result
@@ -306,7 +365,55 @@ func matchFinding(finding suggestionFinding, commits []prCommit, fileChanges []c
 		}
 	}
 
-	// Strategy 2: File path + temporal proximity
+	// Strategy 2: Line-level comparison against commit patches
+	if filePath != "" && len(suggestedLines) > 0 {
+		for _, commit := range commits {
+			if commit.AuthoredDate.Before(suggestionTime) {
+				continue
+			}
+			for _, fc := range commitFiles[commit.CommitSha] {
+				if !filePathsMatch(fc.FilePath, filePath) {
+					continue
+				}
+
+				// Try to find the patch for this commit+file
+				patch := patchIndex[commit.CommitSha+":"+fc.FilePath]
+				if patch == "" {
+					// Try with normalized path
+					for key, p := range patchIndex {
+						parts := strings.SplitN(key, ":", 2)
+						if len(parts) == 2 && parts[0] == commit.CommitSha && filePathsMatch(parts[1], filePath) {
+							patch = p
+							break
+						}
+					}
+				}
+
+				if patch != "" {
+					addedLines := extractAddedLines(patch)
+					matched, total := countMatchingLines(suggestedLines, addedLines)
+					if total > 0 {
+						pct := float64(matched) / float64(total) * 100.0
+						if pct > result.Score {
+							result.Matched = pct > 0
+							result.Method = "diff_line_pct"
+							result.Score = pct
+							result.LinesMatched = matched
+							result.LinesTotal = total
+							result.CommitSha = commit.CommitSha
+							result.MatchedFile = fc.FilePath
+						}
+					}
+				}
+			}
+		}
+		// If we found a line-level match, return it
+		if result.Matched {
+			return result
+		}
+	}
+
+	// Strategy 3: File path + temporal proximity (fallback when no patches available)
 	if filePath == "" {
 		return result
 	}
@@ -322,12 +429,12 @@ func matchFinding(finding suggestionFinding, commits []prCommit, fileChanges []c
 				continue
 			}
 
-			// File was modified after the suggestion — score based on temporal proximity
 			score := calculateTemporalScore(timeDelta)
 			if score > result.Score {
 				result.Matched = true
 				result.Method = "diff_file_temporal"
 				result.Score = score
+				result.LinesTotal = len(suggestedLines)
 				result.CommitSha = commit.CommitSha
 				result.MatchedFile = fc.FilePath
 			}
@@ -373,19 +480,199 @@ func filePathsMatch(path1, path2 string) bool {
 
 // calculateTemporalScore returns a confidence score based on how soon after the suggestion
 // the commit was made. Shorter time = higher confidence.
-func calculateTemporalScore(delta time.Duration) int {
+// Returns a float64 used as a fallback score when patch data is not available.
+func calculateTemporalScore(delta time.Duration) float64 {
 	switch {
 	case delta < 30*time.Minute:
-		return 75 // Very likely applied
+		return 75.0 // Very likely applied
 	case delta < 2*time.Hour:
-		return 60 // Probably applied
+		return 60.0 // Probably applied
 	case delta < 24*time.Hour:
-		return 45 // Possibly applied
+		return 45.0 // Possibly applied
 	case delta < 72*time.Hour:
-		return 30 // Weak signal
+		return 30.0 // Weak signal
 	default:
-		return 0 // Too far apart
+		return 0.0 // Too far apart
 	}
+}
+
+// nonTrivialLines splits text into lines and filters out trivial ones
+// (empty, whitespace-only, single braces/brackets/parens).
+func nonTrivialLines(text string) []string {
+	var result []string
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if isTrivialLine(trimmed) {
+			continue
+		}
+		result = append(result, trimmed)
+	}
+	return result
+}
+
+// isTrivialLine returns true for lines that carry no meaningful code content.
+func isTrivialLine(trimmed string) bool {
+	if trimmed == "" {
+		return true
+	}
+	// Single punctuation characters that are just structural
+	trivialTokens := map[string]bool{
+		"{": true, "}": true,
+		"(": true, ")": true,
+		"[": true, "]": true,
+		"},": true, "],": true, "];": true, ");": true,
+		"};": true, "*/": true, "/*": true,
+	}
+	return trivialTokens[trimmed]
+}
+
+// extractAddedLines parses a unified diff patch and returns only the added lines
+// (lines starting with '+' but not '+++'), with trivial lines filtered out.
+func extractAddedLines(patch string) []string {
+	var added []string
+	for _, line := range strings.Split(patch, "\n") {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			trimmed := strings.TrimSpace(line[1:]) // strip leading '+' then trim
+			if !isTrivialLine(trimmed) {
+				added = append(added, trimmed)
+			}
+		}
+	}
+	return added
+}
+
+// countMatchingLines counts how many of the suggested lines appear in the added lines.
+// Uses normalized (trimmed) comparison to handle indentation differences.
+// Returns (matched, total) where total is len(suggested).
+func countMatchingLines(suggested, added []string) (int, int) {
+	if len(suggested) == 0 {
+		return 0, 0
+	}
+
+	// Build a set from added lines for O(1) lookup
+	addedSet := make(map[string]int, len(added))
+	for _, line := range added {
+		addedSet[line]++
+	}
+
+	matched := 0
+	for _, line := range suggested {
+		if addedSet[line] > 0 {
+			matched++
+			addedSet[line]-- // consume the match to avoid double-counting
+		}
+	}
+	return matched, len(suggested)
+}
+
+// loadCommitPatches loads file-level patches from raw GitHub API commit data.
+// Falls back gracefully if raw tables are unavailable.
+func loadCommitPatches(db dal.Dal, commitShas []string, logger log.Logger) []commitFilePatch {
+	if len(commitShas) == 0 {
+		return nil
+	}
+
+	// Try _raw_github_api_commit_stats which stores per-file patches
+	var patches []commitFilePatch
+	batchSize := 100
+	for i := 0; i < len(commitShas); i += batchSize {
+		end := i + batchSize
+		if end > len(commitShas) {
+			end = len(commitShas)
+		}
+		batch := commitShas[i:end]
+
+		rows, err := db.Cursor(
+			dal.Select("JSON_UNQUOTE(JSON_EXTRACT(CONVERT(data USING utf8mb4), '$.sha')) as commit_sha, "+
+				"JSON_EXTRACT(CONVERT(data USING utf8mb4), '$.files') as files_json"),
+			dal.From("_raw_github_api_commit_stats"),
+			dal.Where("JSON_UNQUOTE(JSON_EXTRACT(CONVERT(data USING utf8mb4), '$.sha')) IN (?) AND JSON_LENGTH(JSON_EXTRACT(CONVERT(data USING utf8mb4), '$.files')) > 0", batch),
+		)
+		if err != nil {
+			logger.Info("Raw commit patches not available (table may not exist): %s", err.Error())
+			return nil
+		}
+
+		for rows.Next() {
+			var sha *string
+			var filesJSON *string
+			if scanErr := rows.Scan(&sha, &filesJSON); scanErr != nil || sha == nil || filesJSON == nil {
+				continue
+			}
+			cleanSha := strings.Trim(*sha, "\"")
+			parsed := parseFilesJSON(*filesJSON)
+			for _, pf := range parsed {
+				patches = append(patches, commitFilePatch{
+					CommitSha: cleanSha,
+					FilePath:  pf.filename,
+					Patch:     pf.patch,
+				})
+			}
+		}
+		rows.Close()
+	}
+
+	logger.Info("Loaded %d file patches from raw commit data", len(patches))
+	return patches
+}
+
+type parsedFile struct {
+	filename string
+	patch    string
+}
+
+// parseFilesJSON extracts filename and patch from the GitHub API files array JSON.
+// Avoids importing encoding/json by using simple string parsing on the already-extracted JSON.
+func parseFilesJSON(filesJSON string) []parsedFile {
+	// The JSON is an array of objects like: [{"filename":"foo.go","patch":"@@ ..."},...]
+	// Use regexp to extract filename and patch pairs
+	var results []parsedFile
+
+	fnPattern := regexp.MustCompile(`"filename"\s*:\s*"([^"]+)"`)
+	patchPattern := regexp.MustCompile(`"patch"\s*:\s*"((?:[^"\\]|\\.)*)?"`)
+
+	fnMatches := fnPattern.FindAllStringSubmatchIndex(filesJSON, -1)
+	patchMatches := patchPattern.FindAllStringSubmatchIndex(filesJSON, -1)
+
+	// Build filename list
+	filenames := make([]string, len(fnMatches))
+	for i, idx := range fnMatches {
+		filenames[i] = filesJSON[idx[2]:idx[3]]
+	}
+
+	// Build patch list — patches may be absent for binary files
+	patchTexts := make([]string, len(filenames))
+	for _, idx := range patchMatches {
+		patchText := ""
+		if idx[2] >= 0 && idx[3] >= 0 {
+			patchText = filesJSON[idx[2]:idx[3]]
+		}
+		// Find which filename this patch belongs to (by position in JSON)
+		for i, fnIdx := range fnMatches {
+			if idx[0] > fnIdx[0] && (i+1 >= len(fnMatches) || idx[0] < fnMatches[i+1][0]) {
+				patchTexts[i] = unescapeJSON(patchText)
+				break
+			}
+		}
+	}
+
+	for i, fn := range filenames {
+		if patchTexts[i] != "" {
+			results = append(results, parsedFile{filename: fn, patch: patchTexts[i]})
+		}
+	}
+	return results
+}
+
+// unescapeJSON converts JSON-escaped strings (\\n → \n, \\t → \t, etc.)
+func unescapeJSON(s string) string {
+	s = strings.ReplaceAll(s, "\\n", "\n")
+	s = strings.ReplaceAll(s, "\\t", "\t")
+	s = strings.ReplaceAll(s, "\\r", "")
+	s = strings.ReplaceAll(s, "\\\"", "\"")
+	s = strings.ReplaceAll(s, "\\\\/", "/")
+	s = strings.ReplaceAll(s, "\\\\", "\\")
+	return s
 }
 
 // enrichFindingFilePaths resolves file paths from raw data for findings that lack them.

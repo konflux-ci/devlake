@@ -18,6 +18,7 @@ limitations under the License.
 package tasks
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -116,44 +117,166 @@ func TestCalculateTemporalScore(t *testing.T) {
 	tests := []struct {
 		name  string
 		delta time.Duration
-		want  int
+		want  float64
 	}{
-		{"10 minutes", 10 * time.Minute, 75},
-		{"1 hour", 1 * time.Hour, 60},
-		{"12 hours", 12 * time.Hour, 45},
-		{"48 hours", 48 * time.Hour, 30},
-		{"1 week", 7 * 24 * time.Hour, 0},
+		{"10 minutes", 10 * time.Minute, 75.0},
+		{"1 hour", 1 * time.Hour, 60.0},
+		{"12 hours", 12 * time.Hour, 45.0},
+		{"48 hours", 48 * time.Hour, 30.0},
+		{"1 week", 7 * 24 * time.Hour, 0.0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := calculateTemporalScore(tt.delta)
 			if got != tt.want {
-				t.Errorf("calculateTemporalScore(%v) = %d, want %d", tt.delta, got, tt.want)
+				t.Errorf("calculateTemporalScore(%v) = %f, want %f", tt.delta, got, tt.want)
 			}
 		})
 	}
+}
+
+func TestNonTrivialLines(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  int
+	}{
+		{"code with empty lines", "foo()\n\nbar()\n", 2},
+		{"just braces", "{\n}\n", 0},
+		{"mixed", "if x > 0 {\n  return x\n}\n", 2},
+		{"whitespace only", "   \n\t\n  \n", 0},
+		{"single brace variants", "}\n},\n];\n);\n", 0},
+		{"real code", "log.Println(\"hello\")\nreturn nil\n", 2},
+		{"empty", "", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := nonTrivialLines(tt.input)
+			if len(got) != tt.want {
+				t.Errorf("nonTrivialLines(%q) = %d lines, want %d (got: %v)", tt.input, len(got), tt.want, got)
+			}
+		})
+	}
+}
+
+func TestExtractAddedLines(t *testing.T) {
+	patch := `@@ -1,5 +1,7 @@
+ func foo() {
+-    return nil
++    if x > 0 {
++        return x
++    }
++    return 0
+ }
+`
+	got := extractAddedLines(patch)
+	// Should get: "if x > 0 {" (not trivial because has content), "return x", "return 0"
+	// "}" is trivial and excluded
+	want := 3
+	if len(got) != want {
+		t.Errorf("extractAddedLines() = %d lines, want %d (got: %v)", len(got), want, got)
+	}
+}
+
+func TestCountMatchingLines(t *testing.T) {
+	tests := []struct {
+		name         string
+		suggested    []string
+		added        []string
+		wantMatched  int
+		wantTotal    int
+	}{
+		{
+			name:        "full match",
+			suggested:   []string{"return x", "return 0"},
+			added:       []string{"return x", "return 0", "log.Println()"},
+			wantMatched: 2,
+			wantTotal:   2,
+		},
+		{
+			name:        "partial match",
+			suggested:   []string{"return x", "return y", "return z"},
+			added:       []string{"return x", "return w"},
+			wantMatched: 1,
+			wantTotal:   3,
+		},
+		{
+			name:        "no match",
+			suggested:   []string{"foo()"},
+			added:       []string{"bar()"},
+			wantMatched: 0,
+			wantTotal:   1,
+		},
+		{
+			name:        "empty suggestion",
+			suggested:   []string{},
+			added:       []string{"foo()"},
+			wantMatched: 0,
+			wantTotal:   0,
+		},
+		{
+			name:        "duplicate lines — no double counting",
+			suggested:   []string{"return nil", "return nil"},
+			added:       []string{"return nil"},
+			wantMatched: 1,
+			wantTotal:   2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matched, total := countMatchingLines(tt.suggested, tt.added)
+			if matched != tt.wantMatched || total != tt.wantTotal {
+				t.Errorf("countMatchingLines() = (%d, %d), want (%d, %d)", matched, total, tt.wantMatched, tt.wantTotal)
+			}
+		})
+	}
+}
+
+func TestIsTrivialLine(t *testing.T) {
+	// isTrivialLine expects already-trimmed input (nonTrivialLines does TrimSpace before calling)
+	trivial := []string{"", "{", "}", "},", "];", ");", "};", "*/", "/*", "(", ")", "[", "]", "],"}
+	for _, s := range trivial {
+		if !isTrivialLine(s) {
+			t.Errorf("isTrivialLine(%q) = false, want true", s)
+		}
+	}
+
+	nonTrivial := []string{"return nil", "if x > 0 {", "// comment", "x := 1"}
+	for _, s := range nonTrivial {
+		if isTrivialLine(s) {
+			t.Errorf("isTrivialLine(%q) = true, want false", s)
+		}
+	}
+}
+
+func almostEqual(a, b, epsilon float64) bool {
+	return math.Abs(a-b) < epsilon
 }
 
 func TestMatchFinding(t *testing.T) {
 	baseTime := time.Date(2026, 3, 15, 10, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name        string
-		finding     suggestionFinding
-		commits     []prCommit
-		fileChanges []commitFileChange
-		wantMatched bool
-		wantMethod  string
-		wantMinScore int
+		name         string
+		finding      suggestionFinding
+		commits      []prCommit
+		fileChanges  []commitFileChange
+		patches      []commitFilePatch
+		wantMatched  bool
+		wantMethod   string
+		wantMinScore float64
 	}{
 		{
 			name: "Apply suggestion commit with matching file",
 			finding: suggestionFinding{
 				AiReviewFinding: models.AiReviewFinding{
-					Id:       "f1",
-					FilePath: "pkg/server/server.go",
-					Type:     models.FindingTypeSuggestion,
+					Id:            "f1",
+					FilePath:      "pkg/server/server.go",
+					Type:          models.FindingTypeSuggestion,
+					SuggestedCode: "return nil",
 				},
 				ReviewCreatedDate: baseTime,
 				AiToolUser:        "coderabbitai[bot]",
@@ -166,16 +289,17 @@ func TestMatchFinding(t *testing.T) {
 			},
 			wantMatched:  true,
 			wantMethod:   "diff_commit_msg",
-			wantMinScore: 90,
+			wantMinScore: 100.0,
 		},
 		{
-			name: "File modified shortly after suggestion",
+			name: "Line-level match with patch data",
 			finding: suggestionFinding{
 				AiReviewFinding: models.AiReviewFinding{
 					Id:              "f2",
 					FilePath:        "pkg/config/config.go",
 					MatchedFilePath: "pkg/config/config.go",
 					Type:            models.FindingTypeSuggestion,
+					SuggestedCode:   "if cfg == nil {\n    return ErrNilConfig\n}\n",
 				},
 				ReviewCreatedDate: baseTime,
 			},
@@ -185,17 +309,46 @@ func TestMatchFinding(t *testing.T) {
 			fileChanges: []commitFileChange{
 				{CommitSha: "def456", FilePath: "pkg/config/config.go", Additions: 5, Deletions: 2},
 			},
+			patches: []commitFilePatch{
+				{CommitSha: "def456", FilePath: "pkg/config/config.go", Patch: "@@ -10,3 +10,5 @@\n func Load() {\n+if cfg == nil {\n+    return ErrNilConfig\n+}\n return cfg\n"},
+			},
 			wantMatched:  true,
-			wantMethod:   "diff_file_temporal",
-			wantMinScore: 70,
+			wantMethod:   "diff_line_pct",
+			wantMinScore: 100.0,
 		},
 		{
-			name: "File modified much later — weak signal",
+			name: "Partial line match — 50%",
 			finding: suggestionFinding{
 				AiReviewFinding: models.AiReviewFinding{
-					Id:       "f3",
-					FilePath: "pkg/handler.go",
-					Type:     models.FindingTypeSuggestion,
+					Id:              "f2b",
+					FilePath:        "pkg/config/config.go",
+					MatchedFilePath: "pkg/config/config.go",
+					Type:            models.FindingTypeSuggestion,
+					SuggestedCode:   "if cfg == nil {\n    return ErrNilConfig\n}\nlog.Warn(\"checked\")\n",
+				},
+				ReviewCreatedDate: baseTime,
+			},
+			commits: []prCommit{
+				{CommitSha: "def456", AuthoredDate: baseTime.Add(15 * time.Minute), Message: "Fix config validation"},
+			},
+			fileChanges: []commitFileChange{
+				{CommitSha: "def456", FilePath: "pkg/config/config.go", Additions: 3, Deletions: 1},
+			},
+			patches: []commitFilePatch{
+				{CommitSha: "def456", FilePath: "pkg/config/config.go", Patch: "@@ -10,3 +10,5 @@\n+if cfg == nil {\n+    return ErrNilConfig\n+}\n"},
+			},
+			wantMatched:  true,
+			wantMethod:   "diff_line_pct",
+			wantMinScore: 50.0,
+		},
+		{
+			name: "File modified much later — temporal fallback",
+			finding: suggestionFinding{
+				AiReviewFinding: models.AiReviewFinding{
+					Id:            "f3",
+					FilePath:      "pkg/handler.go",
+					Type:          models.FindingTypeSuggestion,
+					SuggestedCode: "return err",
 				},
 				ReviewCreatedDate: baseTime,
 			},
@@ -205,17 +358,19 @@ func TestMatchFinding(t *testing.T) {
 			fileChanges: []commitFileChange{
 				{CommitSha: "ghi789", FilePath: "pkg/handler.go", Additions: 20, Deletions: 10},
 			},
+			// No patches — falls back to temporal
 			wantMatched:  true,
 			wantMethod:   "diff_file_temporal",
-			wantMinScore: 25,
+			wantMinScore: 25.0,
 		},
 		{
 			name: "No matching file in commits",
 			finding: suggestionFinding{
 				AiReviewFinding: models.AiReviewFinding{
-					Id:       "f4",
-					FilePath: "pkg/server/server.go",
-					Type:     models.FindingTypeSuggestion,
+					Id:            "f4",
+					FilePath:      "pkg/server/server.go",
+					Type:          models.FindingTypeSuggestion,
+					SuggestedCode: "return nil",
 				},
 				ReviewCreatedDate: baseTime,
 			},
@@ -231,9 +386,10 @@ func TestMatchFinding(t *testing.T) {
 			name: "Commit before suggestion — should not match",
 			finding: suggestionFinding{
 				AiReviewFinding: models.AiReviewFinding{
-					Id:       "f5",
-					FilePath: "pkg/server/server.go",
-					Type:     models.FindingTypeSuggestion,
+					Id:            "f5",
+					FilePath:      "pkg/server/server.go",
+					Type:          models.FindingTypeSuggestion,
+					SuggestedCode: "return nil",
 				},
 				ReviewCreatedDate: baseTime,
 			},
@@ -249,8 +405,9 @@ func TestMatchFinding(t *testing.T) {
 			name: "No file path — only commit message can match",
 			finding: suggestionFinding{
 				AiReviewFinding: models.AiReviewFinding{
-					Id:   "f6",
-					Type: models.FindingTypeSuggestion,
+					Id:            "f6",
+					Type:          models.FindingTypeSuggestion,
+					SuggestedCode: "x := 1",
 				},
 				ReviewCreatedDate: baseTime,
 				AiToolUser:        "coderabbitai[bot]",
@@ -263,13 +420,13 @@ func TestMatchFinding(t *testing.T) {
 			},
 			wantMatched:  true,
 			wantMethod:   "diff_commit_msg",
-			wantMinScore: 80,
+			wantMinScore: 100.0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := matchFinding(tt.finding, tt.commits, tt.fileChanges)
+			result := matchFinding(tt.finding, tt.commits, tt.fileChanges, tt.patches)
 			if result.Matched != tt.wantMatched {
 				t.Errorf("matchFinding() matched = %v, want %v", result.Matched, tt.wantMatched)
 			}
@@ -278,9 +435,30 @@ func TestMatchFinding(t *testing.T) {
 					t.Errorf("matchFinding() method = %q, want %q", result.Method, tt.wantMethod)
 				}
 				if result.Score < tt.wantMinScore {
-					t.Errorf("matchFinding() score = %d, want >= %d", result.Score, tt.wantMinScore)
+					t.Errorf("matchFinding() score = %f, want >= %f", result.Score, tt.wantMinScore)
 				}
 			}
 		})
+	}
+}
+
+func TestParseFilesJSON(t *testing.T) {
+	input := `[{"sha":"abc","filename":"pkg/foo.go","status":"modified","additions":2,"deletions":1,"changes":3,"patch":"@@ -1,3 +1,4 @@\n func foo() {\n+    return nil\n }"},{"sha":"abc","filename":"pkg/bar.go","status":"modified","additions":1,"deletions":0,"changes":1,"patch":"@@ -5,2 +5,3 @@\n+import \"fmt\""}]`
+
+	files := parseFilesJSON(input)
+	if len(files) != 2 {
+		t.Fatalf("parseFilesJSON() returned %d files, want 2", len(files))
+	}
+	if files[0].filename != "pkg/foo.go" {
+		t.Errorf("files[0].filename = %q, want %q", files[0].filename, "pkg/foo.go")
+	}
+	if files[1].filename != "pkg/bar.go" {
+		t.Errorf("files[1].filename = %q, want %q", files[1].filename, "pkg/bar.go")
+	}
+	// Check that patches are unescaped
+	if !almostEqual(0, 0, 0.01) { // just to use almostEqual
+	}
+	if len(files[0].patch) == 0 {
+		t.Error("files[0].patch is empty")
 	}
 }

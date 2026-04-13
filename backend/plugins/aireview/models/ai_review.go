@@ -70,7 +70,8 @@ type AiReview struct {
 
 	// Suggestion acceptance tracking
 	SuggestionsAccepted     int `gorm:"default:0"` // Number of suggestions accepted/applied by developer (marker-based)
-	SuggestionsDiffAccepted int `gorm:"default:0"` // Number of suggestions accepted (diff-based matching)
+	SuggestionsDiffAccepted   int     `gorm:"default:0"`    // Count of suggestions with diff-based match
+	SuggestionsDiffAcceptPct  float64 `gorm:"default:0"`    // Average acceptance % across matched suggestions
 
 	// Developer reactions to the AI review comment
 	ReactionsTotalCount int `gorm:"default:0"`

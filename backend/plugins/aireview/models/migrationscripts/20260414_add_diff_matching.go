@@ -47,11 +47,13 @@ func (script *addDiffMatching) Name() string {
 }
 
 type findingDiffMatching20260414 struct {
-	SuggestionDiffMatched bool   `gorm:"default:false"`
-	SuggestionMatchMethod string `gorm:"type:varchar(50)"`
-	SuggestionMatchScore  int    `gorm:"default:0"`
-	MatchedCommitSha      string `gorm:"type:varchar(40)"`
-	MatchedFilePath       string `gorm:"type:varchar(500)"`
+	SuggestionDiffMatched  bool    `gorm:"default:false"`
+	SuggestionMatchMethod  string  `gorm:"type:varchar(50)"`
+	SuggestionMatchScore   float64 `gorm:"default:0"`
+	SuggestionLinesMatched int     `gorm:"default:0"`
+	SuggestionLinesTotal   int     `gorm:"default:0"`
+	MatchedCommitSha       string  `gorm:"type:varchar(40)"`
+	MatchedFilePath        string  `gorm:"type:varchar(500)"`
 }
 
 func (findingDiffMatching20260414) TableName() string {
@@ -59,7 +61,8 @@ func (findingDiffMatching20260414) TableName() string {
 }
 
 type reviewDiffAccepted20260414 struct {
-	SuggestionsDiffAccepted int `gorm:"default:0"`
+	SuggestionsDiffAccepted  int     `gorm:"default:0"`
+	SuggestionsDiffAcceptPct float64 `gorm:"default:0"`
 }
 
 func (reviewDiffAccepted20260414) TableName() string {
