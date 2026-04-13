@@ -413,9 +413,11 @@ func parseSuggestionAcceptance(body string, metrics *ReviewMetrics) {
 
 	// Pattern 3: Checked checkboxes in suggestion lists (Qodo "Apply" checkboxes)
 	// Matches: "- [x] **suggestion title**" but NOT "- [ ] **suggestion title**"
-	// These appear in Qodo's persistent suggestion table when a developer clicks Apply
-	checkedBoxRe := regexp.MustCompile(`(?m)^[\s-]*\[x\]\s+`)
-	uncheckedBoxRe := regexp.MustCompile(`(?m)^[\s-]*\[ \]\s+`)
+	// These appear in Qodo's persistent suggestion table when a developer clicks Apply.
+	// Note: comment bodies from CSV/DB may store newlines as literal "\n" (escaped),
+	// so we match both real newlines and the "- " prefix mid-line.
+	checkedBoxRe := regexp.MustCompile(`(?m)(?:^|\\n)[\s-]*\[x\]\s+`)
+	uncheckedBoxRe := regexp.MustCompile(`(?m)(?:^|\\n)[\s-]*\[ \]\s+`)
 	checkedCount := len(checkedBoxRe.FindAllString(body, -1))
 	uncheckedCount := len(uncheckedBoxRe.FindAllString(body, -1))
 	// Only count checkboxes as accepted suggestions if there's a mix of checked/unchecked

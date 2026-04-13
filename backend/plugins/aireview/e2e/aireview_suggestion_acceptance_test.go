@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
 	"github.com/apache/incubator-devlake/plugins/aireview/impl"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
@@ -49,6 +50,7 @@ func TestSuggestionAcceptanceTracking(t *testing.T) {
 	require.NoError(t, tasks.CompilePatterns(taskData))
 
 	// Flush and load domain tables
+	dataflowTester.FlushTabler(&crossdomain.Account{})
 	dataflowTester.FlushTabler(&code.PullRequest{})
 	dataflowTester.FlushTabler(&code.PullRequestComment{})
 	dataflowTester.FlushTabler(&models.AiReview{})
