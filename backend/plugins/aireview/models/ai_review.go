@@ -68,6 +68,9 @@ type AiReview struct {
 	PreMergeChecksFailed       int `gorm:"default:0"` // Number of checks failed
 	PreMergeChecksInconclusive int `gorm:"default:0"` // Number of inconclusive checks
 
+	// Suggestion acceptance tracking
+	SuggestionsAccepted int `gorm:"default:0"` // Number of suggestions accepted/applied by developer
+
 	// Developer reactions to the AI review comment
 	ReactionsTotalCount int `gorm:"default:0"`
 	ReactionsThumbsUp   int `gorm:"default:0"`

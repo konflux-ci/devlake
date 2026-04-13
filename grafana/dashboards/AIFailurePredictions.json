@@ -407,6 +407,224 @@
         "x": 0,
         "y": 5
       },
+      "id": 314,
+      "panels": [],
+      "title": "Suggestion Acceptance — Are Developers Using AI Suggestions?",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Percentage of AI code suggestions that developers accepted and applied. Higher rates indicate the AI is producing actionable, high-quality suggestions.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "id": 311,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ROUND(100.0 * SUM(suggestions_accepted) / NULLIF(SUM(suggestions_count), 0), 1) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND suggestions_count > 0\n  AND $__timeFilter(created_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Suggestion Acceptance Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total number of AI suggestions that were accepted/applied by developers across all reviews.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 6,
+        "y": 5
+      },
+      "id": 312,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT SUM(suggestions_accepted) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Suggestions Accepted",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Suggestion acceptance rate broken down by AI tool. Shows which AI tools produce suggestions developers actually use.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 14,
+        "x": 10,
+        "y": 5
+      },
+      "id": 313,
+      "options": {
+        "barRadius": 0.1,
+        "barWidth": 0.6,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ai_tool, ROUND(100.0 * SUM(suggestions_accepted) / NULLIF(SUM(suggestions_count), 0), 1) AS acceptance_rate FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND suggestions_count > 0\n  AND $__timeFilter(created_date)\n  GROUP BY ai_tool\n  ORDER BY acceptance_rate DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Acceptance Rate by AI Tool",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
       "id": 307,
       "panels": [],
       "title": "Risk Level & Tool Breakdown",
@@ -481,7 +699,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 6
+        "y": 11
       },
       "id": 308,
       "options": {
@@ -556,7 +774,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 6
+        "y": 11
       },
       "id": 309,
       "options": {
@@ -654,7 +872,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 6
+        "y": 11
       },
       "id": 310,
       "options": {
@@ -693,7 +911,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 19
       },
       "id": 400,
       "panels": [],
@@ -725,7 +943,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 15
+        "y": 20
       },
       "id": 409,
       "options": {
@@ -782,7 +1000,7 @@
         "h": 4,
         "w": 5,
         "x": 5,
-        "y": 15
+        "y": 20
       },
       "id": 408,
       "options": {
@@ -839,7 +1057,7 @@
         "h": 4,
         "w": 5,
         "x": 10,
-        "y": 15
+        "y": 20
       },
       "id": 401,
       "options": {
@@ -898,7 +1116,7 @@
         "h": 4,
         "w": 4,
         "x": 15,
-        "y": 15
+        "y": 20
       },
       "id": 402,
       "options": {
@@ -956,7 +1174,7 @@
         "h": 4,
         "w": 5,
         "x": 19,
-        "y": 15
+        "y": 20
       },
       "id": 403,
       "options": {
@@ -1038,7 +1256,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 24
       },
       "id": 405,
       "options": {
@@ -1082,7 +1300,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 32
       },
       "id": 200,
       "panels": [],
@@ -1098,7 +1316,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 33
       },
       "id": 201,
       "options": {
@@ -1120,7 +1338,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 38
       },
       "id": 202,
       "panels": [],
@@ -1152,7 +1370,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 34
+        "y": 39
       },
       "id": 203,
       "options": {
@@ -1209,7 +1427,7 @@
         "h": 4,
         "w": 5,
         "x": 5,
-        "y": 34
+        "y": 39
       },
       "id": 204,
       "options": {
@@ -1266,7 +1484,7 @@
         "h": 4,
         "w": 5,
         "x": 10,
-        "y": 34
+        "y": 39
       },
       "id": 205,
       "options": {
@@ -1323,7 +1541,7 @@
         "h": 4,
         "w": 5,
         "x": 15,
-        "y": 34
+        "y": 39
       },
       "id": 206,
       "options": {
@@ -1361,7 +1579,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 43
       },
       "id": 210,
       "panels": [],
@@ -1407,7 +1625,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 39
+        "y": 44
       },
       "id": 211,
       "options": {
@@ -1477,7 +1695,7 @@
         "h": 7,
         "w": 6,
         "x": 6,
-        "y": 39
+        "y": 44
       },
       "id": 212,
       "options": {
@@ -1547,7 +1765,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 39
+        "y": 44
       },
       "id": 213,
       "options": {
@@ -1617,7 +1835,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 39
+        "y": 44
       },
       "id": 214,
       "options": {
@@ -1654,7 +1872,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 51
       },
       "id": 220,
       "panels": [],
@@ -1699,7 +1917,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 47
+        "y": 52
       },
       "id": 221,
       "options": {
@@ -1770,7 +1988,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 47
+        "y": 52
       },
       "id": 222,
       "options": {
@@ -1842,7 +2060,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 47
+        "y": 52
       },
       "id": 223,
       "options": {
@@ -1881,7 +2099,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 58
       },
       "id": 240,
       "panels": [],
@@ -2035,7 +2253,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 59
       },
       "id": 241,
       "options": {
@@ -2075,7 +2293,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 69
       },
       "id": 230,
       "panels": [],
@@ -2091,7 +2309,7 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 70
       },
       "id": 231,
       "options": {
@@ -2368,7 +2586,7 @@
         "h": 14,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 74
       },
       "id": 232,
       "options": {
@@ -2407,7 +2625,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 83
+        "y": 88
       },
       "id": 500,
       "title": "PR Drill-down \u2014 Individual Pull Requests",
@@ -2438,7 +2656,7 @@
         "h": 4,
         "w": 4,
         "x": 20,
-        "y": 34
+        "y": 39
       },
       "id": 501,
       "options": {
@@ -2719,7 +2937,7 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 88
+        "y": 93
       },
       "id": 502,
       "options": {

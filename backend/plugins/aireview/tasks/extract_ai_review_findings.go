@@ -164,18 +164,19 @@ func parseCodeRabbitFindings(review *models.AiReview, body string) []*models.AiR
 		suggestedCode := strings.TrimSpace(match[1])
 
 		finding := &models.AiReviewFinding{
-			Id:            generateFindingId(review.Id, "suggestion", idx),
-			AiReviewId:    review.Id,
-			PullRequestId: review.PullRequestId,
-			RepoId:        review.RepoId,
-			AiTool:        review.AiTool,
-			SuggestedCode: suggestedCode,
-			Category:      models.FindingCategoryBestPractice,
-			Severity:      models.FindingSeverityInfo,
-			Type:          models.FindingTypeSuggestion,
-			Title:         "Code suggestion",
-			Description:   "AI-suggested code change",
-			CreatedDate:   review.CreatedDate,
+			Id:                generateFindingId(review.Id, "suggestion", idx),
+			AiReviewId:        review.Id,
+			PullRequestId:     review.PullRequestId,
+			RepoId:            review.RepoId,
+			AiTool:            review.AiTool,
+			SuggestedCode:     suggestedCode,
+			SuggestionApplied: detectSuggestionApplied(body, idx),
+			Category:          models.FindingCategoryBestPractice,
+			Severity:          models.FindingSeverityInfo,
+			Type:              models.FindingTypeSuggestion,
+			Title:             "Code suggestion",
+			Description:       "AI-suggested code change",
+			CreatedDate:       review.CreatedDate,
 		}
 		findings = append(findings, finding)
 	}
@@ -286,6 +287,17 @@ func detectFindingType(text string) string {
 	}
 
 	return models.FindingTypeComment
+}
+
+// detectSuggestionApplied checks whether a suggestion block within a comment
+// has been marked as applied/resolved by the AI tool.
+// The index parameter identifies which suggestion block in the body we're checking.
+func detectSuggestionApplied(body string, _ int) bool {
+	// Check for global acceptance markers in the comment body.
+	// When the entire comment has acceptance signals, individual suggestions
+	// within it are considered applied.
+	appliedRe := regexp.MustCompile(`(?i)(?:applied suggestion|suggestion applied|✅\s*Resolved|suggestion\s+(?:was\s+)?(?:applied|committed)\s+in\s+commit)`)
+	return appliedRe.MatchString(body)
 }
 
 // truncateTitle creates a short title from description

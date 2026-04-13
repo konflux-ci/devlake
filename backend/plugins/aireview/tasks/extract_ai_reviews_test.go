@@ -839,6 +839,87 @@ func TestParseReviewMetrics_PreMergeChecks(t *testing.T) {
 	}
 }
 
+func TestParseSuggestionAcceptance(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		wantAccepted int
+	}{
+		{
+			name:         "No acceptance markers",
+			body:         "Summary by CodeRabbit. Simple review with no suggestions applied.",
+			wantAccepted: 0,
+		},
+		{
+			name: "CodeRabbit resolved markers in tracking table",
+			body: `| Thread | File | Action | Status |
+|--------|------|--------|--------|
+| 1 | api/handler.go:15 | Committable | ✅ Resolved |
+| 2 | api/handler.go:42 | Committable | ✅ Resolved |
+| 3 | api/middleware.go:8 | Suggestion | Pending |`,
+			wantAccepted: 2,
+		},
+		{
+			name:         "Explicit suggestions applied summary",
+			body:         "3 suggestions applied out of 5 total.",
+			wantAccepted: 3,
+		},
+		{
+			name: "CodeRabbit resolved markers plus summary",
+			body: `Summary by CodeRabbit.
+| 1 | handler.go | ✅ Resolved |
+| 2 | middleware.go | ✅ Resolved |
+2 suggestions applied.`,
+			wantAccepted: 4,
+		},
+		{
+			name: "Qodo checked checkboxes mixed with unchecked",
+			body: `**Suggestions**
+- [x] **Use constants for config keys** - Replace magic strings
+- [ ] **Add validation** - Validate port range
+- [x] **Extract defaults** - Move defaults to a separate block
+- [ ] **Add docs** - Document config options`,
+			wantAccepted: 2,
+		},
+		{
+			name: "All checkboxes checked - likely self-review, not suggestions",
+			body: `**Self-review checklist**
+- [x] I reviewed the code changes
+- [x] I ran the tests
+- [x] I updated the docs`,
+			wantAccepted: 0,
+		},
+		{
+			name:         "Suggestion committed in specific commit",
+			body:         "Suggestion was applied in commit abc1234.",
+			wantAccepted: 1,
+		},
+		{
+			name:         "Applied suggestion marker",
+			body:         "Applied suggestion: use constants instead of magic strings.",
+			wantAccepted: 1,
+		},
+		{
+			name:         "Suggestion accepted (alternate wording)",
+			body:         "1 suggestion accepted by the developer.",
+			wantAccepted: 1,
+		},
+		{
+			name:         "Multiple suggestions implemented",
+			body:         "5 suggestions implemented in the latest push.",
+			wantAccepted: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics := ReviewMetrics{}
+			parseSuggestionAcceptance(tt.body, &metrics)
+			assert.Equal(t, tt.wantAccepted, metrics.SuggestionsAccepted)
+		})
+	}
+}
+
 func TestParseReviewMetrics_CodeRabbitRealWorld(t *testing.T) {
 	// Test with realistic CodeRabbit output format
 	realCodeRabbitBody := `## Summary by CodeRabbit
