@@ -69,7 +69,8 @@ type AiReview struct {
 	PreMergeChecksInconclusive int `gorm:"default:0"` // Number of inconclusive checks
 
 	// Suggestion acceptance tracking
-	SuggestionsAccepted int `gorm:"default:0"` // Number of suggestions accepted/applied by developer
+	SuggestionsAccepted     int `gorm:"default:0"` // Number of suggestions accepted/applied by developer (marker-based)
+	SuggestionsDiffAccepted int `gorm:"default:0"` // Number of suggestions accepted (diff-based matching)
 
 	// Developer reactions to the AI review comment
 	ReactionsTotalCount int `gorm:"default:0"`

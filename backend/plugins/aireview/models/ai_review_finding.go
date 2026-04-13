@@ -58,7 +58,14 @@ type AiReviewFinding struct {
 	// Code context
 	CodeSnippet       string `gorm:"type:text"` // Original code
 	SuggestedCode     string `gorm:"type:text"` // Suggested fix
-	SuggestionApplied bool   // Whether the suggestion was applied
+	SuggestionApplied bool   // Whether the suggestion was applied (marker-based)
+
+	// Diff-based suggestion matching
+	SuggestionDiffMatched   bool   // Whether diff-based matching found a match
+	SuggestionMatchMethod   string `gorm:"type:varchar(50)"`  // marker, diff_commit_msg, diff_file_temporal, or ""
+	SuggestionMatchScore    int    // 0-100 confidence score for the match
+	MatchedCommitSha        string `gorm:"type:varchar(40)"`  // Commit SHA that applied the suggestion
+	MatchedFilePath         string `gorm:"type:varchar(500)"` // File path resolved from raw data
 
 	// Resolution tracking
 	IsResolved   bool

@@ -31,5 +31,6 @@ func All() []plugin.MigrationScript {
 		&addCiPredictionSupport{},
 		&addFlakyInfraFilters{},
 		&addSuggestionsAccepted{},
+		&addDiffMatching{},
 	}
 }
