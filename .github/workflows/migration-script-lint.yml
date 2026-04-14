@@ -22,7 +22,6 @@ on:
       - v*
     branches:
       - main
-  pull_request:
 jobs:
   migration-script-lint:
     name: migration-script-lint

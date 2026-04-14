@@ -18,7 +18,12 @@
 set -e
 
 ROOT_DIR=$(dirname $(dirname "$0"))
-for m in $(go list $ROOT_DIR/... | egrep -v 'test|models|e2e'); do
-  echo start unit testing on $m
-  go test -timeout 60s -v $m
-done
+COVERAGE_FILE="${COVERAGE_FILE:-${ROOT_DIR}/coverage.out}"
+PACKAGES=$(go list ${ROOT_DIR}/... | egrep -v 'test|models|e2e')
+
+echo "Running Go unit tests with coverage..."
+go test -timeout 120s -v -coverprofile="${COVERAGE_FILE}" -covermode=atomic ${PACKAGES}
+
+echo ""
+echo "Coverage summary:"
+go tool cover -func="${COVERAGE_FILE}" | tail -1

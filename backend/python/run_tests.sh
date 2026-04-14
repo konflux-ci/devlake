@@ -17,12 +17,33 @@
 #
 cd "${0%/*}" # make sure we're in the correct dir
 
+PYTHON_DIR="$(pwd)"
+COV_INDEX=0
+
+if [ -n "${COVERAGE_OUTPUT_DIR}" ]; then
+  mkdir -p "${PYTHON_DIR}/${COVERAGE_OUTPUT_DIR}"
+fi
+
 for test_dir in $(find . -type f -name "*_test.py" | xargs dirname | sort -u); do
   printf "Running Python tests in $test_dir\n"
-  cd $test_dir
-  poetry run pytest
+  cd "$test_dir"
+
+  if [ -n "${COVERAGE_OUTPUT_DIR}" ]; then
+    COV_INDEX=$((COV_INDEX + 1))
+    COV_FILE="${PYTHON_DIR}/${COVERAGE_OUTPUT_DIR}/python-coverage-${COV_INDEX}.xml"
+    poetry run pytest --cov --cov-report=xml:"${COV_FILE}" --cov-report=term-missing
+  else
+    poetry run pytest
+  fi
+
   if [ $? != 0 ]; then
     exit 1
   fi
   cd -
 done
+
+if [ -n "${COVERAGE_OUTPUT_DIR}" ]; then
+  echo ""
+  echo "Python coverage reports:"
+  ls -la "${PYTHON_DIR}/${COVERAGE_OUTPUT_DIR}/"*.xml 2>/dev/null
+fi
