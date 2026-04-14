@@ -20,20 +20,6 @@ name: test-e2e
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main, release-*]
-    paths:
-      - "**.go"
-      - '**.py'
-      - '**.toml'
-      - '**.sh'
-      - "Makefile"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/*.yml"
-      - "test/**"
-      - "e2e/**"
-      - "devops/**"
 jobs:
   e2e-mysql:
     runs-on: ubuntu-latest

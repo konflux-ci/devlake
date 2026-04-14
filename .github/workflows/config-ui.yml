@@ -17,15 +17,21 @@
 
 name: config-ui
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'config-ui/**'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'config-ui/**'
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
@@ -33,6 +39,16 @@ jobs:
         cache: 'yarn'
         cache-dependency-path: config-ui/yarn.lock
     - name: Install with Yarn
-      run: cd config-ui; yarn
-    - name: Run Lint
-      run: cd config-ui; yarn tsc && yarn lint
+      working-directory: config-ui
+      run: yarn install
+    - name: Run tests with coverage
+      working-directory: config-ui
+      run: yarn test:coverage
+    - name: Upload TypeScript coverage to Codecov
+      if: always()
+      uses: codecov/codecov-action@v5
+      with:
+        use_oidc: true
+        flags: unit-tests-typescript
+        files: ./config-ui/coverage/lcov.info
+        fail_ci_if_error: false
