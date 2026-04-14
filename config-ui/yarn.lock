@@ -4442,7 +4442,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"copy-to-clipboard@npm:^3.3.1, copy-to-clipboard@npm:^3.3.3":
+"copy-to-clipboard@npm:^3.3.3":
   version: 3.3.3
   resolution: "copy-to-clipboard@npm:3.3.3"
   dependencies:
@@ -8828,14 +8828,14 @@ __metadata:
   linkType: hard
 
 "react-copy-to-clipboard@npm:^5.1.0":
-  version: 5.1.0
-  resolution: "react-copy-to-clipboard@npm:5.1.0"
+  version: 5.1.1
+  resolution: "react-copy-to-clipboard@npm:5.1.1"
   dependencies:
-    copy-to-clipboard: ^3.3.1
+    copy-to-clipboard: ^3.3.3
     prop-types: ^15.8.1
   peerDependencies:
-    react: ^15.3.0 || 16 || 17 || 18
-  checksum: f00a4551b9b63c944a041a6ab46af5ef20ba1106b3bc25173e7ef9bffbfba17a613368682ab8820cfe8d4b3acc5335cd9ce20229145bcc1e6aa8d1db04c512e5
+    react: ">=15.3.0"
+  checksum: 61645d356c19a8d159e31f238441d287ed66a62649913d74793db508cbed4a6b98f4ba757cddb469510c6112549969e5651e852e9a66194167874b0badf707cd
   languageName: node
   linkType: hard
 
