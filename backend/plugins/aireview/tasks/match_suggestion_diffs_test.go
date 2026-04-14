@@ -19,6 +19,7 @@ package tasks
 
 import (
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -443,22 +444,23 @@ func TestMatchFinding(t *testing.T) {
 }
 
 func TestParseFilesJSON(t *testing.T) {
-	input := `[{"sha":"abc","filename":"pkg/foo.go","status":"modified","additions":2,"deletions":1,"changes":3,"patch":"@@ -1,3 +1,4 @@\n func foo() {\n+    return nil\n }"},{"sha":"abc","filename":"pkg/bar.go","status":"modified","additions":1,"deletions":0,"changes":1,"patch":"@@ -5,2 +5,3 @@\n+import \"fmt\""}]`
+	input := `[{"sha":"abc","filename":"pkg/foo.go","status":"modified","additions":2,"deletions":1,"changes":3,"patch":"@@ -1,3 +1,4 @@\n func foo() {\n+    return nil\n }"},{"sha":"abc","filename":"pkg/bar.go","status":"modified","additions":1,"deletions":0,"changes":1,"patch":"@@ -5,2 +5,3 @@\n+import \"fmt\""},{"sha":"abc","filename":"pkg/bin","status":"added"}]`
 
 	files := parseFilesJSON(input)
 	if len(files) != 2 {
-		t.Fatalf("parseFilesJSON() returned %d files, want 2", len(files))
+		t.Fatalf("parseFilesJSON() returned %d files, want 2 (binary file should be excluded)", len(files))
 	}
-	if files[0].filename != "pkg/foo.go" {
-		t.Errorf("files[0].filename = %q, want %q", files[0].filename, "pkg/foo.go")
+	if files[0].Filename != "pkg/foo.go" {
+		t.Errorf("files[0].Filename = %q, want %q", files[0].Filename, "pkg/foo.go")
 	}
-	if files[1].filename != "pkg/bar.go" {
-		t.Errorf("files[1].filename = %q, want %q", files[1].filename, "pkg/bar.go")
+	if files[1].Filename != "pkg/bar.go" {
+		t.Errorf("files[1].Filename = %q, want %q", files[1].Filename, "pkg/bar.go")
 	}
-	// Check that patches are unescaped
-	if !almostEqual(0, 0, 0.01) { // just to use almostEqual
+	if len(files[0].Patch) == 0 {
+		t.Error("files[0].Patch is empty")
 	}
-	if len(files[0].patch) == 0 {
-		t.Error("files[0].patch is empty")
+	// Verify JSON unescaping works — \n in patch should become real newlines
+	if !strings.Contains(files[0].Patch, "\n") {
+		t.Errorf("files[0].Patch should contain real newlines, got: %q", files[0].Patch)
 	}
 }

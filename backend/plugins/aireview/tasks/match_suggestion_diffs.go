@@ -18,6 +18,7 @@ limitations under the License.
 package tasks
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 	"time"
@@ -600,12 +601,11 @@ func loadCommitPatches(db dal.Dal, commitShas []string, logger log.Logger) []com
 				continue
 			}
 			cleanSha := strings.Trim(*sha, "\"")
-			parsed := parseFilesJSON(*filesJSON)
-			for _, pf := range parsed {
+			for _, pf := range parseFilesJSON(*filesJSON) {
 				patches = append(patches, commitFilePatch{
 					CommitSha: cleanSha,
-					FilePath:  pf.filename,
-					Patch:     pf.patch,
+					FilePath:  pf.Filename,
+					Patch:     pf.Patch,
 				})
 			}
 		}
@@ -616,63 +616,26 @@ func loadCommitPatches(db dal.Dal, commitShas []string, logger log.Logger) []com
 	return patches
 }
 
-type parsedFile struct {
-	filename string
-	patch    string
+// ghCommitFile mirrors the relevant fields from the GitHub API commit files array.
+type ghCommitFile struct {
+	Filename string `json:"filename"`
+	Patch    string `json:"patch"`
 }
 
-// parseFilesJSON extracts filename and patch from the GitHub API files array JSON.
-// Avoids importing encoding/json by using simple string parsing on the already-extracted JSON.
-func parseFilesJSON(filesJSON string) []parsedFile {
-	// The JSON is an array of objects like: [{"filename":"foo.go","patch":"@@ ..."},...]
-	// Use regexp to extract filename and patch pairs
-	var results []parsedFile
-
-	fnPattern := regexp.MustCompile(`"filename"\s*:\s*"([^"]+)"`)
-	patchPattern := regexp.MustCompile(`"patch"\s*:\s*"((?:[^"\\]|\\.)*)?"`)
-
-	fnMatches := fnPattern.FindAllStringSubmatchIndex(filesJSON, -1)
-	patchMatches := patchPattern.FindAllStringSubmatchIndex(filesJSON, -1)
-
-	// Build filename list
-	filenames := make([]string, len(fnMatches))
-	for i, idx := range fnMatches {
-		filenames[i] = filesJSON[idx[2]:idx[3]]
+// parseFilesJSON extracts filename and patch pairs from the GitHub API files JSON array.
+func parseFilesJSON(filesJSON string) []ghCommitFile {
+	var files []ghCommitFile
+	if err := json.Unmarshal([]byte(filesJSON), &files); err != nil {
+		return nil
 	}
-
-	// Build patch list — patches may be absent for binary files
-	patchTexts := make([]string, len(filenames))
-	for _, idx := range patchMatches {
-		patchText := ""
-		if idx[2] >= 0 && idx[3] >= 0 {
-			patchText = filesJSON[idx[2]:idx[3]]
-		}
-		// Find which filename this patch belongs to (by position in JSON)
-		for i, fnIdx := range fnMatches {
-			if idx[0] > fnIdx[0] && (i+1 >= len(fnMatches) || idx[0] < fnMatches[i+1][0]) {
-				patchTexts[i] = unescapeJSON(patchText)
-				break
-			}
+	// Filter to files that have a patch (binary files don't)
+	result := make([]ghCommitFile, 0, len(files))
+	for _, f := range files {
+		if f.Patch != "" {
+			result = append(result, f)
 		}
 	}
-
-	for i, fn := range filenames {
-		if patchTexts[i] != "" {
-			results = append(results, parsedFile{filename: fn, patch: patchTexts[i]})
-		}
-	}
-	return results
-}
-
-// unescapeJSON converts JSON-escaped strings (\\n → \n, \\t → \t, etc.)
-func unescapeJSON(s string) string {
-	s = strings.ReplaceAll(s, "\\n", "\n")
-	s = strings.ReplaceAll(s, "\\t", "\t")
-	s = strings.ReplaceAll(s, "\\r", "")
-	s = strings.ReplaceAll(s, "\\\"", "\"")
-	s = strings.ReplaceAll(s, "\\\\/", "/")
-	s = strings.ReplaceAll(s, "\\\\", "\\")
-	return s
+	return result
 }
 
 // enrichFindingFilePaths resolves file paths from raw data for findings that lack them.
