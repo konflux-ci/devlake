@@ -162,6 +162,26 @@ export const AiReviewScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: Pr
             </Form.Item>
           </Space>
 
+          {/* ── CI Failure Filtering ── */}
+          <Divider orientation="left" plain>
+            CI Failure Filtering
+          </Divider>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Filter out noisy CI failures to improve prediction accuracy. Changes take effect on the next blueprint run.
+          </Text>
+          <Form.Item name="excludeFlakyTests" valuePropName="checked" style={{ marginBottom: 8 }}>
+            <Checkbox>
+              Exclude flaky tests — ignore tests/jobs that also fail on periodic or push runs (30-day lookback window)
+            </Checkbox>
+          </Form.Item>
+          <Form.Item name="excludeInfraFailures" valuePropName="checked" style={{ marginBottom: 16 }}>
+            <Checkbox>
+              Exclude infrastructure failures — ignore job failures where no test cases actually failed (e.g. cluster
+              provisioning, quota, timeout). Requires test case data to be collected (CI source &quot;Test Cases&quot; or
+              &quot;Both&quot;).
+            </Checkbox>
+          </Form.Item>
+
           {/* ── CI Backfill ── */}
           <Divider orientation="left" plain>
             CI Data Backfill (Openshift CI / GCS)

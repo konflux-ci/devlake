@@ -29,5 +29,6 @@ func All() []plugin.MigrationScript {
 		&addGeminiConfig{},
 		&addReactions{},
 		&addCiPredictionSupport{},
+		&addFlakyInfraFilters{},
 	}
 }
