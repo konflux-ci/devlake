@@ -40,6 +40,7 @@ var ConvertSyncOperationsMeta = plugin.SubTaskMeta{
 	EntryPoint:       ConvertSyncOperations,
 	EnabledByDefault: true,
 	Description:      "Convert sync operations to domain layer deployments",
+	DomainTypes:      []string{plugin.DOMAIN_TYPE_CICD},
 	DependencyTables: []string{models.ArgocdSyncOperation{}.TableName()},
 	ProductTables:    []string{"cicd_deployments", "cicd_deployment_commits"},
 }
@@ -136,8 +137,14 @@ func ConvertSyncOperations(taskCtx plugin.SubTaskContext) errors.Error {
 			results = append(results, deployment)
 
 			if syncOp.Revision != "" {
+				// Priority: repo_url resolved at extraction time (always present for
+				// multi-source apps) → application-level repo_url → deployment name
+				// as a last-resort non-empty placeholder.
 				repoUrl := deployment.Name
-				if application != nil && application.RepoURL != "" {
+				switch {
+				case syncOp.RepoURL != "":
+					repoUrl = syncOp.RepoURL
+				case application != nil && application.RepoURL != "":
 					repoUrl = application.RepoURL
 				}
 
