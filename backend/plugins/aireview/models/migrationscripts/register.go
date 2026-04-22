@@ -30,5 +30,7 @@ func All() []plugin.MigrationScript {
 		&addReactions{},
 		&addCiPredictionSupport{},
 		&addFlakyInfraFilters{},
+		&addSuggestionsAccepted{},
+		&addDiffMatching{},
 	}
 }

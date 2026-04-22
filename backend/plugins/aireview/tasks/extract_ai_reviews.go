@@ -151,6 +151,7 @@ func ExtractAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 			EffortComplexity:           reviewMetrics.Complexity,
 			EffortRating:               reviewMetrics.EffortRating,
 			EffortMinutes:              reviewMetrics.EffortMinutes,
+			SuggestionsAccepted:        reviewMetrics.SuggestionsAccepted,
 			PreMergeChecksPassed:       reviewMetrics.PreMergeChecksPassed,
 			PreMergeChecksFailed:       reviewMetrics.PreMergeChecksFailed,
 			PreMergeChecksInconclusive: reviewMetrics.PreMergeChecksInconclusive,
@@ -235,6 +236,7 @@ func generateReviewId(prId, commentId, aiTool string) string {
 type ReviewMetrics struct {
 	IssuesFound                int
 	SuggestionsCount           int
+	SuggestionsAccepted        int
 	FilesReviewed              int
 	LinesReviewed              int
 	Complexity                 string
@@ -309,6 +311,12 @@ func parseReviewMetrics(body string) ReviewMetrics {
 	// Also handles: "✅ 2 checks passed" or "❌ 1 check failed"
 	parsePreMergeChecks(body, &metrics)
 
+	// Parse suggestion acceptance signals from AI tool comment bodies.
+	// AI tools update their comments to reflect which suggestions were applied:
+	// - CodeRabbit: "✅ Resolved" markers in tracking tables, resolved thread counts
+	// - Qodo: checkbox rows marked with ✅ in suggestion tables
+	parseSuggestionAcceptance(body, &metrics)
+
 	// Count issue patterns
 	issuePatterns := []string{
 		`(?i)\b(bug|error|issue|problem|warning)\b`,
@@ -371,6 +379,60 @@ func parsePreMergeChecks(body string, metrics *ReviewMetrics) {
 			metrics.PreMergeChecksInconclusive = val
 		}
 	}
+}
+
+// parseSuggestionAcceptance counts accepted/applied suggestions from AI tool comment bodies.
+//
+// AI review tools update their own comments to reflect suggestion outcomes:
+//
+// CodeRabbit patterns:
+//   - Tracking table rows with "✅ Resolved" or "✅" status markers
+//   - "N suggestions applied" or "N/M suggestions accepted"
+//   - "Applied suggestion" in resolution tracking
+//
+// Qodo patterns:
+//   - Suggestion table rows with "✅" checkbox markers (applied)
+//   - "[x]" checked checkboxes in suggestion lists (applied via Apply button)
+//   - "N suggestions implemented" summary lines
+func parseSuggestionAcceptance(body string, metrics *ReviewMetrics) {
+	accepted := 0
+
+	// Pattern 1: Explicit "N suggestions applied/accepted/implemented" summary lines
+	// Matches: "3 suggestions applied", "2/5 suggestions accepted", "1 suggestion implemented"
+	summaryRe := regexp.MustCompile(`(?i)(\d+)(?:/\d+)?\s+suggestions?\s+(?:applied|accepted|implemented)`)
+	if match := summaryRe.FindStringSubmatch(body); len(match) > 1 {
+		if val, err := strconv.Atoi(match[1]); err == nil {
+			accepted += val
+		}
+	}
+
+	// Pattern 2: "Applied suggestion" markers (CodeRabbit tracking tables)
+	// Matches individual "Applied suggestion" or "Suggestion applied" entries
+	appliedRe := regexp.MustCompile(`(?i)(?:applied suggestion|suggestion applied|✅\s*Resolved)`)
+	accepted += len(appliedRe.FindAllString(body, -1))
+
+	// Pattern 3: Checked checkboxes in suggestion lists (Qodo "Apply" checkboxes)
+	// Matches: "- [x] **suggestion title**" but NOT "- [ ] **suggestion title**"
+	// These appear in Qodo's persistent suggestion table when a developer clicks Apply.
+	// Note: comment bodies from CSV/DB may store newlines as literal "\n" (escaped),
+	// so we match both real newlines and the "- " prefix mid-line.
+	checkedBoxRe := regexp.MustCompile(`(?m)(?:^|\\n)[\s-]*\[x\]\s+`)
+	uncheckedBoxRe := regexp.MustCompile(`(?m)(?:^|\\n)[\s-]*\[ \]\s+`)
+	checkedCount := len(checkedBoxRe.FindAllString(body, -1))
+	uncheckedCount := len(uncheckedBoxRe.FindAllString(body, -1))
+	// Only count checkboxes as accepted suggestions if there's a mix of checked/unchecked
+	// (pure checked lists are likely self-review checkboxes, not suggestion tracking)
+	if checkedCount > 0 && uncheckedCount > 0 {
+		accepted += checkedCount
+	}
+
+	// Pattern 4: CodeRabbit "committed suggestion" references
+	// When a user clicks "Commit suggestion" on GitHub, the thread may contain
+	// "Suggestion was applied in commit <sha>" or similar
+	committedRe := regexp.MustCompile(`(?i)suggestion\s+(?:was\s+)?(?:applied|committed)\s+in\s+commit`)
+	accepted += len(committedRe.FindAllString(body, -1))
+
+	metrics.SuggestionsAccepted = accepted
 }
 
 // extractSummary extracts a clean markdown summary from the review body

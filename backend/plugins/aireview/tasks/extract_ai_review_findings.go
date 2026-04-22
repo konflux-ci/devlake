@@ -96,12 +96,15 @@ func ExtractAiReviewFindings(taskCtx plugin.SubTaskContext) errors.Error {
 // parseFindings extracts individual findings from an AI review
 func parseFindings(review *models.AiReview) []*models.AiReviewFinding {
 	var findings []*models.AiReviewFinding
-	body := review.Body
+	body := normalizeBody(review.Body)
 
-	// Parse CodeRabbit-style findings
+	// Parse CodeRabbit-style findings (file blocks, etc.)
 	if review.AiTool == models.AiToolCodeRabbit {
 		findings = append(findings, parseCodeRabbitFindings(review, body)...)
 	}
+
+	// Parse ```suggestion blocks — GitHub-native feature used by all AI tools
+	findings = append(findings, parseSuggestionBlocks(review, body)...)
 
 	// Parse generic inline comment findings
 	findings = append(findings, parseGenericFindings(review, body)...)
@@ -153,7 +156,14 @@ func parseCodeRabbitFindings(review *models.AiReview, body string) []*models.AiR
 		}
 	}
 
-	// Pattern for inline suggestions (```suggestion blocks)
+	return findings
+}
+
+// parseSuggestionBlocks extracts ```suggestion code blocks from any AI review comment.
+// This is a GitHub-native feature used by CodeRabbit, Gemini Code Assist, Qodo, and others.
+func parseSuggestionBlocks(review *models.AiReview, body string) []*models.AiReviewFinding {
+	var findings []*models.AiReviewFinding
+
 	suggestionPattern := regexp.MustCompile("(?s)```suggestion\\s*\\n(.+?)```")
 	suggestionMatches := suggestionPattern.FindAllStringSubmatch(body, -1)
 
@@ -164,18 +174,19 @@ func parseCodeRabbitFindings(review *models.AiReview, body string) []*models.AiR
 		suggestedCode := strings.TrimSpace(match[1])
 
 		finding := &models.AiReviewFinding{
-			Id:            generateFindingId(review.Id, "suggestion", idx),
-			AiReviewId:    review.Id,
-			PullRequestId: review.PullRequestId,
-			RepoId:        review.RepoId,
-			AiTool:        review.AiTool,
-			SuggestedCode: suggestedCode,
-			Category:      models.FindingCategoryBestPractice,
-			Severity:      models.FindingSeverityInfo,
-			Type:          models.FindingTypeSuggestion,
-			Title:         "Code suggestion",
-			Description:   "AI-suggested code change",
-			CreatedDate:   review.CreatedDate,
+			Id:                generateFindingId(review.Id, "suggestion", idx),
+			AiReviewId:        review.Id,
+			PullRequestId:     review.PullRequestId,
+			RepoId:            review.RepoId,
+			AiTool:            review.AiTool,
+			SuggestedCode:     suggestedCode,
+			SuggestionApplied: detectSuggestionApplied(body, idx),
+			Category:          models.FindingCategoryBestPractice,
+			Severity:          models.FindingSeverityInfo,
+			Type:              models.FindingTypeSuggestion,
+			Title:             "Code suggestion",
+			Description:       "AI-suggested code change",
+			CreatedDate:       review.CreatedDate,
 		}
 		findings = append(findings, finding)
 	}
@@ -286,6 +297,32 @@ func detectFindingType(text string) string {
 	}
 
 	return models.FindingTypeComment
+}
+
+// detectSuggestionApplied checks whether a suggestion block within a comment
+// has been marked as applied/resolved by the AI tool.
+// The index parameter identifies which suggestion block in the body we're checking.
+func detectSuggestionApplied(body string, _ int) bool {
+	// Check for global acceptance markers in the comment body.
+	// When the entire comment has acceptance signals, individual suggestions
+	// within it are considered applied.
+	appliedRe := regexp.MustCompile(`(?i)(?:applied suggestion|suggestion applied|✅\s*Resolved|suggestion\s+(?:was\s+)?(?:applied|committed)\s+in\s+commit)`)
+	return appliedRe.MatchString(body)
+}
+
+// normalizeBody strips JSON quoting and converts escaped newlines to real newlines.
+// Comment bodies from the domain table may be stored with JSON encoding
+// (surrounding quotes, escaped newlines as \\n).
+func normalizeBody(body string) string {
+	// Strip surrounding JSON quotes
+	if len(body) >= 2 && body[0] == '"' && body[len(body)-1] == '"' {
+		body = body[1 : len(body)-1]
+	}
+	// Convert escaped newlines/quotes
+	body = strings.ReplaceAll(body, "\\n", "\n")
+	body = strings.ReplaceAll(body, "\\r", "")
+	body = strings.ReplaceAll(body, "\\\"", "\"")
+	return body
 }
 
 // truncateTitle creates a short title from description
