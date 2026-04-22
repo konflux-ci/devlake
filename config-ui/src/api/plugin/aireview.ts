@@ -58,6 +58,10 @@ export interface IAiReviewScopeConfig {
   // CI failure source: 'test_cases' | 'job_result' | 'both'
   ciFailureSource: string;
 
+  // CI failure filtering
+  excludeFlakyTests: boolean;
+  excludeInfraFailures: boolean;
+
   // Issue linking
   bugLinkPattern: string;
 }

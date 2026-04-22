@@ -70,6 +70,16 @@ type AiReviewScopeConfig struct {
 	// Issue linking patterns (for tracking post-merge bugs)
 	BugLinkPattern string `mapstructure:"bugLinkPattern" json:"bugLinkPattern" gorm:"type:varchar(500)"`
 
+	// ExcludeFlakyTests excludes tests/jobs that also fail on periodic/push runs
+	// from CI failure determination. When enabled, only non-flaky failures count
+	// toward the confusion matrix. Off by default.
+	ExcludeFlakyTests bool `mapstructure:"excludeFlakyTests" json:"excludeFlakyTests" gorm:"type:boolean;default:false"`
+
+	// ExcludeInfraFailures excludes CI job failures where no test cases actually
+	// failed (indicating infrastructure issues like cluster provisioning, quota,
+	// or timeout). Only applies to the job_result CI source. Off by default.
+	ExcludeInfraFailures bool `mapstructure:"excludeInfraFailures" json:"excludeInfraFailures" gorm:"type:boolean;default:false"`
+
 	// CiBackfillEnabled enables fetching CI job results from GCS for PRs that
 	// have AI reviews but no CI data. Disabled by default because it requires
 	// network access to the public Openshift CI GCS bucket.
