@@ -43,6 +43,8 @@ export const getPluginScopeId = (plugin: string, scope: any) => {
       return `${scope.name}`;
     case 'codecov':
       return `${scope.codecovId}`;
+    case 'langfuse':
+      return `${scope.projectId}`;
     default:
       return `${scope.id}`;
   }
