@@ -35,7 +35,7 @@ require (
 	golang.org/x/exp v0.0.0-20221028150844-83b7d23a625f
 	golang.org/x/oauth2 v0.13.0
 	golang.org/x/sync v0.8.0
-	gorm.io/datatypes v1.0.1
+	gorm.io/datatypes v1.2.7
 	gorm.io/driver/mysql v1.5.1
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.5
