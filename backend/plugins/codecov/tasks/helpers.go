@@ -26,7 +26,7 @@ import (
 // ParseFullName splits a "owner/repo" string into its components.
 func ParseFullName(fullName string) (owner, repo string, err errors.Error) {
 	parts := strings.Split(fullName, "/")
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", "", errors.BadInput.New("invalid fullName format, expected 'owner/repo'")
 	}
 	return parts[0], parts[1], nil
