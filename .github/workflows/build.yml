@@ -209,7 +209,7 @@ jobs:
             TAG=${{ github.ref_name }}
             SHA=${{ steps.get_short_sha.outputs.SHORT_SHA }}
       - name: Clear cache
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         if: always()
         with:
           script: |
