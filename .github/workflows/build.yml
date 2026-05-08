@@ -52,7 +52,7 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
       - name: Build and push lake image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: true
@@ -84,7 +84,7 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
       - name: Build and push lake image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: true
@@ -127,7 +127,7 @@ jobs:
           path: /tmp/devlake-build-cache-${{ matrix.platform }}
           key: buildx-devlake-build-cache-${{ github.run_id }}-${{ matrix.platform }}
       - name: Build and cache lake build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: false
@@ -194,7 +194,7 @@ jobs:
               echo "TAGS=${image_name}:${{ github.ref_name }}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}" >> $GITHUB_OUTPUT
           fi
       - name: Build and push lake image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: true
@@ -273,7 +273,7 @@ jobs:
               echo "TAGS=${image_name}:${{ github.ref_name }}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}" >> $GITHUB_OUTPUT
           fi
       - name: Build and push ${{ matrix.build.name }} image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.build.context }}
           push: true
