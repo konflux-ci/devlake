@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
-    - uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+    - uses: docker/login-action@9f4a8ea54ed9055d5f86c993e1f2ffa674f98344
       with:
         username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
