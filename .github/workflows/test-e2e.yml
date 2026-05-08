@@ -34,7 +34,7 @@ jobs:
     container: mericodev/lake-builder:latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
       - name: Build Python
         run: |
@@ -74,7 +74,7 @@ jobs:
     container: mericodev/lake-builder:latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
       - name: Build Python
         run: |
