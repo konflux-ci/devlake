@@ -29,6 +29,7 @@ import { GitHubConfig } from './github';
 import { GitLabConfig } from './gitlab';
 import { JenkinsConfig } from './jenkins';
 import { JiraConfig } from './jira';
+import { LangfuseConfig } from './langfuse';
 import { PagerDutyConfig } from './pagerduty';
 import { SonarQubeConfig } from './sonarqube';
 import { TAPDConfig } from './tapd';
@@ -54,6 +55,7 @@ export const pluginConfigs: IPluginConfig[] = [
   GitLabConfig,
   JenkinsConfig,
   JiraConfig,
+  LangfuseConfig,
   PagerDutyConfig,
   SlackConfig,
   QDevConfig,

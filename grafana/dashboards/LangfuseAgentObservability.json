@@ -1,0 +1,447 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "datasource", "uid": "grafana" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "panels": [],
+      "title": "Code Review Signals",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total code review sessions with findings",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "blue", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Review Sessions",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT COUNT(DISTINCT trace_id) AS total\nFROM _tool_langfuse_observations\nWHERE name = 'tool_result'\n  AND JSON_UNQUOTE(JSON_EXTRACT(input, '$.operation')) = 'code_review'\n  AND $__timeFilter(start_time)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total code findings across all review sessions",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "orange", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 3 }, { "color": "red", "value": 10 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Total Findings",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT SUM(CAST(JSON_EXTRACT(input, '$.findings_count') AS UNSIGNED)) AS total\nFROM _tool_langfuse_observations\nWHERE name = 'tool_result'\n  AND JSON_UNQUOTE(JSON_EXTRACT(input, '$.operation')) = 'code_review'\n  AND $__timeFilter(start_time)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Major severity findings from code reviews",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Major Findings",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT COALESCE(SUM(CAST(JSON_EXTRACT(input, '$.severity_counts.major') AS UNSIGNED)), 0) AS total\nFROM _tool_langfuse_observations\nWHERE name = 'tool_result'\n  AND JSON_UNQUOTE(JSON_EXTRACT(input, '$.operation')) = 'code_review'\n  AND $__timeFilter(start_time)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total LLM tokens consumed across all agent sessions",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "green", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Total Tokens",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT SUM(total_tokens) AS total\nFROM _tool_langfuse_observations\nWHERE type = 'GENERATION'\n  AND $__timeFilter(start_time)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "LLM models used by the agent",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "purple", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "LLM Model",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT COALESCE(model, 'unknown') AS model\nFROM _tool_langfuse_observations\nWHERE type = 'GENERATION' AND model IS NOT NULL AND model != ''\n  AND $__timeFilter(start_time)\nGROUP BY model\nORDER BY COUNT(*) DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Agent escalation events (interrupts requiring human attention)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "yellow", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "id": 6,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Escalations",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT COALESCE(SUM(CAST(JSON_EXTRACT(input, '$.escalation_count') AS UNSIGNED)), 0) AS total\nFROM _tool_langfuse_observations\nWHERE name = 'handoff_submitted'\n  AND $__timeFilter(start_time)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Each agent session with its code review results, tool calls, and LLM cost",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "custom": { "align": "auto", "displayMode": "auto", "filterable": true }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "duration_sec" },
+            "properties": [{ "id": "unit", "value": "s" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "major" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }, { "id": "custom.displayMode", "value": "color-background" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "minor" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }, { "id": "custom.displayMode", "value": "color-background" }]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+      "id": 10,
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false }, "sortBy": [{ "desc": true, "displayName": "timestamp" }] },
+      "title": "Agent Review Sessions",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  t.timestamp,\n  JSON_UNQUOTE(JSON_EXTRACT(ss.input, '$.user_id')) AS user,\n  JSON_UNQUOTE(JSON_EXTRACT(ss.input, '$.message_preview')) AS request,\n  CAST(JSON_EXTRACT(tr.input, '$.findings_count') AS UNSIGNED) AS findings,\n  COALESCE(CAST(JSON_EXTRACT(tr.input, '$.severity_counts.major') AS UNSIGNED), 0) AS major,\n  COALESCE(CAST(JSON_EXTRACT(tr.input, '$.severity_counts.minor') AS UNSIGNED), 0) AS minor,\n  CAST(JSON_EXTRACT(hs.input, '$.tool_call_count') AS UNSIGNED) AS tool_calls,\n  CAST(JSON_EXTRACT(hs.input, '$.escalation_count') AS UNSIGNED) AS escalations,\n  ROUND(t.latency_ms / 1000) AS duration_sec,\n  (\n    SELECT SUM(o.total_tokens)\n    FROM _tool_langfuse_observations o\n    WHERE o.trace_id = t.trace_id AND o.type = 'GENERATION'\n  ) AS tokens,\n  t.session_id\nFROM _tool_langfuse_traces t\nLEFT JOIN _tool_langfuse_observations ss\n  ON ss.trace_id = t.trace_id AND ss.name = 'session_started'\nLEFT JOIN _tool_langfuse_observations tr\n  ON tr.trace_id = t.trace_id AND tr.name = 'tool_result'\n  AND JSON_UNQUOTE(JSON_EXTRACT(tr.input, '$.operation')) = 'code_review'\nLEFT JOIN _tool_langfuse_observations hs\n  ON hs.trace_id = t.trace_id AND hs.name = 'handoff_submitted'\nWHERE $__timeFilter(t.timestamp)\nORDER BY t.timestamp DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 101,
+      "panels": [],
+      "title": "Findings Analysis",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Findings by severity across all code review sessions",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "major" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "minor" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "id": 20,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "pieType": "donut", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "tooltip": { "mode": "single", "sort": "none" } },
+      "title": "Findings by Severity",
+      "type": "piechart",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  COALESCE(SUM(CAST(JSON_EXTRACT(input, '$.severity_counts.major') AS UNSIGNED)), 0) AS major,\n  COALESCE(SUM(CAST(JSON_EXTRACT(input, '$.severity_counts.minor') AS UNSIGNED)), 0) AS minor\nFROM _tool_langfuse_observations\nWHERE name = 'tool_result'\n  AND JSON_UNQUOTE(JSON_EXTRACT(input, '$.operation')) = 'code_review'\n  AND $__timeFilter(start_time)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Files most frequently flagged across code reviews",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "bars", "fillOpacity": 80, "gradientMode": "none", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "stacking": { "group": "A", "mode": "none" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 16 },
+      "id": 21,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single", "sort": "none" } },
+      "title": "Most Reviewed Files",
+      "type": "barchart",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  SUBSTRING_INDEX(jt.file_path, '/', -2) AS file,\n  COUNT(*) AS reviews\nFROM _tool_langfuse_observations o\nJOIN JSON_TABLE(\n  o.input, '$.files_touched[*]' COLUMNS(file_path VARCHAR(500) PATH '$')\n) AS jt\nWHERE o.name = 'tool_result'\n  AND JSON_UNQUOTE(JSON_EXTRACT(o.input, '$.operation')) = 'code_review'\n  AND $__timeFilter(o.start_time)\nGROUP BY jt.file_path\nORDER BY reviews DESC\nLIMIT 15",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 102,
+      "panels": [],
+      "title": "Agent Execution",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Agentic SDLC event distribution",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 25 },
+      "id": 30,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "pieType": "pie", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "tooltip": { "mode": "single", "sort": "none" } },
+      "title": "Agent Event Types",
+      "type": "piechart",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  name AS event_type,\n  COUNT(*) AS count\nFROM _tool_langfuse_observations\nWHERE type = 'EVENT'\n  AND $__timeFilter(start_time)\nGROUP BY name\nORDER BY count DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Token usage per LLM call (input vs output)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "bars", "fillOpacity": 80, "gradientMode": "none", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "stacking": { "group": "A", "mode": "normal" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 25 },
+      "id": 31,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single", "sort": "none" } },
+      "title": "Token Usage per LLM Call",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "time_series",
+          "rawSql": "SELECT\n  start_time AS time,\n  input_tokens,\n  output_tokens\nFROM _tool_langfuse_observations\nWHERE type = 'GENERATION'\n  AND $__timeFilter(start_time)\nORDER BY start_time",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Agent execution steps per session (spans breakdown)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "bars", "fillOpacity": 80, "gradientMode": "none", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "stacking": { "group": "A", "mode": "none" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 25 },
+      "id": 32,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single", "sort": "none" } },
+      "title": "Agent Step Types",
+      "type": "barchart",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  name,\n  COUNT(*) AS executions\nFROM _tool_langfuse_observations\nWHERE type = 'SPAN'\n  AND $__timeFilter(start_time)\nGROUP BY name\nORDER BY executions DESC\nLIMIT 15",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "id": 103,
+      "panels": [],
+      "title": "Session Detail",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Average session duration and token cost",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "custom": { "align": "auto", "displayMode": "auto", "filterable": true }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "avg_duration_sec" },
+            "properties": [{ "id": "unit", "value": "s" }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "id": 40,
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false }, "sortBy": [{ "desc": true, "displayName": "sessions" }] },
+      "title": "Session Aggregates by User",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  JSON_UNQUOTE(JSON_EXTRACT(ss.input, '$.user_id')) AS user_id,\n  COUNT(DISTINCT t.trace_id) AS sessions,\n  ROUND(AVG(t.latency_ms / 1000)) AS avg_duration_sec,\n  SUM((\n    SELECT COALESCE(SUM(o.total_tokens), 0)\n    FROM _tool_langfuse_observations o\n    WHERE o.trace_id = t.trace_id AND o.type = 'GENERATION'\n  )) AS total_tokens,\n  SUM(COALESCE(CAST(JSON_EXTRACT(tr.input, '$.findings_count') AS UNSIGNED), 0)) AS total_findings\nFROM _tool_langfuse_traces t\nLEFT JOIN _tool_langfuse_observations ss\n  ON ss.trace_id = t.trace_id AND ss.name = 'session_started'\nLEFT JOIN _tool_langfuse_observations tr\n  ON tr.trace_id = t.trace_id AND tr.name = 'tool_result'\n  AND JSON_UNQUOTE(JSON_EXTRACT(tr.input, '$.operation')) = 'code_review'\nWHERE $__timeFilter(t.timestamp)\nGROUP BY JSON_UNQUOTE(JSON_EXTRACT(ss.input, '$.user_id'))\nORDER BY sessions DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Session duration over time",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "points", "fillOpacity": 0, "gradientMode": "none", "lineWidth": 0, "pointSize": 8, "showPoints": "always", "stacking": { "group": "A", "mode": "none" } },
+          "mappings": [],
+          "unit": "s",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "id": 41,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single", "sort": "none" } },
+      "title": "Session Duration Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "time_series",
+          "rawSql": "SELECT\n  t.timestamp AS time,\n  ROUND(t.latency_ms / 1000) AS duration_sec\nFROM _tool_langfuse_traces t\nWHERE $__timeFilter(t.timestamp)\nORDER BY t.timestamp",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["langfuse", "llm", "agent", "code-review"],
+  "templating": { "list": [] },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Langfuse Agent Observability",
+  "uid": "langfuse-agent-observability",
+  "version": 2
+}
