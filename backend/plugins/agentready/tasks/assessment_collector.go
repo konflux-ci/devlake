@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -271,6 +272,9 @@ func discoverRepos(db dal.Dal, options *AgentReadyOptions, logger log.Logger) ([
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
+// FetchGithubAssessment fetches an assessment file via the GitHub Contents API.
+// The filePath is typically a symlink (e.g. assessment-latest.json -> assessment-<timestamp>.json);
+// the Contents API resolves symlinks automatically and returns the target file's content.
 func FetchGithubAssessment(endpoint, fullName, filePath, branch, token string) (string, error) {
 	endpoint = strings.TrimSuffix(endpoint, "/")
 	apiURL := fmt.Sprintf("%s/repos/%s/contents/%s", endpoint, fullName, filePath)
@@ -322,7 +326,7 @@ func FetchGithubAssessment(endpoint, fullName, filePath, branch, token string) (
 	return string(decoded), nil
 }
 
-func FetchGitlabAssessment(endpoint string, projectId int, filePath, branch, token string) (string, error) {
+func fetchGitlabRawFile(endpoint string, projectId int, filePath, branch, token string) (string, error) {
 	endpoint = strings.TrimSuffix(endpoint, "/")
 	encodedPath := url.PathEscape(filePath)
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/files/%s/raw", endpoint, projectId, encodedPath)
@@ -359,4 +363,104 @@ func FetchGitlabAssessment(endpoint string, projectId int, filePath, branch, tok
 	}
 
 	return string(body), nil
+}
+
+// FetchGitlabAssessment fetches an assessment file via the Gitlab Repository Files API.
+// The filePath is typically a symlink (e.g. assessment-latest.json -> assessment-<timestamp>.json);
+// the Gitlab Repository Files API does not resolve symlinks automatically.
+// To resolve this, multiple hops will be made (max 5) to find the actual assessment file.
+func FetchGitlabAssessment(endpoint string, projectId int, filePath, branch, token string) (string, error) {
+	// In theory there should only be one hop from assessment-latest.json to the actual file.
+	const maxHops = 2
+	content, err := fetchGitlabRawFile(endpoint, projectId, filePath, branch, token)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch Gitlab assessment: %w", err)
+	}
+	// No assessment file found.
+	if content == "" {
+		return "", nil
+	}
+	return resolveGitlabSymlink(endpoint, projectId, filePath, branch, token, content, maxHops)
+}
+
+// looksLikeSymlinkTarget validates if a string looks like a symlink
+func looksLikeSymlinkTarget(s string) bool {
+	// Empty
+	if s == "" {
+		return false
+	}
+	// Too many characters
+	if len(s) > 500 {
+		return false
+	}
+	// Null bytes
+	if strings.Contains(s, "\x00") {
+		return false
+	}
+	// Newlines
+	if strings.Contains(s, "\n") {
+		return false
+	}
+	// Carriage return
+	if strings.Contains(s, "\r") {
+		return false
+	}
+	// JSON characters
+	if strings.ContainsAny(s, "{}:,[]\"'\\") {
+		return false
+	}
+	// Doesn't end with '.json'
+	if !strings.HasSuffix(s, ".json") {
+		return false
+	}
+
+	// Should be symlink to another json file containing latest
+	// assessment json.
+	return true
+}
+
+// resolveGitlabSymlink detects if rawContent is a symlink target path
+// and follows it to fetch the actual file. Returns the content as-is
+// if it's already valid JSON.
+func resolveGitlabSymlink(endpoint string, projectId int, originalFilePath, branch, token, rawContent string, maxHops int) (string, error) {
+	content := rawContent
+	// ".agentready/assessment-latest.json" -> ".agentready"
+	currentDir := path.Dir(originalFilePath)
+	for i := 0; i < maxHops; i++ {
+		trimmed := strings.TrimSpace(content)
+
+		// Already valid JSON, done
+		// This is the actual assessment file
+		if json.Valid([]byte(trimmed)) {
+			return trimmed, nil
+		}
+
+		// Not JSON, but doesn't look like a symlink target either
+		// Return as-is and let the caller's json.Unmarshal produce the error
+		if !looksLikeSymlinkTarget(trimmed) {
+			return content, nil
+		}
+
+		// Resolve relative to current directory:
+		// path.Join(".agentready", "assessment-20260512.json")
+		// new path -> ".agentready/assessment-20260512.json"
+		// path.Clean handles "../" normalization
+		resolvedPath := path.Clean(path.Join(currentDir, trimmed))
+
+		// Update currentDir for potential next hop
+		currentDir = path.Dir(resolvedPath)
+
+		// Fetch the resolved target
+		// Should only be one more hop
+		fetched, err := fetchGitlabRawFile(endpoint, projectId, resolvedPath, branch, token)
+		if err != nil {
+			return "", fmt.Errorf("following symlink %q -> %q: %w", originalFilePath, resolvedPath, err)
+		}
+		if fetched == "" {
+			return "", fmt.Errorf("symlink target %q not found (404)", resolvedPath)
+		}
+
+		content = fetched
+	}
+	return "", fmt.Errorf("too many symlink hops (max %d) starting from %q", maxHops, originalFilePath)
 }
