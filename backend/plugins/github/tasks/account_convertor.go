@@ -129,5 +129,63 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	return converter.Execute()
+	err = converter.Execute()
+	if err != nil {
+		return err
+	}
+
+	// Second pass: create domain Account rows for repo accounts that have no
+	// matching _tool_github_accounts record. This typically happens for GitHub
+	// App bot accounts (e.g. "dependabot[bot]", "renovate[bot]") because the
+	// /users/<login> API returns 404 for bots, so no GithubAccount row is
+	// created during collection.
+	return convertOrphanedRepoAccounts(taskCtx, db, data, accountIdGen)
+}
+
+// convertOrphanedRepoAccounts finds GithubRepoAccount entries that have no
+// corresponding GithubAccount row (typically bot accounts) and creates minimal
+// domain Account records for them so that dashboard JOINs on accounts don't
+// lose bot identity.
+func convertOrphanedRepoAccounts(taskCtx plugin.SubTaskContext, db dal.Dal, data *GithubTaskData, accountIdGen *didgen.DomainIdGenerator) errors.Error {
+	cursor, err := db.Cursor(
+		dal.Select("_tool_github_repo_accounts.*"),
+		dal.From(&models.GithubRepoAccount{}),
+		dal.Where(
+			"_tool_github_repo_accounts.repo_github_id = ? AND _tool_github_repo_accounts.connection_id = ?",
+			data.Options.GithubId,
+			data.Options.ConnectionId,
+		),
+		dal.Join(`LEFT JOIN _tool_github_accounts ga ON (
+			_tool_github_repo_accounts.connection_id = ga.connection_id
+			AND _tool_github_repo_accounts.account_id = ga.id
+		)`),
+		dal.Where("ga.id IS NULL"),
+	)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close()
+
+	logger := taskCtx.GetLogger()
+	for cursor.Next() {
+		var orphan models.GithubRepoAccount
+		err = db.Fetch(cursor, &orphan)
+		if err != nil {
+			return err
+		}
+		logger.Info("creating domain account for orphaned repo account (likely bot): login=%s, id=%d", orphan.Login, orphan.AccountId)
+		domainUser := &crossdomain.Account{
+			DomainEntity: domainlayer.DomainEntity{
+				Id: accountIdGen.Generate(data.Options.ConnectionId, orphan.AccountId),
+			},
+			UserName: orphan.Login,
+			FullName: orphan.Login,
+		}
+		err = db.CreateOrUpdate(domainUser)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

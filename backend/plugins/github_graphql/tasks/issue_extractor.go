@@ -85,14 +85,15 @@ func ExtractIssues(taskCtx plugin.SubTaskContext) errors.Error {
 			if len(issue.AssigneeList.Assignees) > 0 {
 				extractGraphqlPreAccount(&results, &issue.AssigneeList.Assignees[0], data.Options.GithubId, data.Options.ConnectionId)
 			}
-			extractGraphqlPreAccount(&results, issue.Author, data.Options.GithubId, data.Options.ConnectionId)
-			for _, assignee := range issue.AssigneeList.Assignees {
+			extractGraphqlPreActorAccount(&results, issue.Author, data.Options.GithubId, data.Options.ConnectionId)
+			for i := range issue.AssigneeList.Assignees {
+				assignee := &issue.AssigneeList.Assignees[i]
 				issueAssignee := &models.GithubIssueAssignee{
 					ConnectionId: githubIssue.ConnectionId,
 					IssueId:      githubIssue.GithubId,
 					RepoId:       githubIssue.RepoId,
-					AssigneeId:   assignee.Id,
-					AssigneeName: assignee.Login,
+					AssigneeId:   assignee.GetId(),
+					AssigneeName: assignee.GetLogin(),
 				}
 				results = append(results, issueAssignee)
 			}
@@ -144,12 +145,12 @@ func convertGithubIssue(milestoneMap map[int]int, issue *GraphqlQueryIssue, conn
 		GithubUpdatedAt: issue.UpdatedAt,
 	}
 	if len(issue.AssigneeList.Assignees) > 0 {
-		githubIssue.AssigneeId = issue.AssigneeList.Assignees[0].Id
-		githubIssue.AssigneeName = issue.AssigneeList.Assignees[0].Login
+		githubIssue.AssigneeId = issue.AssigneeList.Assignees[0].GetId()
+		githubIssue.AssigneeName = issue.AssigneeList.Assignees[0].GetLogin()
 	}
 	if issue.Author != nil {
-		githubIssue.AuthorId = issue.Author.Id
-		githubIssue.AuthorName = issue.Author.Login
+		githubIssue.AuthorId = issue.Author.GetId()
+		githubIssue.AuthorName = issue.Author.GetLogin()
 	}
 	if issue.ClosedAt != nil {
 		temp := uint(issue.ClosedAt.Sub(issue.CreatedAt).Minutes())

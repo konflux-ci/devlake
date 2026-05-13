@@ -78,7 +78,7 @@ func ExtractPrs(taskCtx plugin.SubTaskContext) errors.Error {
 			if err != nil {
 				return nil, err
 			}
-			extractGraphqlPreAccount(&results, rawL.Author, data.Options.GithubId, data.Options.ConnectionId)
+			extractGraphqlPreActorAccount(&results, rawL.Author, data.Options.GithubId, data.Options.ConnectionId)
 			for _, label := range rawL.Labels.Nodes {
 				results = append(results, &models.GithubPrLabel{
 					ConnectionId: data.Options.ConnectionId,
@@ -111,9 +111,9 @@ func ExtractPrs(taskCtx plugin.SubTaskContext) errors.Error {
 					}
 
 					if apiPullRequestReview.Author != nil {
-						githubPrReview.AuthorUserId = apiPullRequestReview.Author.Id
-						githubPrReview.AuthorUsername = apiPullRequestReview.Author.Login
-						extractGraphqlPreAccount(&results, apiPullRequestReview.Author, data.Options.GithubId, data.Options.ConnectionId)
+						githubPrReview.AuthorUserId = apiPullRequestReview.Author.GetId()
+						githubPrReview.AuthorUsername = apiPullRequestReview.Author.GetLogin()
+						extractGraphqlPreActorAccount(&results, apiPullRequestReview.Author, data.Options.GithubId, data.Options.ConnectionId)
 					}
 
 					results = append(results, githubPrReview)
@@ -123,8 +123,8 @@ func ExtractPrs(taskCtx plugin.SubTaskContext) errors.Error {
 				githubReviewRequests := &models.GithubReviewer{
 					ConnectionId:  data.Options.ConnectionId,
 					PullRequestId: githubPr.GithubId,
-					ReviewerId:    apiReviewRequests.RequestedReviewer.User.Id,
-					Username:      apiReviewRequests.RequestedReviewer.User.Login,
+					ReviewerId:    apiReviewRequests.RequestedReviewer.GetId(),
+					Username:      apiReviewRequests.RequestedReviewer.GetLogin(),
 				}
 				results = append(results, githubReviewRequests)
 			}
@@ -181,15 +181,15 @@ func convertGithubPullRequest(pull *GraphqlQueryPr, connId uint64, repoId int) (
 		IsDraft:         pull.IsDraft,
 	}
 	if pull.MergedBy != nil {
-		githubPull.MergedByName = pull.MergedBy.Login
-		githubPull.MergedById = pull.MergedBy.Id
+		githubPull.MergedByName = pull.MergedBy.GetLogin()
+		githubPull.MergedById = pull.MergedBy.GetId()
 	}
 	if pull.MergeCommit != nil {
 		githubPull.MergeCommitSha = pull.MergeCommit.Oid
 	}
 	if pull.Author != nil {
-		githubPull.AuthorName = pull.Author.Login
-		githubPull.AuthorId = pull.Author.Id
+		githubPull.AuthorName = pull.Author.GetLogin()
+		githubPull.AuthorId = pull.Author.GetId()
 	}
 	return githubPull, nil
 }
@@ -207,7 +207,7 @@ func convertPullRequestCommit(prCommit GraphqlQueryCommit) (*models.GithubCommit
 		Url:            prCommit.Url,
 	}
 	if prCommit.Commit.Author.User != nil {
-		githubCommit.AuthorId = prCommit.Commit.Author.User.Id
+		githubCommit.AuthorId = prCommit.Commit.Author.User.GetId()
 	}
 	return githubCommit, nil
 }
