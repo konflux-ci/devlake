@@ -70,10 +70,13 @@
             {
               "type": "value",
               "options": {
+                "Platinum": { "color": "#E5E4E2", "text": "Platinum" },
                 "Gold": { "color": "#FFD700", "text": "Gold" },
                 "Silver": { "color": "#C0C0C0", "text": "Silver" },
                 "Bronze": { "color": "#CD7F32", "text": "Bronze" },
-                "Needs Improvement": { "color": "red", "text": "Needs Improvement" }
+                "NeedsImprovement": { "color": "#FF4444", "text": "Needs Improvement" },
+                "Needs Improvement": { "color": "#FF4444", "text": "Needs Improvement" },
+                "None": { "color": "#808080", "text": "None" }
               }
             }
           ]

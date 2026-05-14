@@ -84,6 +84,34 @@
           "placement": "right",
           "values": ["value", "percent"]
         }
+      },
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Platinum" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#E5E4E2" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Gold" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FFD700" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Silver" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#C0C0C0" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Bronze" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#CD7F32" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "NeedsImprovement" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF4444" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "None" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#808080" } }]
+          }
+        ]
       }
     },
     {
