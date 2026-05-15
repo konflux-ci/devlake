@@ -82,11 +82,15 @@ func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, e
 	}
 
 	var findings []models.AgentReadyFinding
-	_ = db.All(&findings,
+	err = db.All(&findings,
 		dal.From(&models.AgentReadyFinding{}),
 		dal.Where("assessment_id = ?", id),
 		dal.Orderby("tier ASC, status ASC"),
 	)
+
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to query findings for assessment")
+	}
 
 	return &plugin.ApiResourceOutput{
 		Body: map[string]interface{}{
