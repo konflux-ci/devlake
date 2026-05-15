@@ -80,7 +80,7 @@ func TestParseAssessmentJSON(t *testing.T) {
 	if parseErr != nil {
 		t.Fatalf("unexpected error: %v", parseErr)
 	}
-	result, err := ParseAssessmentJSON(assessment, parsed)
+	result, err := parseAssessmentJSON(assessment, parsed)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestParseFindings(t *testing.T) {
 	if parseErr != nil {
 		t.Fatalf("unexpected error: %v", parseErr)
 	}
-	findings, err := ParseFindings(parsed, assessmentId, repoId)
+	findings, err := parseFindings(parsed, assessmentId, repoId)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

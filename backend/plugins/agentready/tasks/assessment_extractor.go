@@ -107,7 +107,7 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 			taskCtx.IncProgress(1)
 			continue
 		}
-		assessment, assessErr := ParseAssessmentJSON(&rawAssessments[i], parsed)
+		assessment, assessErr := parseAssessmentJSON(&rawAssessments[i], parsed)
 		if assessErr != nil {
 			logger.Warn(nil, "Failed to extract assessment for repo %s: %v", rawAssessments[i].RepoId, assessErr)
 			taskCtx.IncProgress(1)
@@ -119,7 +119,7 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 			logger.Warn(dbErr, "Failed to save parsed assessment %s", assessment.Id)
 		}
 
-		findings, findErr := ParseFindings(parsed, assessment.Id, assessment.RepoId)
+		findings, findErr := parseFindings(parsed, assessment.Id, assessment.RepoId)
 		if findErr != nil {
 			logger.Warn(nil, "Failed to parse assessment findings for repo %s: %v", assessment.RepoId, findErr)
 		}
@@ -136,7 +136,7 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	return nil
 }
 
-func ParseAssessmentJSON(assessment *models.AgentReadyAssessment, parsed *assessmentJSON) (*models.AgentReadyAssessment, error) {
+func parseAssessmentJSON(assessment *models.AgentReadyAssessment, parsed *assessmentJSON) (*models.AgentReadyAssessment, error) {
 	assessedAt, err := time.Parse(time.RFC3339, parsed.Timestamp)
 	if err != nil {
 		assessedAt = assessment.CollectedAt
@@ -156,7 +156,7 @@ func ParseAssessmentJSON(assessment *models.AgentReadyAssessment, parsed *assess
 	return assessment, nil
 }
 
-func ParseFindings(parsed *assessmentJSON, assessmentId, repoId string) ([]*models.AgentReadyFinding, error) {
+func parseFindings(parsed *assessmentJSON, assessmentId, repoId string) ([]*models.AgentReadyFinding, error) {
 	var findings []*models.AgentReadyFinding
 	for _, f := range parsed.Findings {
 		if f.Status == models.FindingStatusNotApplicable {
