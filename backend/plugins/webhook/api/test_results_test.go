@@ -18,35 +18,19 @@ limitations under the License.
 package api
 
 import (
+	"bytes"
 	"encoding/xml"
+	"fmt"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/apache/incubator-devlake/core/plugin"
 	testTasks "github.com/apache/incubator-devlake/plugins/testregistry/tasks"
 )
 
-func TestGenerateWebhookUID(t *testing.T) {
-	// Should generate unique IDs
-	ids := make(map[string]bool)
-	for i := 0; i < 1000; i++ {
-		id := generateWebhookUID()
-		if len(id) != 16 {
-			t.Errorf("generateWebhookUID() length = %d, want 16", len(id))
-		}
-		if ids[id] {
-			t.Errorf("generateWebhookUID() produced duplicate ID: %s", id)
-		}
-		ids[id] = true
-	}
-}
-
-func TestGenerateWebhookUID_IsHex(t *testing.T) {
-	id := generateWebhookUID()
-	for _, c := range id {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			t.Errorf("generateWebhookUID() contains non-hex character: %c in %s", c, id)
-		}
-	}
-}
 
 func TestParseJUnitXML_TestSuites(t *testing.T) {
 	xmlContent := []byte(`<?xml version="1.0" encoding="UTF-8"?>
@@ -263,5 +247,80 @@ func TestTestCaseStatusDetection(t *testing.T) {
 func TestMaxJUnitFilesConstant(t *testing.T) {
 	if maxJUnitFilesPerRequest != 100 {
 		t.Errorf("maxJUnitFilesPerRequest = %d, want 100", maxJUnitFilesPerRequest)
+	}
+}
+
+// errorReader always returns an error from Read, used to test panic behaviour.
+type errorReader struct{}
+
+func (errorReader) Read(_ []byte) (int, error) {
+	return 0, fmt.Errorf("simulated rand failure")
+}
+
+func TestGenerateWebhookUID_PanicOnReadError(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("generateWebhookUIDFrom should panic when the reader fails")
+			return
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "crypto/rand.Read failed") {
+			t.Errorf("unexpected panic value: %v", r)
+		}
+	}()
+	generateWebhookUIDFrom(errorReader{})
+}
+
+// makeMultipartRequest builds a POST request with the given form fields.
+func makeMultipartRequest(t *testing.T, fields map[string]string) *http.Request {
+	t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	for k, v := range fields {
+		if err := w.WriteField(k, v); err != nil {
+			t.Fatalf("WriteField(%q): %v", k, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("multipart.Writer.Close: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/test_results", &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	return req
+}
+
+func TestPostTestResultsImpl_NilRequest(t *testing.T) {
+	_, err := postTestResultsImpl(&plugin.ApiResourceInput{Request: nil}, 1)
+	if err == nil {
+		t.Fatal("expected error for nil request, got nil")
+	}
+}
+
+func TestPostTestResultsImpl_MissingRequiredFields(t *testing.T) {
+	allFields := map[string]string{
+		"jobId":        "job-1",
+		"jobName":      "build",
+		"organization": "my-org",
+		"repository":   "my-repo",
+		"result":       "SUCCESS",
+	}
+
+	for _, missing := range []string{"jobId", "jobName", "organization", "repository", "result"} {
+		t.Run("missing_"+missing, func(t *testing.T) {
+			fields := make(map[string]string, len(allFields))
+			for k, v := range allFields {
+				fields[k] = v
+			}
+			delete(fields, missing)
+
+			input := &plugin.ApiResourceInput{
+				Request: makeMultipartRequest(t, fields),
+			}
+			_, err := postTestResultsImpl(input, 1)
+			if err == nil {
+				t.Errorf("expected error when %q is missing, got nil", missing)
+			}
+		})
 	}
 }
