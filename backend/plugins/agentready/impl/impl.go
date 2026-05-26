@@ -25,6 +25,8 @@ var _ interface {
 	plugin.MetricPluginBlueprintV200
 } = (*AgentReady)(nil)
 
+// AgentReady is the DevLake plugin that collects and analyzes AI readiness
+// assessments from repositories.
 type AgentReady struct{}
 
 func (p AgentReady) Init(basicRes context.BasicRes) errors.Error {

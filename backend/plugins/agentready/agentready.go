@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// PluginEntry is the AgentReady plugin instance registered with DevLake.
 var PluginEntry impl.AgentReady
 
 func main() {

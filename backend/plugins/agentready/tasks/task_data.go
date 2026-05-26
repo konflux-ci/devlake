@@ -10,6 +10,7 @@ import (
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
 
+// AgentReadyOptions holds the task options decoded from the pipeline plan.
 type AgentReadyOptions struct {
 	ProjectName   string                        `json:"projectName"`
 	RepoId        string                        `json:"repoId"`
@@ -19,10 +20,13 @@ type AgentReadyOptions struct {
 	ScopeConfig   *models.AgentReadyScopeConfig `json:"scopeConfig"`
 }
 
+// AgentReadyTaskData holds the runtime data passed to each subtask.
 type AgentReadyTaskData struct {
 	Options *AgentReadyOptions
 }
 
+// RepoInfo holds connection and identity details for a single repository
+// resolved during task preparation.
 type RepoInfo struct {
 	DomainRepoId      string
 	Provider          string
@@ -35,6 +39,7 @@ type RepoInfo struct {
 	Token             string
 }
 
+// DecodeTaskOptions decodes the raw pipeline options map into AgentReadyOptions.
 func DecodeTaskOptions(options map[string]interface{}) (*AgentReadyOptions, errors.Error) {
 	var op AgentReadyOptions
 	if err := helper.Decode(options, &op, nil); err != nil {
@@ -43,6 +48,7 @@ func DecodeTaskOptions(options map[string]interface{}) (*AgentReadyOptions, erro
 	return &op, nil
 }
 
+// ValidateTaskOptions returns an error if the required options are missing.
 func ValidateTaskOptions(op *AgentReadyOptions) errors.Error {
 	if op.RepoId == "" && op.ProjectName == "" {
 		return errors.BadInput.New("either repoId or projectName is required")
