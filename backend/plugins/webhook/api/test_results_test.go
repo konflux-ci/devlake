@@ -257,19 +257,30 @@ func (errorReader) Read(_ []byte) (int, error) {
 	return 0, fmt.Errorf("simulated rand failure")
 }
 
-func TestGenerateWebhookUID_PanicOnReadError(t *testing.T) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("generateWebhookUIDFrom should panic when the reader fails")
-			return
+func TestGenerateWebhookUID_ReturnsErrorOnReadFailure(t *testing.T) {
+	_, err := generateWebhookUIDFrom(errorReader{})
+	if err == nil {
+		t.Fatal("generateWebhookUIDFrom should return error when reader fails")
+	}
+	if !strings.Contains(err.Error(), "failed to generate random UID") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestGenerateWebhookUID_Success(t *testing.T) {
+	id, err := generateWebhookUID()
+	if err != nil {
+		t.Fatalf("generateWebhookUID() returned unexpected error: %v", err)
+	}
+	if len(id) != 16 {
+		t.Errorf("generateWebhookUID() length = %d, want 16", len(id))
+	}
+	// Verify hex characters
+	for _, c := range id {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			t.Errorf("generateWebhookUID() contains non-hex character: %c in %s", c, id)
 		}
-		msg, ok := r.(string)
-		if !ok || !strings.Contains(msg, "crypto/rand.Read failed") {
-			t.Errorf("unexpected panic value: %v", r)
-		}
-	}()
-	generateWebhookUIDFrom(errorReader{})
+	}
 }
 
 // makeMultipartRequest builds a POST request with the given form fields.

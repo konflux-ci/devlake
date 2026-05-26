@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -79,6 +80,12 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 		return nil, errors.BadInput.New("required form fields: jobId, jobName, organization, repository, result")
 	}
 
+	// Validate field lengths to prevent DB column overflow (job_id is varchar(255), job_name is varchar(500))
+	domainJobId := fmt.Sprintf("webhook:%d:%s", connectionId, jobId)
+	if len(domainJobId) > 255 {
+		return nil, errors.BadInput.New("jobId is too long; the prefixed ID must fit in 255 characters")
+	}
+
 	// Read optional form fields
 	jobType := input.Request.FormValue("jobType")
 	commitSha := input.Request.FormValue("commitSha")
@@ -89,28 +96,36 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 
 	var pullRequestNumber *int
 	if prStr := input.Request.FormValue("pullRequestNumber"); prStr != "" {
-		if prNum, err := strconv.Atoi(prStr); err == nil {
-			pullRequestNumber = &prNum
+		prNum, parseErr := strconv.Atoi(prStr)
+		if parseErr != nil {
+			return nil, errors.BadInput.New(fmt.Sprintf("pullRequestNumber must be a valid integer, got %q", prStr))
 		}
+		pullRequestNumber = &prNum
 	}
 
 	var startedAt, finishedAt *time.Time
 	if s := input.Request.FormValue("startedAt"); s != "" {
-		if t, err := common.ConvertStringToTime(s); err == nil {
-			startedAt = &t
+		t, parseErr := common.ConvertStringToTime(s)
+		if parseErr != nil {
+			return nil, errors.BadInput.New(fmt.Sprintf("startedAt must be a valid ISO 8601 timestamp, got %q", s))
 		}
+		startedAt = &t
 	}
 	if s := input.Request.FormValue("finishedAt"); s != "" {
-		if t, err := common.ConvertStringToTime(s); err == nil {
-			finishedAt = &t
+		t, parseErr := common.ConvertStringToTime(s)
+		if parseErr != nil {
+			return nil, errors.BadInput.New(fmt.Sprintf("finishedAt must be a valid ISO 8601 timestamp, got %q", s))
 		}
+		finishedAt = &t
 	}
 
 	var durationSec *float64
 	if s := input.Request.FormValue("durationSec"); s != "" {
-		if d, err := strconv.ParseFloat(s, 64); err == nil {
-			durationSec = &d
+		d, parseErr := strconv.ParseFloat(s, 64)
+		if parseErr != nil {
+			return nil, errors.BadInput.New(fmt.Sprintf("durationSec must be a valid number, got %q", s))
 		}
+		durationSec = &d
 	} else if startedAt != nil && finishedAt != nil {
 		d := finishedAt.Sub(*startedAt).Seconds()
 		durationSec = &d
@@ -139,8 +154,15 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 	defer txHelper.End()
 	db := txHelper.Begin()
 
-	// Build domain job ID with webhook prefix
-	domainJobId := fmt.Sprintf("webhook:%d:%s", connectionId, jobId)
+	// Delete existing suites and cases for this job to ensure idempotent retries
+	if delErr := db.Delete(&models.TestCase{}, dal.Where("connection_id = ? AND job_id = ?", connectionId, domainJobId)); delErr != nil {
+		err = errors.Default.Wrap(delErr, "failed to delete existing test cases")
+		return nil, err
+	}
+	if delErr := db.Delete(&models.TestSuite{}, dal.Where("connection_id = ? AND job_id = ?", connectionId, domainJobId)); delErr != nil {
+		err = errors.Default.Wrap(delErr, "failed to delete existing test suites")
+		return nil, err
+	}
 
 	// Save CI job
 	ciJob := &models.TestRegistryCIJob{
@@ -179,7 +201,7 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 		}
 
 		xmlContent, readErr := io.ReadAll(io.LimitReader(f, 10*1024*1024))
-		f.Close()
+		_ = f.Close()
 		if readErr != nil {
 			err = errors.Default.Wrap(readErr, fmt.Sprintf("failed to read uploaded file %s", fileHeader.Filename))
 			return nil, err
@@ -187,7 +209,7 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 
 		// Parse XML — try <testsuites> first, then bare <testsuite>
 		var suitesXml testTasks.TestSuites
-		_ = xml.Unmarshal(xmlContent, &suitesXml)
+		firstErr := xml.Unmarshal(xmlContent, &suitesXml)
 
 		// Handle bare <testsuite> root element (or failed <testsuites> parse)
 		if len(suitesXml.Suites) == 0 {
@@ -197,13 +219,28 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 			}
 		}
 
+		// Return error if file could not be parsed as JUnit XML
+		if len(suitesXml.Suites) == 0 {
+			errMsg := fmt.Sprintf("failed to parse JUnit XML from file %s", fileHeader.Filename)
+			if firstErr != nil {
+				err = errors.BadInput.Wrap(firstErr, errMsg)
+			} else {
+				err = errors.BadInput.New(errMsg + ": no test suites found")
+			}
+			return nil, err
+		}
+
 		// Save each suite and its test cases
 		for _, suite := range suitesXml.Suites {
 			if suite == nil || suite.Name == "" {
 				continue
 			}
 
-			suiteId := generateWebhookUID()
+			suiteId, uidErr := generateWebhookUID()
+			if uidErr != nil {
+				err = uidErr
+				return nil, err
+			}
 			testSuite := &models.TestSuite{
 				ConnectionId: connectionId,
 				JobId:        domainJobId,
@@ -226,7 +263,11 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 					continue
 				}
 
-				testCaseId := generateWebhookUID()
+				testCaseId, uidErr := generateWebhookUID()
+				if uidErr != nil {
+					err = uidErr
+					return nil, err
+				}
 				status := "passed"
 				var failureMsg, failureOut, skipMsg *string
 
@@ -277,14 +318,14 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 }
 
 // generateWebhookUID creates a random 16-char hex string for unique IDs.
-func generateWebhookUID() string {
+func generateWebhookUID() (string, errors.Error) {
 	return generateWebhookUIDFrom(rand.Reader)
 }
 
-func generateWebhookUIDFrom(r io.Reader) string {
+func generateWebhookUIDFrom(r io.Reader) (string, errors.Error) {
 	b := make([]byte, 8)
-	if _, err := r.Read(b); err != nil {
-		panic("crypto/rand.Read failed: " + err.Error())
+	if _, readErr := r.Read(b); readErr != nil {
+		return "", errors.Default.Wrap(readErr, "failed to generate random UID")
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
