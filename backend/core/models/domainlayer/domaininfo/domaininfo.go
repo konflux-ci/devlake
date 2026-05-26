@@ -30,6 +30,9 @@ import (
 func GetDomainTablesInfo() []dal.Tabler {
 	return []dal.Tabler{
 		// code
+		&code.AiReview{},
+		&code.AiFailurePrediction{},
+		&code.AiPredictionMetrics{},
 		&code.Commit{},
 		&code.CommitFile{},
 		&code.CommitFileComponent{},

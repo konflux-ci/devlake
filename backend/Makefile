@@ -27,7 +27,7 @@ PYTHON_DIR ?= "./python"
 all: build
 
 go-dep:
-	go install github.com/vektra/mockery/v2@v2.43.0
+	go install github.com/vektra/mockery/v2@v2.53.6
 	go install github.com/swaggo/swag/cmd/swag@v1.16.1
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.4
 
@@ -84,6 +84,7 @@ debug: build-plugin-debug
 	dlv debug server/main.go
 
 mock:
+	@which mockery > /dev/null 2>&1 || (echo "mockery not found. Run: make go-dep" && exit 1)
 	rm -rf mocks
 	mockery --recursive --keeptree --dir=./core --output=./mocks/core --unroll-variadic=false --name='.*'
 	mockery --recursive --keeptree --dir=./helpers --output=./mocks/helpers --unroll-variadic=false --name='.*'
