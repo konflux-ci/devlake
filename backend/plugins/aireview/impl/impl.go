@@ -110,9 +110,13 @@ func (p AiReview) SubTaskMetas() []plugin.SubTaskMeta {
 		tasks.EnrichGithubReviewReactionsMeta,
 		tasks.EnrichGitlabReviewReactionsMeta,
 		tasks.ExtractAiReviewFindingsMeta,
+		tasks.ConvertAiReviewsMeta,
+		tasks.MatchSuggestionDiffsMeta,
 		tasks.FetchMissingCiJobsMeta,
 		tasks.CalculateFailurePredictionsMeta,
+		tasks.ConvertFailurePredictionsMeta,
 		tasks.CalculatePredictionMetricsMeta,
+		tasks.ConvertPredictionMetricsMeta,
 	}
 }
 
@@ -240,9 +244,13 @@ func (p AiReview) MakeMetricPluginPipelinePlanV200(projectName string, options j
 					tasks.EnrichGithubReviewReactionsMeta.Name,
 					tasks.EnrichGitlabReviewReactionsMeta.Name,
 					tasks.ExtractAiReviewFindingsMeta.Name,
+					tasks.ConvertAiReviewsMeta.Name,
+					tasks.MatchSuggestionDiffsMeta.Name,
 					tasks.FetchMissingCiJobsMeta.Name,
 					tasks.CalculateFailurePredictionsMeta.Name,
+					tasks.ConvertFailurePredictionsMeta.Name,
 					tasks.CalculatePredictionMetricsMeta.Name,
+					tasks.ConvertPredictionMetricsMeta.Name,
 				},
 			},
 		},

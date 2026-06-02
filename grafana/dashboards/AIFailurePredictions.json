@@ -85,7 +85,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "rawSql": "SELECT COUNT(*) AS value FROM ai_reviews WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)",
           "refId": "A"
         }
       ],
@@ -148,7 +148,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT ROUND(100.0 * SUM(CASE WHEN reactions_total_count > 0 THEN 1 ELSE 0 END) / COUNT(*), 2) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "rawSql": "SELECT ROUND(100.0 * SUM(CASE WHEN reactions_total_count > 0 THEN 1 ELSE 0 END) / COUNT(*), 2) AS value FROM ai_reviews WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)",
           "refId": "A"
         }
       ],
@@ -215,7 +215,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN pr.status = 'MERGED' THEN pr.id END) / COUNT(DISTINCT pr.id), 1) AS value FROM pull_requests pr INNER JOIN _tool_aireview_reviews ar ON ar.pull_request_id = pr.id WHERE pr.status IN ('MERGED', 'CLOSED') AND ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring})\n  AND ar.body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(ar.created_date)",
+          "rawSql": "SELECT ROUND(100.0 * COUNT(DISTINCT CASE WHEN pr.status = 'MERGED' THEN pr.id END) / COUNT(DISTINCT pr.id), 1) AS value FROM pull_requests pr INNER JOIN ai_reviews ar ON ar.pull_request_id = pr.id WHERE pr.status IN ('MERGED', 'CLOSED') AND ar.repo_id IN (${repo_id:sqlstring}) AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date)",
           "refId": "A"
         }
       ],
@@ -273,7 +273,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT SUM(reactions_thumbs_up) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "rawSql": "SELECT SUM(reactions_thumbs_up) AS value FROM ai_reviews WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)",
           "refId": "A"
         }
       ],
@@ -334,7 +334,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT SUM(reactions_thumbs_down) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "rawSql": "SELECT SUM(reactions_thumbs_down) AS value FROM ai_reviews WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)",
           "refId": "A"
         }
       ],
@@ -392,7 +392,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(DISTINCT repo_id) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "rawSql": "SELECT COUNT(DISTINCT repo_id) AS value FROM ai_reviews WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)",
           "refId": "A"
         }
       ],
@@ -406,6 +406,480 @@
         "w": 24,
         "x": 0,
         "y": 5
+      },
+      "id": 314,
+      "panels": [],
+      "title": "Suggestion Acceptance — Are Developers Using AI Suggestions?",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Percentage of AI code suggestions that developers accepted and applied. Higher rates indicate the AI is producing actionable, high-quality suggestions.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "id": 311,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ROUND(100.0 * SUM(GREATEST(suggestions_accepted, suggestions_diff_accepted)) / NULLIF(SUM(suggestions_count), 0), 1) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND suggestions_count > 0\n  AND $__timeFilter(created_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Suggestion Acceptance Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total number of AI suggestions that were accepted/applied by developers across all reviews.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 6,
+        "y": 5
+      },
+      "id": 312,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT SUM(GREATEST(suggestions_accepted, suggestions_diff_accepted)) AS value FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Suggestions Accepted",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Suggestion acceptance rate broken down by AI tool. Shows which AI tools produce suggestions developers actually use.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 14,
+        "x": 10,
+        "y": 5
+      },
+      "id": 313,
+      "options": {
+        "barRadius": 0.1,
+        "barWidth": 0.6,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ai_tool, ROUND(100.0 * SUM(GREATEST(suggestions_accepted, suggestions_diff_accepted)) / NULLIF(SUM(suggestions_count), 0), 1) AS acceptance_rate FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND suggestions_count > 0\n  AND $__timeFilter(created_date)\n  GROUP BY ai_tool\n  ORDER BY acceptance_rate DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Acceptance Rate by AI Tool",
+      "type": "barchart"
+    },
+    {
+      "id": 510,
+      "type": "row",
+      "title": "Diff-Based Suggestion Acceptance — Line-Level Code Matching",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "panels": []
+    },
+    {
+      "id": 511,
+      "type": "stat",
+      "title": "Diff-Based Acceptance Rate",
+      "description": "Percentage of AI suggestions where matching code was found in subsequent commits (line-level comparison)",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 11
+      },
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ROUND(100.0 * COUNT(CASE WHEN suggestion_diff_matched = 1 THEN 1 END) / NULLIF(COUNT(*), 0), 1) AS value\nFROM _tool_aireview_findings\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND type = 'suggestion'\n  AND suggested_code != ''\n  AND $__timeFilter(created_date)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 512,
+      "type": "stat",
+      "title": "Avg Lines Applied %",
+      "description": "Average percentage of non-trivial suggested lines found in commit diffs",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 6,
+        "y": 11
+      },
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 30
+              },
+              {
+                "color": "green",
+                "value": 60
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT ROUND(AVG(suggestion_match_score), 1) AS value\nFROM _tool_aireview_findings\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND type = 'suggestion'\n  AND suggestion_diff_matched = 1\n  AND $__timeFilter(created_date)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 513,
+      "type": "stat",
+      "title": "Suggestions 100% Applied",
+      "description": "Number of suggestions where all non-trivial lines were found in commits",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 10,
+        "y": 11
+      },
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_aireview_findings\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND type = 'suggestion'\n  AND suggestion_diff_matched = 1\n  AND suggestion_match_score >= 99.9\n  AND $__timeFilter(created_date)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 514,
+      "type": "barchart",
+      "title": "Suggestion Acceptance Distribution",
+      "description": "How much of each suggestion was applied (0%, 1-50%, 51-99%, 100%)",
+      "gridPos": {
+        "h": 4,
+        "w": 10,
+        "x": 14,
+        "y": 11
+      },
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none"
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  bucket,\n  cnt AS count\nFROM (\n  SELECT 'Not matched' AS bucket, 0 AS sort_order, COUNT(*) AS cnt\n  FROM _tool_aireview_findings\n  WHERE repo_id IN (${repo_id:sqlstring}) AND type = 'suggestion' AND suggested_code != ''\n    AND suggestion_diff_matched = 0 AND $__timeFilter(created_date)\n  UNION ALL\n  SELECT '1-50% applied', 1, COUNT(*)\n  FROM _tool_aireview_findings\n  WHERE repo_id IN (${repo_id:sqlstring}) AND type = 'suggestion'\n    AND suggestion_diff_matched = 1 AND suggestion_match_score > 0 AND suggestion_match_score <= 50\n    AND $__timeFilter(created_date)\n  UNION ALL\n  SELECT '51-99% applied', 2, COUNT(*)\n  FROM _tool_aireview_findings\n  WHERE repo_id IN (${repo_id:sqlstring}) AND type = 'suggestion'\n    AND suggestion_diff_matched = 1 AND suggestion_match_score > 50 AND suggestion_match_score < 99.9\n    AND $__timeFilter(created_date)\n  UNION ALL\n  SELECT '100% applied', 3, COUNT(*)\n  FROM _tool_aireview_findings\n  WHERE repo_id IN (${repo_id:sqlstring}) AND type = 'suggestion'\n    AND suggestion_diff_matched = 1 AND suggestion_match_score >= 99.9\n    AND $__timeFilter(created_date)\n) t ORDER BY sort_order",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 515,
+      "type": "table",
+      "title": "Suggestion Details — Line-Level Matching",
+      "description": "Individual AI suggestions with acceptance percentage based on code diff comparison",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pct_applied"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "suggestion_preview"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": true,
+          "reducer": [
+            "count"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawSql": "SELECT\n  f.matched_file_path AS file_path,\n  f.suggestion_match_method AS method,\n  ROUND(f.suggestion_match_score, 1) AS pct_applied,\n  f.suggestion_lines_matched AS lines_matched,\n  f.suggestion_lines_total AS lines_total,\n  LEFT(f.suggested_code, 120) AS suggestion_preview,\n  ar.ai_tool,\n  pr.pull_request_key AS pr_number\nFROM _tool_aireview_findings f\nJOIN _tool_aireview_reviews ar ON f.ai_review_id = ar.id\nLEFT JOIN pull_requests pr ON f.pull_request_id = pr.id\nWHERE f.repo_id IN (${repo_id:sqlstring})\n  AND f.type = 'suggestion'\n  AND f.suggestion_diff_matched = 1\n  AND $__timeFilter(f.created_date)\nORDER BY f.suggestion_match_score DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
       },
       "id": 307,
       "panels": [],
@@ -481,7 +955,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 6
+        "y": 24
       },
       "id": 308,
       "options": {
@@ -509,7 +983,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT risk_level, COUNT(*) as count FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date) GROUP BY risk_level",
+          "rawSql": "SELECT risk_level, COUNT(*) as count FROM ai_reviews WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date) GROUP BY risk_level",
           "refId": "A"
         }
       ],
@@ -556,7 +1030,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 6
+        "y": 24
       },
       "id": 309,
       "options": {
@@ -584,7 +1058,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT ai_tool, COUNT(*) as count FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date) GROUP BY ai_tool",
+          "rawSql": "SELECT ai_tool, COUNT(*) as count FROM ai_reviews WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date) GROUP BY ai_tool",
           "refId": "A"
         }
       ],
@@ -654,7 +1128,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 6
+        "y": 24
       },
       "id": 310,
       "options": {
@@ -680,7 +1154,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  COUNT(*) AS `Skipped Reviews`,\n  ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM _tool_aireview_reviews WHERE repo_id IN (${repo_id:sqlstring}) AND ai_tool IN (${ai_tool:sqlstring})\n    AND $__timeFilter(created_date)), 1) AS `Skipped %`\nFROM _tool_aireview_reviews\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND body LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "rawSql": "SELECT\n  COUNT(*) AS `Skipped Reviews`,\n  ROUND(100.0 * COUNT(*) / NULLIF((SELECT COUNT(*) FROM _tool_aireview_reviews ar2\n    JOIN project_mapping pm2 ON ar2.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n    WHERE pm2.project_name = '${project}'\n      AND ar2.repo_id IN (${repo_id:sqlstring})\n      AND ar2.ai_tool IN (${ai_tool:sqlstring})\n      AND $__timeFilter(ar2.created_date)), 0), 1) AS `Skipped %`\nFROM _tool_aireview_reviews ar\nJOIN project_mapping pm ON ar.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE pm.project_name = '${project}'\n  AND ar.repo_id IN (${repo_id:sqlstring})\n  AND ar.ai_tool IN (${ai_tool:sqlstring})\n  AND ar.body LIKE '%Review skipped%'\n  AND $__timeFilter(ar.created_date)",
           "refId": "A"
         }
       ],
@@ -693,7 +1167,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 32
       },
       "id": 400,
       "panels": [],
@@ -725,7 +1199,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 15
+        "y": 33
       },
       "id": 409,
       "options": {
@@ -750,7 +1224,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(DISTINCT pull_request_id) AS value\nFROM _tool_aireview_reviews\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND body NOT LIKE '%Review skipped%'\n  AND $__timeFilter(created_date)",
+          "rawSql": "SELECT COUNT(DISTINCT pull_request_id) AS value\nFROM ai_reviews\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)",
           "refId": "A"
         }
       ],
@@ -782,7 +1256,7 @@
         "h": 4,
         "w": 5,
         "x": 5,
-        "y": 15
+        "y": 33
       },
       "id": 408,
       "options": {
@@ -807,7 +1281,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS value\nFROM (\n  SELECT pull_request_id\n  FROM _tool_aireview_reviews\n  WHERE repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring})\n    AND body NOT LIKE '%Review skipped%'\n    AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n  HAVING COUNT(*) = 1\n) t",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM (\n  SELECT pull_request_id\n  FROM ai_reviews\n  WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n  HAVING COUNT(*) = 1\n) t",
           "refId": "A"
         }
       ],
@@ -839,7 +1313,7 @@
         "h": 4,
         "w": 5,
         "x": 10,
-        "y": 15
+        "y": 33
       },
       "id": 401,
       "options": {
@@ -865,7 +1339,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS value\nFROM (\n  SELECT pull_request_id\n  FROM _tool_aireview_reviews\n  WHERE repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring})\n    AND body NOT LIKE '%Review skipped%'\n    AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n  HAVING COUNT(*) > 1\n) t",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM (\n  SELECT pull_request_id\n  FROM ai_reviews\n  WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n  HAVING COUNT(*) > 1\n) t",
           "refId": "A"
         }
       ],
@@ -898,7 +1372,7 @@
         "h": 4,
         "w": 4,
         "x": 15,
-        "y": 15
+        "y": 33
       },
       "id": 402,
       "options": {
@@ -924,7 +1398,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT ROUND(AVG(review_count), 1) AS value\nFROM (\n  SELECT pull_request_id, COUNT(*) AS review_count\n  FROM _tool_aireview_reviews\n  WHERE repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring})\n    AND body NOT LIKE '%Review skipped%'\n    AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n  HAVING COUNT(*) > 1\n) t",
+          "rawSql": "SELECT ROUND(AVG(review_count), 1) AS value\nFROM (\n  SELECT pull_request_id, COUNT(*) AS review_count\n  FROM ai_reviews\n  WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n  HAVING COUNT(*) > 1\n) t",
           "refId": "A"
         }
       ],
@@ -956,7 +1430,7 @@
         "h": 4,
         "w": 5,
         "x": 19,
-        "y": 15
+        "y": 33
       },
       "id": 403,
       "options": {
@@ -982,7 +1456,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_github_pull_request_reviews hrv\nJOIN (\n  SELECT\n    CAST(SUBSTRING_INDEX(ar.pull_request_id, ':', -1) AS UNSIGNED) AS pr_numeric_id,\n    MIN(ar.created_date) AS first_ai_review\n  FROM _tool_aireview_reviews ar\n  WHERE ar.repo_id IN (${repo_id:sqlstring})\n    AND ar.ai_tool IN (${ai_tool:sqlstring})\n    AND ar.body NOT LIKE '%Review skipped%'\n    AND $__timeFilter(ar.created_date)\n  GROUP BY ar.pull_request_id\n) ai ON hrv.pull_request_id = ai.pr_numeric_id\nWHERE hrv.github_submit_at > ai.first_ai_review\n  AND hrv.author_username NOT LIKE '%[bot]%'\n  AND hrv.author_username NOT IN ('coderabbitai', 'qodo-merge-pro')\n  AND hrv.state IN ('APPROVED', 'CHANGES_REQUESTED')",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_github_pull_request_reviews hrv\nJOIN (\n  SELECT\n    CAST(SUBSTRING_INDEX(ar.pull_request_id, ':', -1) AS UNSIGNED) AS pr_numeric_id,\n    MIN(ar.created_date) AS first_ai_review\n  FROM ai_reviews ar\n  WHERE ar.project_name = '${project}' AND ar.repo_id IN (${repo_id:sqlstring})\n    AND ar.ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(ar.created_date)\n  GROUP BY ar.pull_request_id\n) ai ON hrv.pull_request_id = ai.pr_numeric_id\nWHERE hrv.github_submit_at > ai.first_ai_review\n  AND hrv.author_username NOT LIKE '%[bot]%'\n  AND hrv.author_username NOT IN ('coderabbitai', 'qodo-merge-pro')\n  AND hrv.state IN ('APPROVED', 'CHANGES_REQUESTED')",
           "refId": "A"
         }
       ],
@@ -1038,7 +1512,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 37
       },
       "id": 405,
       "options": {
@@ -1069,7 +1543,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  CASE\n    WHEN review_count = 1 THEN '1 round'\n    WHEN review_count BETWEEN 2 AND 3 THEN '2\u20133 rounds'\n    WHEN review_count BETWEEN 4 AND 5 THEN '4\u20135 rounds'\n    WHEN review_count BETWEEN 6 AND 10 THEN '6\u201310 rounds'\n    ELSE '11+ rounds'\n  END AS `Review Rounds`,\n  COUNT(*) AS `PRs`\nFROM (\n  SELECT pull_request_id, COUNT(*) AS review_count\n  FROM _tool_aireview_reviews\n  WHERE repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring})\n    AND body NOT LIKE '%Review skipped%'\n    AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n) t\nGROUP BY `Review Rounds`\nORDER BY MIN(review_count)",
+          "rawSql": "SELECT\n  CASE\n    WHEN review_count = 1 THEN '1 round'\n    WHEN review_count BETWEEN 2 AND 3 THEN '2\u20133 rounds'\n    WHEN review_count BETWEEN 4 AND 5 THEN '4\u20135 rounds'\n    WHEN review_count BETWEEN 6 AND 10 THEN '6\u201310 rounds'\n    ELSE '11+ rounds'\n  END AS `Review Rounds`,\n  COUNT(*) AS `PRs`\nFROM (\n  SELECT pull_request_id, COUNT(*) AS review_count\n  FROM ai_reviews\n  WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n    AND ai_tool IN (${ai_tool:sqlstring}) AND $__timeFilter(created_date)\n  GROUP BY pull_request_id\n) t\nGROUP BY `Review Rounds`\nORDER BY MIN(review_count)",
           "refId": "A"
         }
       ],
@@ -1082,7 +1556,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 45
       },
       "id": 200,
       "panels": [],
@@ -1098,7 +1572,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 46
       },
       "id": 201,
       "options": {
@@ -1120,7 +1594,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 51
       },
       "id": 202,
       "panels": [],
@@ -1152,7 +1626,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 34
+        "y": 52
       },
       "id": 203,
       "options": {
@@ -1177,7 +1651,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score >= ${warning_threshold}\n  AND had_ci_failure = 1",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score >= ${warning_threshold}\n  AND had_ci_failure = 1",
           "refId": "A"
         }
       ],
@@ -1209,7 +1683,7 @@
         "h": 4,
         "w": 5,
         "x": 5,
-        "y": 34
+        "y": 52
       },
       "id": 204,
       "options": {
@@ -1234,7 +1708,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score >= ${warning_threshold}\n  AND had_ci_failure = 0",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score >= ${warning_threshold}\n  AND had_ci_failure = 0",
           "refId": "A"
         }
       ],
@@ -1266,7 +1740,7 @@
         "h": 4,
         "w": 5,
         "x": 10,
-        "y": 34
+        "y": 52
       },
       "id": 205,
       "options": {
@@ -1291,7 +1765,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score < ${warning_threshold}\n  AND had_ci_failure = 1",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score < ${warning_threshold}\n  AND had_ci_failure = 1",
           "refId": "A"
         }
       ],
@@ -1323,7 +1797,7 @@
         "h": 4,
         "w": 5,
         "x": 15,
-        "y": 34
+        "y": 52
       },
       "id": 206,
       "options": {
@@ -1348,7 +1822,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score < ${warning_threshold}\n  AND had_ci_failure = 0",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  AND risk_score < ${warning_threshold}\n  AND had_ci_failure = 0",
           "refId": "A"
         }
       ],
@@ -1361,7 +1835,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 56
       },
       "id": 210,
       "panels": [],
@@ -1407,7 +1881,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 39
+        "y": 57
       },
       "id": 211,
       "options": {
@@ -1431,7 +1905,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp\n  FROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(tp * 100.0 / NULLIF(tp + fp, 0), 1) AS value FROM counts",
+          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp\n  FROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(tp * 100.0 / NULLIF(tp + fp, 0), 1) AS value FROM counts",
           "refId": "A"
         }
       ],
@@ -1477,7 +1951,7 @@
         "h": 7,
         "w": 6,
         "x": 6,
-        "y": 39
+        "y": 57
       },
       "id": 212,
       "options": {
@@ -1501,7 +1975,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS fn\n  FROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(tp * 100.0 / NULLIF(tp + fn, 0), 1) AS value FROM counts",
+          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS fn\n  FROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(tp * 100.0 / NULLIF(tp + fn, 0), 1) AS value FROM counts",
           "refId": "A"
         }
       ],
@@ -1547,7 +2021,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 39
+        "y": 57
       },
       "id": 213,
       "options": {
@@ -1571,7 +2045,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS fn\n  FROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(2 * tp * 100.0 / NULLIF(2 * tp + fp + fn, 0), 1) AS value FROM counts",
+          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS fn\n  FROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(2 * tp * 100.0 / NULLIF(2 * tp + fp + fn, 0), 1) AS value FROM counts",
           "refId": "A"
         }
       ],
@@ -1617,7 +2091,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 39
+        "y": 57
       },
       "id": 214,
       "options": {
@@ -1641,7 +2115,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS tn,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp\n  FROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(tn * 100.0 / NULLIF(tn + fp, 0), 1) AS value FROM counts",
+          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS tn,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp\n  FROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(tn * 100.0 / NULLIF(tn + fp, 0), 1) AS value FROM counts",
           "refId": "A"
         }
       ],
@@ -1654,7 +2128,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 64
       },
       "id": 220,
       "panels": [],
@@ -1699,7 +2173,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 47
+        "y": 65
       },
       "id": 221,
       "options": {
@@ -1725,7 +2199,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH pr_data AS (\n  SELECT risk_score AS max_risk_score, had_ci_failure AS ci_failed\n  FROM _tool_aireview_failure_predictions\n  WHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n),\nthresholds AS (SELECT 0 AS t UNION ALL SELECT 10 UNION ALL SELECT 20 UNION ALL SELECT 50 UNION ALL SELECT 80 UNION ALL SELECT 100),\ncurve AS (\n  SELECT th.t AS threshold,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS tn\n  FROM thresholds th CROSS JOIN pr_data pd GROUP BY th.t\n),\npr_points AS (\n  SELECT threshold,\n    COALESCE(tp * 1.0 / NULLIF(tp + fp, 0), 1.0) AS prec,\n    COALESCE(tp * 1.0 / NULLIF(tp + fn, 0), 0.0) AS rec\n  FROM curve\n),\nlag_points AS (\n  SELECT threshold, prec, rec,\n    LAG(prec) OVER (ORDER BY threshold ASC) AS prev_prec,\n    LAG(rec)  OVER (ORDER BY threshold ASC) AS prev_rec\n  FROM pr_points\n)\nSELECT ROUND(SUM(CASE WHEN prev_rec IS NOT NULL AND prev_rec > rec\n  THEN (prev_rec - rec) * (prec + prev_prec) / 2 ELSE 0 END), 3) AS value\nFROM lag_points",
+          "rawSql": "WITH pr_data AS (\n  SELECT risk_score AS max_risk_score, had_ci_failure AS ci_failed\n  FROM ai_failure_predictions\n  WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n),\nthresholds AS (SELECT 0 AS t UNION ALL SELECT 10 UNION ALL SELECT 20 UNION ALL SELECT 50 UNION ALL SELECT 80 UNION ALL SELECT 100),\ncurve AS (\n  SELECT th.t AS threshold,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS tn\n  FROM thresholds th CROSS JOIN pr_data pd GROUP BY th.t\n),\npr_points AS (\n  SELECT threshold,\n    COALESCE(tp * 1.0 / NULLIF(tp + fp, 0), 1.0) AS prec,\n    COALESCE(tp * 1.0 / NULLIF(tp + fn, 0), 0.0) AS rec\n  FROM curve\n),\nlag_points AS (\n  SELECT threshold, prec, rec,\n    LAG(prec) OVER (ORDER BY threshold ASC) AS prev_prec,\n    LAG(rec)  OVER (ORDER BY threshold ASC) AS prev_rec\n  FROM pr_points\n)\nSELECT ROUND(SUM(CASE WHEN prev_rec IS NOT NULL AND prev_rec > rec\n  THEN (prev_rec - rec) * (prec + prev_prec) / 2 ELSE 0 END), 3) AS value\nFROM lag_points",
           "refId": "A"
         }
       ],
@@ -1770,7 +2244,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 47
+        "y": 65
       },
       "id": 222,
       "options": {
@@ -1796,7 +2270,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH pr_data AS (\n  SELECT risk_score AS max_risk_score, had_ci_failure AS ci_failed\n  FROM _tool_aireview_failure_predictions\n  WHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n),\nthresholds AS (SELECT 0 AS t UNION ALL SELECT 10 UNION ALL SELECT 20 UNION ALL SELECT 50 UNION ALL SELECT 80 UNION ALL SELECT 100),\ncurve AS (\n  SELECT th.t AS threshold,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS tn\n  FROM thresholds th CROSS JOIN pr_data pd GROUP BY th.t\n),\nroc_points AS (\n  SELECT threshold,\n    COALESCE(fp * 1.0 / NULLIF(fp + tn, 0), 0.0) AS fpr,\n    COALESCE(tp * 1.0 / NULLIF(tp + fn, 0), 0.0) AS tpr\n  FROM curve\n),\nlag_points AS (\n  SELECT threshold, fpr, tpr,\n    LAG(fpr) OVER (ORDER BY threshold DESC) AS prev_fpr,\n    LAG(tpr) OVER (ORDER BY threshold DESC) AS prev_tpr\n  FROM roc_points\n)\nSELECT ROUND(SUM(CASE WHEN prev_fpr IS NOT NULL AND fpr > prev_fpr\n  THEN (fpr - prev_fpr) * (tpr + prev_tpr) / 2 ELSE 0 END), 3) AS value\nFROM lag_points",
+          "rawSql": "WITH pr_data AS (\n  SELECT risk_score AS max_risk_score, had_ci_failure AS ci_failed\n  FROM ai_failure_predictions\n  WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n),\nthresholds AS (SELECT 0 AS t UNION ALL SELECT 10 UNION ALL SELECT 20 UNION ALL SELECT 50 UNION ALL SELECT 80 UNION ALL SELECT 100),\ncurve AS (\n  SELECT th.t AS threshold,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN pd.max_risk_score >= th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN pd.max_risk_score <  th.t AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS tn\n  FROM thresholds th CROSS JOIN pr_data pd GROUP BY th.t\n),\nroc_points AS (\n  SELECT threshold,\n    COALESCE(fp * 1.0 / NULLIF(fp + tn, 0), 0.0) AS fpr,\n    COALESCE(tp * 1.0 / NULLIF(tp + fn, 0), 0.0) AS tpr\n  FROM curve\n),\nlag_points AS (\n  SELECT threshold, fpr, tpr,\n    LAG(fpr) OVER (ORDER BY threshold DESC) AS prev_fpr,\n    LAG(tpr) OVER (ORDER BY threshold DESC) AS prev_tpr\n  FROM roc_points\n)\nSELECT ROUND(SUM(CASE WHEN prev_fpr IS NOT NULL AND fpr > prev_fpr\n  THEN (fpr - prev_fpr) * (tpr + prev_tpr) / 2 ELSE 0 END), 3) AS value\nFROM lag_points",
           "refId": "A"
         }
       ],
@@ -1842,7 +2316,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 47
+        "y": 65
       },
       "id": 223,
       "options": {
@@ -1868,7 +2342,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS tn\n  FROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(fp * 100.0 / NULLIF(fp + tn, 0), 1) AS value FROM counts",
+          "rawSql": "WITH counts AS (\n  SELECT\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS tn\n  FROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n)\nSELECT ROUND(fp * 100.0 / NULLIF(fp + tn, 0), 1) AS value FROM counts",
           "refId": "A"
         }
       ],
@@ -1881,7 +2355,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 71
       },
       "id": 240,
       "panels": [],
@@ -2035,7 +2509,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 72
       },
       "id": 241,
       "options": {
@@ -2062,7 +2536,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    repo_id,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS tn\n  FROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  GROUP BY repo_id\n)\nSELECT\n  COALESCE(r.name, c.repo_id) AS Repository,\n  c.tp + c.fp + c.fn + c.tn AS `PRs with CI`,\n  c.tp AS `AI Warned \u2192 Failed (TP)`,\n  c.fp AS `AI Warned \u2192 Passed (FP)`,\n  c.fn AS `AI Missed \u2192 Failed (FN)`,\n  c.tn AS `AI OK \u2192 Passed (TN)`,\n  ROUND(100.0 * c.tp / NULLIF(c.tp + c.fp, 0), 1) AS `Precision %`,\n  ROUND(100.0 * c.tp / NULLIF(c.tp + c.fn, 0), 1) AS `Recall %`,\n  ROUND(100.0 * 2 * c.tp / NULLIF(2 * c.tp + c.fp + c.fn, 0), 1) AS `F1 %`\nFROM counts c\nLEFT JOIN repos r ON c.repo_id = r.id\nHAVING c.tp + c.fp + c.fn + c.tn > 0\nORDER BY `PRs with CI` DESC",
+          "rawSql": "WITH counts AS (\n  SELECT\n    repo_id,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN risk_score >= ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN risk_score < ${warning_threshold} AND had_ci_failure = 0 THEN 1 ELSE 0 END) AS tn\n  FROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n  GROUP BY repo_id\n)\nSELECT\n  COALESCE(r.name, c.repo_id) AS Repository,\n  c.tp + c.fp + c.fn + c.tn AS `PRs with CI`,\n  c.tp AS `AI Warned \u2192 Failed (TP)`,\n  c.fp AS `AI Warned \u2192 Passed (FP)`,\n  c.fn AS `AI Missed \u2192 Failed (FN)`,\n  c.tn AS `AI OK \u2192 Passed (TN)`,\n  ROUND(100.0 * c.tp / NULLIF(c.tp + c.fp, 0), 1) AS `Precision %`,\n  ROUND(100.0 * c.tp / NULLIF(c.tp + c.fn, 0), 1) AS `Recall %`,\n  ROUND(100.0 * 2 * c.tp / NULLIF(2 * c.tp + c.fp + c.fn, 0), 1) AS `F1 %`\nFROM counts c\nLEFT JOIN repos r ON c.repo_id = r.id\nHAVING c.tp + c.fp + c.fn + c.tn > 0\nORDER BY `PRs with CI` DESC",
           "refId": "A"
         }
       ],
@@ -2075,7 +2549,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 82
       },
       "id": 230,
       "panels": [],
@@ -2091,7 +2565,7 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 83
       },
       "id": 231,
       "options": {
@@ -2368,7 +2842,7 @@
         "h": 14,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 87
       },
       "id": 232,
       "options": {
@@ -2394,7 +2868,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "WITH pr_data AS (\n  SELECT risk_score AS max_risk_score, had_ci_failure AS ci_failed\n  FROM _tool_aireview_failure_predictions\n  WHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n),\nlevels AS (\n  SELECT 'High only'        AS label, 80 AS min_score, 1 AS sort_order UNION ALL\n  SELECT 'Medium or higher',           50,              2               UNION ALL\n  SELECT 'Any risk (Low+)',            10,              3\n),\ncurve AS (\n  SELECT l.label, l.sort_order,\n    SUM(CASE WHEN pd.max_risk_score >= l.min_score AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN pd.max_risk_score >= l.min_score AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN pd.max_risk_score <  l.min_score AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN pd.max_risk_score <  l.min_score AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS tn\n  FROM levels l CROSS JOIN pr_data pd\n  GROUP BY l.label, l.sort_order, l.min_score\n)\nSELECT\n  label                                                                         AS `Flag as Risky When`,\n  tp                                                                            AS `AI Warned \u2192 Failed (TP)`,\n  fp                                                                            AS `AI Warned \u2192 Passed (FP)`,\n  fn                                                                            AS `AI Missed \u2192 Failed (FN)`,\n  tn                                                                            AS `AI OK \u2192 Passed (TN)`,\n  ROUND(tp * 100.0 / NULLIF(tp + fp, 0), 1)                                    AS `Precision %`,\n  ROUND(tp * 100.0 / NULLIF(tp + fn, 0), 1)                                    AS `Recall %`,\n  ROUND(2 * tp * 100.0 / NULLIF(2 * tp + fp + fn, 0), 1)                      AS `F1 %`,\n  ROUND(tn * 100.0 / NULLIF(tn + fp, 0), 1)                                    AS `Specificity %`\nFROM curve\nORDER BY sort_order",
+          "rawSql": "WITH pr_data AS (\n  SELECT risk_score AS max_risk_score, had_ci_failure AS ci_failed\n  FROM ai_failure_predictions\n  WHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND prediction_outcome != ''\n  AND ci_failure_source = '${ci_failure_source}'\n  AND $__timeFilter(flagged_at)\n),\nlevels AS (\n  SELECT 'High only'        AS label, 80 AS min_score, 1 AS sort_order UNION ALL\n  SELECT 'Medium or higher',           50,              2               UNION ALL\n  SELECT 'Any risk (Low+)',            10,              3\n),\ncurve AS (\n  SELECT l.label, l.sort_order,\n    SUM(CASE WHEN pd.max_risk_score >= l.min_score AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS tp,\n    SUM(CASE WHEN pd.max_risk_score >= l.min_score AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS fp,\n    SUM(CASE WHEN pd.max_risk_score <  l.min_score AND pd.ci_failed = 1 THEN 1 ELSE 0 END) AS fn,\n    SUM(CASE WHEN pd.max_risk_score <  l.min_score AND pd.ci_failed = 0 THEN 1 ELSE 0 END) AS tn\n  FROM levels l CROSS JOIN pr_data pd\n  GROUP BY l.label, l.sort_order, l.min_score\n)\nSELECT\n  label                                                                         AS `Flag as Risky When`,\n  tp                                                                            AS `AI Warned \u2192 Failed (TP)`,\n  fp                                                                            AS `AI Warned \u2192 Passed (FP)`,\n  fn                                                                            AS `AI Missed \u2192 Failed (FN)`,\n  tn                                                                            AS `AI OK \u2192 Passed (TN)`,\n  ROUND(tp * 100.0 / NULLIF(tp + fp, 0), 1)                                    AS `Precision %`,\n  ROUND(tp * 100.0 / NULLIF(tp + fn, 0), 1)                                    AS `Recall %`,\n  ROUND(2 * tp * 100.0 / NULLIF(2 * tp + fp + fn, 0), 1)                      AS `F1 %`,\n  ROUND(tn * 100.0 / NULLIF(tn + fp, 0), 1)                                    AS `Specificity %`\nFROM curve\nORDER BY sort_order",
           "refId": "A"
         }
       ],
@@ -2407,7 +2881,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 83
+        "y": 101
       },
       "id": 500,
       "title": "PR Drill-down \u2014 Individual Pull Requests",
@@ -2438,7 +2912,7 @@
         "h": 4,
         "w": 4,
         "x": 20,
-        "y": 34
+        "y": 52
       },
       "id": 501,
       "options": {
@@ -2460,7 +2934,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT COUNT(*) AS value\nFROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND $__timeFilter(flagged_at)\n  AND prediction_outcome = 'NO_CI'",
+          "rawSql": "SELECT COUNT(*) AS value\nFROM ai_failure_predictions\nWHERE project_name = '${project}' AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND $__timeFilter(flagged_at)\n  AND prediction_outcome = 'NO_CI'",
           "refId": "A"
         }
       ],
@@ -2719,7 +3193,7 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 88
+        "y": 106
       },
       "id": 502,
       "options": {
@@ -2745,7 +3219,7 @@
         {
           "datasource": "mysql",
           "format": "table",
-          "rawSql": "SELECT\n  pull_request_key AS `PR #`,\n  pr_title AS `Title`,\n  repo_name AS `Repository`,\n  pr_author AS `Author`,\n  risk_score AS `Risk Score`,\n  CASE WHEN was_flagged_risky THEN 'Yes' ELSE 'No' END AS `AI Flagged`,\n  CASE WHEN had_ci_failure THEN 'Yes' ELSE 'No' END AS `CI Failed`,\n  prediction_outcome AS `Outcome`,\n  ci_failure_source AS `CI Source`,\n  flagged_at AS `Reviewed At`,\n  CONCAT(additions, '+/', deletions, '-') AS `Size`,\n  pr_url AS `URL`\nFROM _tool_aireview_failure_predictions\nWHERE repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND $__timeFilter(flagged_at)\n  AND ('${outcome_filter}' = 'All' OR prediction_outcome = '${outcome_filter}')\n  AND (ci_failure_source = '${ci_failure_source}' OR prediction_outcome = 'NO_CI')\nORDER BY flagged_at DESC\nLIMIT 500",
+          "rawSql": "SELECT\n  pull_request_key AS `PR #`,\n  pr_title AS `Title`,\n  repo_name AS `Repository`,\n  pr_author AS `Author`,\n  MAX(risk_score) AS `Risk Score`,\n  CASE WHEN MAX(was_flagged_risky) THEN 'Yes' ELSE 'No' END AS `AI Flagged`,\n  CASE WHEN MAX(had_ci_failure) THEN 'Yes' ELSE 'No' END AS `CI Failed`,\n  CASE\n    WHEN MAX(was_flagged_risky) = 1 AND MAX(had_ci_failure) = 1 THEN 'TP'\n    WHEN MAX(was_flagged_risky) = 1 AND MAX(had_ci_failure) = 0 AND ci_failure_source != 'none' THEN 'FP'\n    WHEN MAX(was_flagged_risky) = 0 AND MAX(had_ci_failure) = 1 THEN 'FN'\n    WHEN MAX(was_flagged_risky) = 0 AND MAX(had_ci_failure) = 0 AND ci_failure_source != 'none' THEN 'TN'\n    ELSE 'NO_CI'\n  END AS `Outcome`,\n  ci_failure_source AS `CI Source`,\n  GROUP_CONCAT(DISTINCT ai_tool ORDER BY ai_tool SEPARATOR ', ') AS `AI Tools`,\n  MAX(flagged_at) AS `Reviewed At`,\n  CONCAT(MAX(additions), '+/', MAX(deletions), '-') AS `Size`,\n  pr_url AS `URL`\nFROM ai_failure_predictions\nWHERE project_name = '${project}'\n  AND repo_id IN (${repo_id:sqlstring})\n  AND ai_tool IN (${ai_tool:sqlstring})\n  AND $__timeFilter(flagged_at)\n  AND (ci_failure_source = '${ci_failure_source}' OR prediction_outcome = 'NO_CI')\nGROUP BY pull_request_id, pull_request_key, repo_name, pr_title, pr_author, pr_url, ci_failure_source\nHAVING '${outcome_filter}' = 'All'\n  OR (CASE\n    WHEN MAX(was_flagged_risky) = 1 AND MAX(had_ci_failure) = 1 THEN 'TP'\n    WHEN MAX(was_flagged_risky) = 1 AND MAX(had_ci_failure) = 0 AND ci_failure_source != 'none' THEN 'FP'\n    WHEN MAX(was_flagged_risky) = 0 AND MAX(had_ci_failure) = 1 THEN 'FN'\n    WHEN MAX(was_flagged_risky) = 0 AND MAX(had_ci_failure) = 0 AND ci_failure_source != 'none' THEN 'TN'\n    ELSE 'NO_CI'\n  END) = '${outcome_filter}'\nORDER BY `Reviewed At` DESC\nLIMIT 500",
           "refId": "A"
         }
       ],
@@ -2767,18 +3241,32 @@
   "templating": {
     "list": [
       {
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT project_name FROM ai_failure_predictions ORDER BY project_name",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Project",
+        "multi": false,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT project_name FROM ai_failure_predictions ORDER BY project_name",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "current": {
           "text": "All",
           "value": "$__all"
         },
         "datasource": "mysql",
-        "definition": "SELECT r.name AS __text, ar.repo_id AS __value FROM _tool_aireview_reviews ar JOIN repos r ON ar.repo_id = r.id GROUP BY ar.repo_id, r.name ORDER BY r.name",
+        "definition": "SELECT r.name AS __text, ar.repo_id AS __value FROM ai_reviews ar JOIN repos r ON ar.repo_id = r.id WHERE ar.project_name = '${project}' GROUP BY ar.repo_id, r.name ORDER BY r.name",
         "includeAll": true,
         "label": "Repository",
         "multi": true,
         "name": "repo_id",
         "options": [],
-        "query": "SELECT r.name AS __text, ar.repo_id AS __value FROM _tool_aireview_reviews ar JOIN repos r ON ar.repo_id = r.id GROUP BY ar.repo_id, r.name ORDER BY r.name",
+        "query": "SELECT r.name AS __text, ar.repo_id AS __value FROM ai_reviews ar JOIN repos r ON ar.repo_id = r.id WHERE ar.project_name = '${project}' GROUP BY ar.repo_id, r.name ORDER BY r.name",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -2789,13 +3277,13 @@
           "value": "$__all"
         },
         "datasource": "mysql",
-        "definition": "SELECT DISTINCT ai_tool FROM _tool_aireview_reviews ORDER BY ai_tool",
+        "definition": "SELECT DISTINCT ai_tool FROM ai_reviews WHERE project_name = '${project}' ORDER BY ai_tool",
         "includeAll": true,
         "label": "AI Tool",
         "multi": true,
         "name": "ai_tool",
         "options": [],
-        "query": "SELECT DISTINCT ai_tool FROM _tool_aireview_reviews ORDER BY ai_tool",
+        "query": "SELECT DISTINCT ai_tool FROM ai_reviews WHERE project_name = '${project}' ORDER BY ai_tool",
         "refresh": 1,
         "regex": "",
         "sort": 1,

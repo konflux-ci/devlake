@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -40,7 +39,7 @@ func CollectFlags(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 
 	// Extract owner and repo from FullName (format: "owner/repo")
-	owner, repo, err := parseFullName(data.Options.FullName)
+	owner, repo, err := ParseFullName(data.Options.FullName)
 	if err != nil {
 		return err
 	}
@@ -76,11 +75,3 @@ func CollectFlags(taskCtx plugin.SubTaskContext) errors.Error {
 	return collector.Execute()
 }
 
-func parseFullName(fullName string) (owner, repo string, err errors.Error) {
-	// FullName format: "owner/repo"
-	parts := strings.Split(fullName, "/")
-	if len(parts) != 2 {
-		return "", "", errors.BadInput.New("invalid fullName format, expected 'owner/repo'")
-	}
-	return parts[0], parts[1], nil
-}

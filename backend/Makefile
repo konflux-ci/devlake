@@ -84,6 +84,7 @@ debug: build-plugin-debug
 	dlv debug server/main.go
 
 mock:
+	@which mockery > /dev/null 2>&1 || (echo "mockery not found. Run: make go-dep" && exit 1)
 	rm -rf mocks
 	mockery --recursive --keeptree --dir=./core --output=./mocks/core --unroll-variadic=false --name='.*'
 	mockery --recursive --keeptree --dir=./helpers --output=./mocks/helpers --unroll-variadic=false --name='.*'

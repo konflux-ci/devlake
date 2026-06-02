@@ -10,6 +10,9 @@
     "lint": "tsc && eslint . --fix",
     "prettier": "prettier . --write",
     "lint-staged": "lint-staged",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prepare": "cd .. && husky install config-ui/.husky"
   },
   "lint-staged": {
@@ -49,6 +52,8 @@
     "styled-components": "^6.1.8"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/file-saver": "^2.0.5",
     "@types/node": "^18.19.20",
     "@types/react": "^18.2.56",
@@ -58,17 +63,20 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/styled-components": "^5.1.34",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^2.0.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^8.10.0",
     "eslint-config-react-app": "^7.0.1",
     "eslint-plugin-header": "^3.1.1",
     "eslint-plugin-prettier": "^4.2.1",
     "husky": "^8.0.0",
+    "jsdom": "^24.0.0",
     "lint-staged": "^13.1.0",
     "prettier": "^2.7.1",
     "typescript": "^5.1.6",
     "vite": "^5.1.4",
-    "vite-plugin-svgr": "^4.2.0"
+    "vite-plugin-svgr": "^4.2.0",
+    "vitest": "^2.0.0"
   },
   "volta": {
     "node": "18.20.8",

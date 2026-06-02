@@ -118,11 +118,9 @@ func listCodecovRemoteScopes(
 		fullName := fmt.Sprintf("%s/%s", owner, repoName)
 		codecovId := fmt.Sprintf("%s/%s", owner, repoName)
 
-		// Determine branch - only include repos with main or master branch
 		branch := repo.Branch
-		if branch != "main" && branch != "master" {
-			// Skip repos that don't have main or master branch
-			continue
+		if branch == "" {
+			branch = "main"
 		}
 
 		children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo]{

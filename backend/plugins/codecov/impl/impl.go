@@ -18,6 +18,8 @@ limitations under the License.
 package impl
 
 import (
+	"fmt"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -198,6 +200,50 @@ func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 	if err != nil {
 		taskCtx.GetLogger().Warn(err, "unable to load CodecovRepo scope for %s, branch will default to 'main'", op.FullName)
 		repo = nil
+	}
+
+	// Auto-detect the default branch from the Codecov API
+	owner, repoName, parseErr := tasks.ParseFullName(op.FullName)
+	if parseErr != nil {
+		taskCtx.GetLogger().Warn(parseErr, "[Codecov] Failed to parse fullName '%s', branch detection skipped", op.FullName)
+	} else {
+		repoUrl := fmt.Sprintf("/api/v2/github/%s/repos/%s/", owner, repoName)
+		res, apiErr := apiClient.Get(repoUrl, nil, nil)
+		if apiErr != nil {
+			taskCtx.GetLogger().Warn(apiErr, "[Codecov] Failed to fetch repo detail for %s, using stored branch", op.FullName)
+		} else if res.StatusCode != 200 {
+			taskCtx.GetLogger().Warn(nil, "[Codecov] Repo detail API returned status %d for %s, using stored branch", res.StatusCode, op.FullName)
+		} else {
+			var repoDetail struct {
+				Branch string `json:"branch"`
+			}
+			if unmarshalErr := helper.UnmarshalResponse(res, &repoDetail); unmarshalErr != nil {
+				taskCtx.GetLogger().Warn(unmarshalErr, "[Codecov] Failed to parse repo detail response for %s", op.FullName)
+			} else if repoDetail.Branch != "" {
+				if repo != nil && repo.Branch != repoDetail.Branch {
+					taskCtx.GetLogger().Info("[Codecov] Default branch updated: %s -> %s for %s", repo.Branch, repoDetail.Branch, op.FullName)
+					repo.Branch = repoDetail.Branch
+					if updateErr := db.Update(repo); updateErr != nil {
+						taskCtx.GetLogger().Warn(updateErr, "[Codecov] Failed to persist branch update for %s", op.FullName)
+					}
+				} else if repo != nil && repo.Branch == "" {
+					repo.Branch = repoDetail.Branch
+					if updateErr := db.Update(repo); updateErr != nil {
+						taskCtx.GetLogger().Warn(updateErr, "[Codecov] Failed to persist branch update for %s", op.FullName)
+					}
+				} else if repo == nil {
+					// Scope record not found in DB but API returned branch info;
+					// create a minimal in-memory repo so collectors can use the detected branch
+					repo = &models.CodecovRepo{
+						CodecovId: op.FullName,
+						FullName:  op.FullName,
+						Name:      repoName,
+						Branch:    repoDetail.Branch,
+					}
+					taskCtx.GetLogger().Info("[Codecov] No scope record found, using API-detected branch '%s' for %s", repoDetail.Branch, op.FullName)
+				}
+			}
+		}
 	}
 
 	return &tasks.CodecovTaskData{

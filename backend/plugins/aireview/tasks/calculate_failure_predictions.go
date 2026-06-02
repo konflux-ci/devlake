@@ -86,13 +86,20 @@ func CalculateFailurePredictions(taskCtx plugin.SubTaskContext) errors.Error {
 		ciFailureSource = models.CiSourceJobResult
 	}
 
+	excludeFlakyTests := data.Options.ScopeConfig.ExcludeFlakyTests
+	excludeInfraFailures := data.Options.ScopeConfig.ExcludeInfraFailures
+
 	sources := []string{ciFailureSource}
 	if ciFailureSource == models.CiSourceBoth {
 		sources = []string{models.CiSourceTestCases, models.CiSourceJobResult}
 	}
 
-	logger.Info("Calculating failure predictions for repo %s (warning_threshold=%d, ci_source=%s)",
-		data.Options.RepoId, warningThreshold, ciFailureSource)
+	logger.Info("Calculating failure predictions for repo %s (warning_threshold=%d, ci_source=%s, exclude_flaky=%v, exclude_infra=%v)",
+		data.Options.RepoId, warningThreshold, ciFailureSource, excludeFlakyTests, excludeInfraFailures)
+
+	if excludeInfraFailures && ciFailureSource == models.CiSourceJobResult {
+		logger.Info("Warning: excludeInfraFailures requires ci_test_cases to be populated. If test case data is not collected, all job failures will be treated as infrastructure failures and excluded.")
+	}
 
 	// Load AI-reviewed PR summaries (same for all sources).
 	prSummaries, err := loadAiReviewPrSummaries(db, data.Options.RepoId, data.Options.ProjectName)
@@ -107,28 +114,32 @@ func CalculateFailurePredictions(taskCtx plugin.SubTaskContext) errors.Error {
 
 	repoShortNames := uniqueRepoShortNames(prSummaries)
 
-	// Pre-build flaky sets for whichever sources are needed.
+	// Pre-build flaky sets only when the exclude_flaky_tests flag is enabled.
 	var flakyTests map[prCiKey]bool
 	var flakyJobs map[string]bool
-	for _, source := range sources {
-		switch source {
-		case models.CiSourceTestCases:
-			if flakyTests == nil {
-				flakyTests, err = buildFlakyTestSet(db)
-				if err != nil {
-					return err
+	if excludeFlakyTests {
+		for _, source := range sources {
+			switch source {
+			case models.CiSourceTestCases:
+				if flakyTests == nil {
+					flakyTests, err = buildFlakyTestSet(db)
+					if err != nil {
+						return err
+					}
+					logger.Info("Loaded %d flaky test entries", len(flakyTests))
 				}
-				logger.Info("Loaded %d flaky test entries", len(flakyTests))
-			}
-		case models.CiSourceJobResult:
-			if flakyJobs == nil {
-				flakyJobs, err = buildFlakyJobSet(db)
-				if err != nil {
-					return err
+			case models.CiSourceJobResult:
+				if flakyJobs == nil {
+					flakyJobs, err = buildFlakyJobSet(db)
+					if err != nil {
+						return err
+					}
+					logger.Info("Loaded %d flaky job entries", len(flakyJobs))
 				}
-				logger.Info("Loaded %d flaky job entries", len(flakyJobs))
 			}
 		}
+	} else {
+		logger.Info("Flaky test/job filtering is disabled")
 	}
 
 	now := time.Now()
@@ -144,7 +155,7 @@ func CalculateFailurePredictions(taskCtx plugin.SubTaskContext) errors.Error {
 		case models.CiSourceTestCases:
 			ciOutcomes, err = loadCiOutcomesByTestCases(db, repoShortNames, flakyTests)
 		case models.CiSourceJobResult:
-			ciOutcomes, err = loadCiOutcomesByJobResult(db, repoShortNames, flakyJobs)
+			ciOutcomes, err = loadCiOutcomesByJobResult(db, repoShortNames, flakyJobs, excludeInfraFailures)
 		}
 		if err != nil {
 			return err
@@ -445,26 +456,40 @@ func loadCiOutcomesByTestCases(db dal.Dal, repoShortNames []string, flakyTests m
 type ciJobRow struct {
 	PullRequestNumber int64  `gorm:"column:pull_request_number"`
 	Repository        string `gorm:"column:repository"`
+	JobId             string `gorm:"column:job_id"`
 	JobName           string `gorm:"column:job_name"`
 	Result            string `gorm:"column:result"`
 }
 
 // loadCiOutcomesByJobResult queries ci_test_jobs.result for PR-triggered jobs
 // and returns a map indicating whether each PR had a non-flaky job-level failure.
-// Works without ci_test_cases being populated.
-func loadCiOutcomesByJobResult(db dal.Dal, repoShortNames []string, flakyJobs map[string]bool) (map[prCiKey]ciOutcomeEntry, errors.Error) {
+// When excludeInfraFailures is true, individual job runs that failed but have no
+// failed test cases are considered infrastructure failures and excluded.
+// Works without ci_test_cases being populated (unless excludeInfraFailures is enabled).
+func loadCiOutcomesByJobResult(db dal.Dal, repoShortNames []string, flakyJobs map[string]bool, excludeInfraFailures bool) (map[prCiKey]ciOutcomeEntry, errors.Error) {
 	if len(repoShortNames) == 0 {
 		return map[prCiKey]ciOutcomeEntry{}, nil
 	}
 
 	var rows []ciJobRow
 	err := db.All(&rows,
-		dal.Select("pull_request_number, repository, job_name, result"),
+		dal.Select("pull_request_number, repository, job_id, job_name, result"),
 		dal.From("ci_test_jobs"),
 		dal.Where("trigger_type = 'pull_request' AND pull_request_number > 0 AND repository IN ? AND finished_at >= ?", repoShortNames, time.Now().AddDate(0, -3, 0)),
 	)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "failed to load CI job outcomes")
+	}
+
+	// When infra filtering is enabled, pre-load individual job run IDs that have
+	// at least one failed test case. This allows us to distinguish infra failures
+	// (job failed but no tests failed) from real test failures on a per-run basis.
+	var jobRunsWithTestFailures map[string]bool
+	if excludeInfraFailures {
+		jobRunsWithTestFailures, err = buildJobRunsWithTestFailures(db, repoShortNames)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	outcomes := make(map[prCiKey]ciOutcomeEntry)
@@ -484,11 +509,41 @@ func loadCiOutcomesByJobResult(db dal.Dal, repoShortNames []string, flakyJobs ma
 		if flakyJobs[flakyKey] {
 			continue
 		}
+		// Check if this specific job run is an infrastructure failure
+		// (failed but no test cases actually failed in this run).
+		if excludeInfraFailures && !jobRunsWithTestFailures[r.JobId] {
+			continue
+		}
 		entry := outcomes[key]
 		entry.HadNonFlakyFailure = true
 		outcomes[key] = entry
 	}
 	return outcomes, nil
+}
+
+// buildJobRunsWithTestFailures returns a set of job_id values for PR-triggered
+// CI job runs that have at least one failed test case. Used to identify individual
+// infrastructure failures — a specific job run that failed but had no test failures.
+func buildJobRunsWithTestFailures(db dal.Dal, repoShortNames []string) (map[string]bool, errors.Error) {
+	var rows []struct {
+		JobId string `gorm:"column:job_id"`
+	}
+
+	err := db.All(&rows,
+		dal.Select("DISTINCT j.job_id"),
+		dal.From("ci_test_jobs j"),
+		dal.Join("JOIN ci_test_cases tc ON j.connection_id = tc.connection_id AND j.job_id = tc.job_id"),
+		dal.Where("j.trigger_type = 'pull_request' AND j.pull_request_number > 0 AND j.repository IN ? AND tc.status = 'failed' AND j.finished_at >= ?", repoShortNames, time.Now().AddDate(0, -3, 0)),
+	)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to build job runs with test failures set")
+	}
+
+	result := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		result[r.JobId] = true
+	}
+	return result, nil
 }
 
 // uniqueRepoShortNames returns the distinct repo short names from the summaries.

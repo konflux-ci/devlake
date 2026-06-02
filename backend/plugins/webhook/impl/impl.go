@@ -96,6 +96,9 @@ func (p Webhook) ApiResources() map[string]map[string]plugin.ApiResourceHandler 
 		"connections/:connectionId/issues": {
 			"POST": api.PostIssue,
 		},
+		"connections/:connectionId/test_results": {
+			"POST": api.PostTestResults,
+		},
 		"connections/:connectionId/issue/:issueKey/close": {
 			"POST": api.CloseIssue,
 		},
@@ -107,6 +110,9 @@ func (p Webhook) ApiResources() map[string]map[string]plugin.ApiResourceHandler 
 		},
 		":connectionId/issues": {
 			"POST": api.PostIssue,
+		},
+		":connectionId/test_results": {
+			"POST": api.PostTestResults,
 		},
 		":connectionId/issue/:issueKey/close": {
 			"POST": api.CloseIssue,
@@ -124,6 +130,9 @@ func (p Webhook) ApiResources() map[string]map[string]plugin.ApiResourceHandler 
 		},
 		"connections/by-name/:connectionName/issues": {
 			"POST": api.PostIssueByName,
+		},
+		"connections/by-name/:connectionName/test_results": {
+			"POST": api.PostTestResultsByName,
 		},
 		"connections/by-name/:connectionName/issue/:issueKey/close": {
 			"POST": api.CloseIssueByName,

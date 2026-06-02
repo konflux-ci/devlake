@@ -58,7 +58,16 @@ type AiReviewFinding struct {
 	// Code context
 	CodeSnippet       string `gorm:"type:text"` // Original code
 	SuggestedCode     string `gorm:"type:text"` // Suggested fix
-	SuggestionApplied bool   // Whether the suggestion was applied
+	SuggestionApplied bool   // Whether the suggestion was applied (marker-based)
+
+	// Diff-based suggestion matching
+	SuggestionDiffMatched   bool    // Whether diff-based matching found a match
+	SuggestionMatchMethod   string  `gorm:"type:varchar(50)"`  // marker, diff_commit_msg, diff_file_temporal, diff_line_pct, or ""
+	SuggestionMatchScore    float64 // 0.0-100.0 percentage of non-trivial suggested lines found in the commit diff
+	SuggestionLinesMatched  int     // Number of non-trivial suggested lines found in commit diff
+	SuggestionLinesTotal    int     // Total non-trivial lines in the suggestion
+	MatchedCommitSha        string  `gorm:"type:varchar(40)"`  // Commit SHA that applied the suggestion
+	MatchedFilePath         string  `gorm:"type:varchar(500)"` // File path resolved from raw data
 
 	// Resolution tracking
 	IsResolved   bool

@@ -55,7 +55,7 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 
 	// Extract owner and repo from FullName
-	owner, repo, err := parseFullName(data.Options.FullName)
+	owner, repo, err := ParseFullName(data.Options.FullName)
 	if err != nil {
 		return err
 	}
