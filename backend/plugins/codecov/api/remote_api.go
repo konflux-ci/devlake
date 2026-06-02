@@ -94,10 +94,12 @@ func listCodecovRemoteScopes(
 	}
 
 	if reposBody.StatusCode == http.StatusNotFound {
+		_ = reposBody.Body.Close()
 		return nil, nil, errors.HttpStatus(http.StatusNotFound).New(fmt.Sprintf("Organization or owner '%s' not found", owner))
 	}
 
 	if reposBody.StatusCode != http.StatusOK {
+		_ = reposBody.Body.Close()
 		return nil, nil, errors.HttpStatus(reposBody.StatusCode).New("unexpected status code while fetching repositories")
 	}
 
@@ -234,9 +236,11 @@ func SearchRemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutp
 	}
 
 	if res.StatusCode == http.StatusNotFound {
+		_ = res.Body.Close()
 		return nil, errors.HttpStatus(http.StatusNotFound).New(fmt.Sprintf("organization '%s' not found", owner))
 	}
 	if res.StatusCode != http.StatusOK {
+		_ = res.Body.Close()
 		return nil, errors.HttpStatus(res.StatusCode).New("unexpected status code while searching repositories")
 	}
 
