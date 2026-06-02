@@ -28,13 +28,23 @@ func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to discover repos for metrics calculation")
 	}
-	if len(repos) == 0 {
-		logger.Info("No repos found for metrics calculation, skipping")
-		return nil
-	}
 	repoIds := make([]string, 0, len(repos))
 	for _, r := range repos {
 		repoIds = append(repoIds, r.DomainRepoId)
+	}
+
+	if config := data.Options.ScopeConfig; config != nil && config.SubmissionsRepo != "" {
+		submissionIds, subErr := discoverSubmissionRepoIds(db, config.SubmissionsConnectionId)
+		if subErr != nil {
+			logger.Warn(nil, "Failed to discover submission repo IDs: %v", subErr)
+		} else {
+			repoIds = append(repoIds, submissionIds...)
+		}
+	}
+
+	if len(repoIds) == 0 {
+		logger.Info("No repos found for metrics calculation, skipping")
+		return nil
 	}
 	var assessments []models.AgentReadyAssessment
 	clauses := []dal.Clause{
