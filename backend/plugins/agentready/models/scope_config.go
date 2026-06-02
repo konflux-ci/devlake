@@ -9,7 +9,8 @@ type AgentReadyScopeConfig struct {
 
 	Branch             string `mapstructure:"branch" json:"branch" gorm:"type:varchar(255)"`
 	AssessmentFilePath string `mapstructure:"assessmentFilePath" json:"assessmentFilePath" gorm:"type:varchar(500)"`
-	ExcludeRepos            string `mapstructure:"excludeRepos" json:"excludeRepos" gorm:"type:text"`
+	ExcludeRepos string `mapstructure:"excludeRepos" json:"excludeRepos" gorm:"type:text"`
+
 	SubmissionsRepo         string `mapstructure:"submissionsRepo" json:"submissionsRepo" gorm:"type:varchar(500)"`
 	SubmissionsPath         string `mapstructure:"submissionsPath" json:"submissionsPath" gorm:"type:varchar(500)"`
 	SubmissionsConnectionId uint64 `mapstructure:"submissionsConnectionId" json:"submissionsConnectionId"`

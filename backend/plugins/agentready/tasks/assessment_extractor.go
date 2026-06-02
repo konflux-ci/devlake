@@ -76,11 +76,13 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 		repoIds = append(repoIds, r.DomainRepoId)
 	}
 
-	submissionIds, subErr := discoverSubmissionRepoIds(db)
-	if subErr != nil {
-		logger.Warn(nil, "Failed to discover submission repo IDs: %v", subErr)
-	} else {
-		repoIds = append(repoIds, submissionIds...)
+	if config := data.Options.ScopeConfig; config != nil && config.SubmissionsRepo != "" {
+		submissionIds, subErr := discoverSubmissionRepoIds(db, config.SubmissionsConnectionId)
+		if subErr != nil {
+			logger.Warn(nil, "Failed to discover submission repo IDs: %v", subErr)
+		} else {
+			repoIds = append(repoIds, submissionIds...)
+		}
 	}
 
 	if len(repoIds) == 0 {
@@ -217,15 +219,19 @@ func parseRawAssessment(rawJSON string) (*assessmentJSON, error) {
 	return &parsed, nil
 }
 
-func discoverSubmissionRepoIds(db dal.Dal) ([]string, error) {
+func discoverSubmissionRepoIds(db dal.Dal, connectionId uint64) ([]string, error) {
 	var rows []struct {
 		RepoId string `gorm:"column:repo_id"`
 	}
-	err := db.All(&rows,
+	clauses := []dal.Clause{
 		dal.Select("DISTINCT repo_id"),
 		dal.From(&models.AgentReadyAssessment{}),
 		dal.Where("provider = ?", "submissions"),
-	)
+	}
+	if connectionId > 0 {
+		clauses = append(clauses, dal.Where("connection_id = ?", connectionId))
+	}
+	err := db.All(&rows, clauses...)
 	if err != nil {
 		return nil, fmt.Errorf("querying submission repo IDs: %w", err)
 	}
