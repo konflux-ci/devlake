@@ -17,12 +17,14 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Form, Input, message, Modal, Spin } from 'antd';
+import { Divider, Form, Input, message, Modal, Select, Spin } from 'antd';
 
 import API from '@/api';
 import { IAgentReadyScopeConfig } from '@/api/plugin/agentready';
+import { IConnectionAPI } from '@/types';
 
 const DEFAULT_ASSESSMENT_FILE_PATH = '.agentready/assessment-latest.json';
+const DEFAULT_SUBMISSIONS_PATH = 'submissions';
 
 interface Props {
   scopeConfigId?: number;
@@ -34,11 +36,20 @@ export const AgentReadyScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: 
   const [form] = Form.useForm<IAgentReadyScopeConfig>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [connections, setConnections] = useState<IConnectionAPI[]>([]);
+
+  useEffect(() => {
+    API.connection
+      .list('github')
+      .then(setConnections)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!scopeConfigId) {
       form.setFieldsValue({
         assessmentFilePath: DEFAULT_ASSESSMENT_FILE_PATH,
+        submissionsPath: DEFAULT_SUBMISSIONS_PATH,
       });
       return;
     }
@@ -110,6 +121,34 @@ export const AgentReadyScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: 
             tooltip="Comma-separated list of repository names to exclude from assessment collection."
           >
             <Input.TextArea rows={3} placeholder="e.g. repo-a, repo-b" />
+          </Form.Item>
+          <Divider orientation="left" plain>
+            Submissions Repository (Optional)
+          </Divider>
+          <Form.Item
+            label="Submissions Repo"
+            name="submissionsRepo"
+            tooltip="GitHub full name of the centralized submissions repository (e.g. org/repo). Leave empty to disable bulk onboarding."
+          >
+            <Input placeholder="e.g. ambient-code/agentready" />
+          </Form.Item>
+          <Form.Item
+            label="Submissions Path"
+            name="submissionsPath"
+            tooltip="Directory within the submissions repo containing {org}/{repo}/{file}.json structure."
+          >
+            <Input placeholder={DEFAULT_SUBMISSIONS_PATH} />
+          </Form.Item>
+          <Form.Item
+            label="GitHub Connection"
+            name="submissionsConnectionId"
+            tooltip="GitHub connection used to authenticate API calls to the submissions repository."
+          >
+            <Select
+              allowClear
+              placeholder="Select a GitHub connection"
+              options={connections.map((c) => ({ label: c.name, value: c.id }))}
+            />
           </Form.Item>
         </Form>
       </Spin>
