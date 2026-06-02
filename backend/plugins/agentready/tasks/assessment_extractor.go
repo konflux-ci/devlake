@@ -71,13 +71,21 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to discover repos for extraction")
 	}
-	if len(repos) == 0 {
-		logger.Info("No repos found for extraction, skipping")
-		return nil
-	}
 	repoIds := make([]string, 0, len(repos))
 	for _, r := range repos {
 		repoIds = append(repoIds, r.DomainRepoId)
+	}
+
+	submissionIds, subErr := discoverSubmissionRepoIds(db)
+	if subErr != nil {
+		logger.Warn(nil, "Failed to discover submission repo IDs: %v", subErr)
+	} else {
+		repoIds = append(repoIds, submissionIds...)
+	}
+
+	if len(repoIds) == 0 {
+		logger.Info("No repos found for extraction, skipping")
+		return nil
 	}
 
 	var rawAssessments []models.AgentReadyAssessment
@@ -207,4 +215,23 @@ func parseRawAssessment(rawJSON string) (*assessmentJSON, error) {
 		return nil, fmt.Errorf("parsing assessment JSON: %w", err)
 	}
 	return &parsed, nil
+}
+
+func discoverSubmissionRepoIds(db dal.Dal) ([]string, error) {
+	var rows []struct {
+		RepoId string `gorm:"column:repo_id"`
+	}
+	err := db.All(&rows,
+		dal.Select("DISTINCT repo_id"),
+		dal.From(&models.AgentReadyAssessment{}),
+		dal.Where("provider = ?", "submissions"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying submission repo IDs: %w", err)
+	}
+	ids := make([]string, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.RepoId)
+	}
+	return ids, nil
 }
