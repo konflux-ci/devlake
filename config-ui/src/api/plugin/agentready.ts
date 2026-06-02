@@ -24,6 +24,9 @@ export interface IAgentReadyScopeConfig {
   branch: string;
   assessmentFilePath: string;
   excludeRepos: string;
+  submissionsRepo: string;
+  submissionsPath: string;
+  submissionsConnectionId: number;
 }
 
 export const getScopeConfig = (id: number): Promise<IAgentReadyScopeConfig> =>
