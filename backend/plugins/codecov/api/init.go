@@ -31,7 +31,6 @@ var basicRes context.BasicRes
 var dsHelper *api.DsHelper[models.CodecovConnection, models.CodecovRepo, models.CodecovScopeConfig]
 var raProxy *api.DsRemoteApiProxyHelper[models.CodecovConnection]
 var raScopeList *api.DsRemoteApiScopeListHelper[models.CodecovConnection, models.CodecovRepo, CodecovRemotePagination]
-var raScopeSearch *api.DsRemoteApiScopeSearchHelper[models.CodecovConnection, models.CodecovRepo]
 
 func Init(br context.BasicRes, p plugin.PluginMeta) {
 	basicRes = br
@@ -52,5 +51,4 @@ func Init(br context.BasicRes, p plugin.PluginMeta) {
 	)
 	raProxy = api.NewDsRemoteApiProxyHelper[models.CodecovConnection](dsHelper.ConnApi.ModelApiHelper)
 	raScopeList = api.NewDsRemoteApiScopeListHelper[models.CodecovConnection, models.CodecovRepo, CodecovRemotePagination](raProxy, listCodecovRemoteScopes)
-	raScopeSearch = api.NewDsRemoteApiScopeSearchHelper[models.CodecovConnection, models.CodecovRepo](raProxy, searchCodecovRepos)
 }

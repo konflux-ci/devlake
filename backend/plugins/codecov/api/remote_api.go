@@ -18,9 +18,11 @@ limitations under the License.
 package api
 
 import (
+	gocontext "context"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -155,18 +157,6 @@ func listCodecovRemoteScopes(
 	return children, nextPage, nil
 }
 
-func searchCodecovRepos(
-	apiClient plugin.ApiClient,
-	params *dsmodels.DsRemoteApiScopeSearchParams,
-) (
-	children []dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo],
-	err errors.Error,
-) {
-	// Codecov API may not have a search endpoint, so we'll return empty for now
-	// This can be implemented later if Codecov provides search functionality
-	return children, nil
-}
-
 // RemoteScopes list all available scopes on the remote server
 // @Summary list all available scopes on the remote server
 // @Description list all available scopes on the remote server
@@ -183,7 +173,10 @@ func RemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, er
 	return raScopeList.Get(input)
 }
 
-// SearchRemoteScopes searches scopes on the remote server
+// SearchRemoteScopes searches scopes on the remote server.
+// Bypasses the standard search helper because Codecov's repos endpoint
+// is scoped to an organization (needs connection.Organization), and the
+// framework callback only receives apiClient + params.
 // @Summary searches scopes on the remote server
 // @Description searches scopes on the remote server
 // @Accept application/json
@@ -197,5 +190,106 @@ func RemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, er
 // @Tags plugins/codecov
 // @Router /plugins/codecov/connections/{connectionId}/search-remote-scopes [GET]
 func SearchRemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	return raScopeSearch.Get(input)
+	connection, err := dsHelper.ConnApi.ModelApiHelper.FindByPk(input)
+	if err != nil {
+		return nil, err
+	}
+
+	apiClient, err := api.NewApiClientFromConnection(gocontext.TODO(), basicRes, connection)
+	if err != nil {
+		return nil, err
+	}
+
+	search := input.Query.Get("search")
+	if search == "" {
+		return &plugin.ApiResourceOutput{
+			Body: map[string]interface{}{
+				"children": []dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo]{},
+				"page":     1,
+				"pageSize": 50,
+			},
+		}, nil
+	}
+
+	page := 1
+	pageSize := 50
+	if v, e := strconv.Atoi(input.Query.Get("page")); e == nil && v > 0 {
+		page = v
+	}
+	if v, e := strconv.Atoi(input.Query.Get("pageSize")); e == nil && v > 0 {
+		pageSize = v
+	}
+
+	owner := connection.Organization
+	query := url.Values{
+		"search":    []string{search},
+		"page":      []string{fmt.Sprintf("%v", page)},
+		"page_size": []string{fmt.Sprintf("%v", pageSize)},
+	}
+
+	reposUrl := fmt.Sprintf("/api/v2/github/%s/repos/", owner)
+	res, err := apiClient.Get(reposUrl, query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode == http.StatusNotFound {
+		return nil, errors.HttpStatus(http.StatusNotFound).New(fmt.Sprintf("organization '%s' not found", owner))
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.HttpStatus(res.StatusCode).New("unexpected status code while searching repositories")
+	}
+
+	var reposResponse codecovReposResponse
+	err = api.UnmarshalResponse(res, &reposResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	children := make([]dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo], 0, len(reposResponse.Results))
+	for _, repo := range reposResponse.Results {
+		repoName := repo.Name
+		if repoName == "" && repo.Repository.Name != "" {
+			repoName = repo.Repository.Name
+		}
+		if repoName == "" {
+			continue
+		}
+
+		fullName := fmt.Sprintf("%s/%s", owner, repoName)
+		codecovId := fullName
+
+		branch := repo.Branch
+		if branch == "" {
+			branch = "main"
+		}
+
+		children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo]{
+			Type:     api.RAS_ENTRY_TYPE_SCOPE,
+			ParentId: nil,
+			Id:       codecovId,
+			Name:     repoName,
+			FullName: fullName,
+			Data: &models.CodecovRepo{
+				CodecovId:   codecovId,
+				Name:        repoName,
+				FullName:    fullName,
+				Service:     repo.Service,
+				Language:    repo.Language,
+				Active:      repo.Active,
+				ActivatedAt: repo.ActivatedAt,
+				Updatestamp: repo.Updatestamp,
+				Private:     repo.Private,
+				Branch:      branch,
+			},
+		})
+	}
+
+	return &plugin.ApiResourceOutput{
+		Body: map[string]interface{}{
+			"children": children,
+			"page":     page,
+			"pageSize": pageSize,
+		},
+	}, nil
 }
