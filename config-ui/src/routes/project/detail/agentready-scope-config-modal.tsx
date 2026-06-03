@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Divider, Form, Input, message, Modal, Select, Spin } from 'antd';
+import { Form, Input, message, Modal, Segmented, Select, Spin } from 'antd';
 
 import API from '@/api';
 import { IAgentReadyScopeConfig } from '@/api/plugin/agentready';
@@ -26,6 +26,12 @@ import { IConnectionAPI } from '@/types';
 const DEFAULT_ASSESSMENT_FILE_PATH = '.agentready/assessment-latest.json';
 const DEFAULT_SUBMISSIONS_PATH = 'submissions';
 
+type SetupMode = 'individual' | 'submissions';
+
+interface FormValues extends IAgentReadyScopeConfig {
+  mode: SetupMode;
+}
+
 interface Props {
   scopeConfigId?: number;
   onCancel: () => void;
@@ -33,7 +39,7 @@ interface Props {
 }
 
 export const AgentReadyScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: Props) => {
-  const [form] = Form.useForm<IAgentReadyScopeConfig>();
+  const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [connections, setConnections] = useState<IConnectionAPI[]>([]);
@@ -48,6 +54,7 @@ export const AgentReadyScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: 
   useEffect(() => {
     if (!scopeConfigId) {
       form.setFieldsValue({
+        mode: 'individual',
         assessmentFilePath: DEFAULT_ASSESSMENT_FILE_PATH,
         submissionsPath: DEFAULT_SUBMISSIONS_PATH,
       });
@@ -59,7 +66,8 @@ export const AgentReadyScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: 
       try {
         const config = await API.plugin.agentready.getScopeConfig(scopeConfigId);
         if (config) {
-          form.setFieldsValue(config);
+          const mode: SetupMode = config.submissionsRepo ? 'submissions' : 'individual';
+          form.setFieldsValue({ ...config, mode });
         }
       } catch {
         message.error('Failed to load configuration.');
@@ -71,7 +79,19 @@ export const AgentReadyScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: 
   }, [scopeConfigId, form]);
 
   const handleSave = async () => {
-    const values = await form.validateFields();
+    const { mode, ...values } = await form.validateFields();
+
+    if (mode === 'individual') {
+      values.submissionsRepo = '';
+      values.submissionsPath = '';
+      values.submissionsBranch = '';
+      values.submissionsConnectionId = 0;
+    } else {
+      values.branch = '';
+      values.assessmentFilePath = '';
+      values.excludeRepos = '';
+    }
+
     setSaving(true);
     try {
       const saved = scopeConfigId
@@ -100,55 +120,92 @@ export const AgentReadyScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: 
       onOk={handleSave}
     >
       <Spin spinning={loading}>
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }} initialValues={{ mode: 'individual' }}>
           <Form.Item
-            label="Branch"
-            name="branch"
-            tooltip="Git branch to read assessments from. Leave empty to use the repository's default branch."
+            label="Name"
+            name="name"
+            rules={[{ required: true, message: 'Please enter a configuration name' }]}
+            tooltip="A unique name to identify this configuration."
           >
-            <Input placeholder="e.g. main" />
+            <Input placeholder="e.g. My AgentReady Config" />
           </Form.Item>
           <Form.Item
-            label="Assessment File Path"
-            name="assessmentFilePath"
-            tooltip="Path to the assessment JSON file within each repository."
+            label="Setup Mode"
+            name="mode"
+            tooltip="Individual Repos: collect assessments from each repo. Submissions Repo: collect from a centralized submissions repository."
           >
-            <Input placeholder={DEFAULT_ASSESSMENT_FILE_PATH} />
-          </Form.Item>
-          <Form.Item
-            label="Exclude Repos"
-            name="excludeRepos"
-            tooltip="Comma-separated list of repository names to exclude from assessment collection."
-          >
-            <Input.TextArea rows={3} placeholder="e.g. repo-a, repo-b" />
-          </Form.Item>
-          <Divider orientation="left" plain>
-            Submissions Repository (Optional)
-          </Divider>
-          <Form.Item
-            label="Submissions Repo"
-            name="submissionsRepo"
-            tooltip="GitHub full name of the centralized submissions repository (e.g. org/repo). Leave empty to disable bulk onboarding."
-          >
-            <Input placeholder="e.g. ambient-code/agentready" />
-          </Form.Item>
-          <Form.Item
-            label="Submissions Path"
-            name="submissionsPath"
-            tooltip="Directory within the submissions repo containing {org}/{repo}/{file}.json structure."
-          >
-            <Input placeholder={DEFAULT_SUBMISSIONS_PATH} />
-          </Form.Item>
-          <Form.Item
-            label="GitHub Connection"
-            name="submissionsConnectionId"
-            tooltip="GitHub connection used to authenticate API calls to the submissions repository."
-          >
-            <Select
-              allowClear
-              placeholder="Select a GitHub connection"
-              options={connections.map((c) => ({ label: c.name, value: c.id }))}
+            <Segmented
+              options={[
+                { label: 'Individual Repos', value: 'individual' },
+                { label: 'Submissions Repo', value: 'submissions' },
+              ]}
             />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.mode !== cur.mode}>
+            {({ getFieldValue }) =>
+              getFieldValue('mode') === 'individual' ? (
+                <>
+                  <Form.Item
+                    label="Branch"
+                    name="branch"
+                    tooltip="Git branch to read assessments from. Leave empty to use the repository's default branch."
+                  >
+                    <Input placeholder="e.g. main" />
+                  </Form.Item>
+                  <Form.Item
+                    label="Assessment File Path"
+                    name="assessmentFilePath"
+                    tooltip="Path to the assessment JSON file within each repository."
+                  >
+                    <Input placeholder={DEFAULT_ASSESSMENT_FILE_PATH} />
+                  </Form.Item>
+                  <Form.Item
+                    label="Exclude Repos"
+                    name="excludeRepos"
+                    tooltip="Comma-separated list of repository names to exclude from assessment collection."
+                  >
+                    <Input.TextArea rows={3} placeholder="e.g. repo-a, repo-b" />
+                  </Form.Item>
+                </>
+              ) : (
+                <>
+                  <Form.Item
+                    label="Submissions Repo"
+                    name="submissionsRepo"
+                    rules={[{ required: true, message: 'Please enter the submissions repository' }]}
+                    tooltip="GitHub full name of the centralized submissions repository (e.g. org/repo)."
+                  >
+                    <Input placeholder="e.g. ambient-code/agentready" />
+                  </Form.Item>
+                  <Form.Item
+                    label="Submissions Path"
+                    name="submissionsPath"
+                    tooltip="Directory within the submissions repo containing {org}/{repo}/{file}.json structure."
+                  >
+                    <Input placeholder={DEFAULT_SUBMISSIONS_PATH} />
+                  </Form.Item>
+                  <Form.Item
+                    label="Branch"
+                    name="submissionsBranch"
+                    tooltip="Git branch to read from in the submissions repository. Leave empty to use 'main'."
+                  >
+                    <Input placeholder="main" />
+                  </Form.Item>
+                  <Form.Item
+                    label="GitHub Connection"
+                    name="submissionsConnectionId"
+                    rules={[{ required: true, message: 'Please select a GitHub connection' }]}
+                    tooltip="GitHub connection used to authenticate API calls to the submissions repository."
+                  >
+                    <Select
+                      allowClear
+                      placeholder="Select a GitHub connection"
+                      options={connections.map((c) => ({ label: c.name, value: c.id }))}
+                    />
+                  </Form.Item>
+                </>
+              )
+            }
           </Form.Item>
         </Form>
       </Spin>

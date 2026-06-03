@@ -13,6 +13,7 @@ type addSubmissionsConfig struct{}
 type agentReadyScopeConfig20260602 struct {
 	SubmissionsRepo         string `gorm:"type:varchar(500)"`
 	SubmissionsPath         string `gorm:"type:varchar(500)"`
+	SubmissionsBranch       string `gorm:"type:varchar(255)"`
 	SubmissionsConnectionId uint64
 }
 

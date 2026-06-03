@@ -207,6 +207,9 @@ func discoverRepos(db dal.Dal, options *AgentReadyOptions, logger log.Logger) ([
 
 	var repos []*RepoInfo
 	for _, repoId := range repoIds {
+		if strings.HasPrefix(repoId, "submissions:") {
+			continue
+		}
 		provider, connId, scopeId, err := ParseDomainRepoId(repoId)
 		if err != nil {
 			logger.Warn(err, "Skipping unparseable repo ID: %s", repoId)
