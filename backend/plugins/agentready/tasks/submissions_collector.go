@@ -57,10 +57,9 @@ func ParseSubmissionEntries(tree []githubTreeEntry, submissionsPath string) []Su
 			continue
 		}
 
-		// Strip the submissions path prefix to get "org/repo/filename.json"
+		// Strip prefix to get "org/repo/filename.json"; reject deeper nesting
 		relPath := strings.TrimPrefix(entry.Path, prefix)
 		parts := strings.SplitN(relPath, "/", 4)
-		// Expect exactly 3 parts: org, repo, filename
 		if len(parts) != 3 {
 			continue
 		}
@@ -150,8 +149,10 @@ func collectFromSubmissionsRepo(ctx context.Context, db dal.Dal, logger log.Logg
 		endpoint = "https://api.github.com"
 	}
 
+	branch := config.SubmissionsBranch
+
 	// Fetch the full recursive tree
-	treeResp, err := FetchGithubTree(ctx, endpoint, config.SubmissionsRepo, "", conn.Token)
+	treeResp, err := FetchGithubTree(ctx, endpoint, config.SubmissionsRepo, branch, conn.Token)
 	if err != nil {
 		logger.Warn(nil, "Failed to fetch tree for submissions repo %s: %v", config.SubmissionsRepo, err)
 		return
