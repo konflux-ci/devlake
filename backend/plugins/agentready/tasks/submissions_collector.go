@@ -131,7 +131,7 @@ func MakeSubmissionsRepoId(org, repo string) string {
 
 // collectFromSubmissionsRepo fetches all assessment JSON files from a
 // centralized submissions repository and stores them as assessments.
-func collectFromSubmissionsRepo(ctx context.Context, db dal.Dal, logger log.Logger, taskCtx plugin.SubTaskContext, config *models.AgentReadyScopeConfig) {
+func collectFromSubmissionsRepo(ctx context.Context, db dal.Dal, logger log.Logger, taskCtx plugin.SubTaskContext, config *models.AgentReadyScopeConfig, projectName string) {
 	submissionsPath := config.SubmissionsPath
 	if submissionsPath == "" {
 		submissionsPath = models.DefaultSubmissionsPath
@@ -164,6 +164,27 @@ func collectFromSubmissionsRepo(ctx context.Context, db dal.Dal, logger log.Logg
 	// Parse entries from the tree
 	entries := ParseSubmissionEntries(treeResp.Tree, submissionsPath)
 	logger.Info("Found %d submission entries in %s", len(entries), config.SubmissionsRepo)
+
+	// Register submission repos in project_mapping so Grafana dashboards
+	// (which JOIN on project_mapping) can find them.
+	if projectName != "" {
+		seen := map[string]bool{}
+		for _, entry := range entries {
+			repoId := MakeSubmissionsRepoId(entry.Org, entry.Repo)
+			if seen[repoId] {
+				continue
+			}
+			seen[repoId] = true
+			mapping := &projectMappingRow{
+				ProjectName: projectName,
+				Table:       "repos",
+				RowId:       repoId,
+			}
+			if mapErr := db.CreateOrUpdate(mapping); mapErr != nil {
+				logger.Warn(mapErr, "Failed to insert project_mapping for %s", repoId)
+			}
+		}
+	}
 
 	now := time.Now()
 	for _, entry := range entries {
