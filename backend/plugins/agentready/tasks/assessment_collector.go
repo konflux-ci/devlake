@@ -180,7 +180,7 @@ func CollectAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 
 	if config.SubmissionsRepo != "" {
 		logger.Info("Collecting assessments from submissions repo: %s", config.SubmissionsRepo)
-		collectFromSubmissionsRepo(ctx, db, logger, taskCtx, config)
+		collectFromSubmissionsRepo(ctx, db, logger, taskCtx, config, data.Options.ProjectName)
 	}
 
 	return nil
