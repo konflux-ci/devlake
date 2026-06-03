@@ -208,6 +208,7 @@ All endpoints support filtering via `projectName` and/or `repoId` query paramete
   "excludeRepos": "repo1,repo2",
   "submissionsRepo": "",
   "submissionsPath": "submissions",
+  "submissionsBranch": "",
   "submissionsConnectionId": 0
 }
 ```
@@ -219,6 +220,7 @@ All endpoints support filtering via `projectName` and/or `repoId` query paramete
 | `excludeRepos` | string | (none) | Comma-separated list of repository names to skip |
 | `submissionsRepo` | string | (none) | GitHub full name of the submissions repository (e.g., `ambient-code/agentready`). Empty disables bulk onboarding |
 | `submissionsPath` | string | `submissions` | Directory within the submissions repo containing `{org}/{repo}/{file}.json` structure |
+| `submissionsBranch` | string | (default branch) | Git branch of the submissions repo to read from. Empty uses the repository default branch |
 | `submissionsConnectionId` | uint64 | 0 | ID of a GitHub connection (`_tool_github_connections`) to use for API authentication |
 
 ### Submissions Configuration
@@ -232,6 +234,7 @@ To enable bulk onboarding from a centralized submissions repository:
 {
   "submissionsRepo": "ambient-code/agentready",
   "submissionsPath": "submissions",
+  "submissionsBranch": "main",
   "submissionsConnectionId": 1
 }
 ```
