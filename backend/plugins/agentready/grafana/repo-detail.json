@@ -199,7 +199,7 @@
           "text": ["All"],
           "value": ["$__all"]
         },
-        "datasource": "mysql",
+        "datasource": "${DS_DEVLAKE}",
         "definition": "select distinct name from projects",
         "hide": 0,
         "includeAll": true,
