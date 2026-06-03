@@ -26,6 +26,7 @@ export interface IAgentReadyScopeConfig {
   excludeRepos: string;
   submissionsRepo: string;
   submissionsPath: string;
+  submissionsBranch: string;
   submissionsConnectionId: number;
 }
 

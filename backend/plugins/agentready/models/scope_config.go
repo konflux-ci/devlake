@@ -13,6 +13,7 @@ type AgentReadyScopeConfig struct {
 
 	SubmissionsRepo         string `mapstructure:"submissionsRepo" json:"submissionsRepo" gorm:"type:varchar(500)"`
 	SubmissionsPath         string `mapstructure:"submissionsPath" json:"submissionsPath" gorm:"type:varchar(500)"`
+	SubmissionsBranch       string `mapstructure:"submissionsBranch" json:"submissionsBranch" gorm:"type:varchar(255)"`
 	SubmissionsConnectionId uint64 `mapstructure:"submissionsConnectionId" json:"submissionsConnectionId"`
 }
 
