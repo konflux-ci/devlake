@@ -190,6 +190,24 @@ func TestFetchGithubTree_APIError(t *testing.T) {
 	}
 }
 
+func TestFetchGithubTree_BranchWithSlash(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expectedPath := "/repos/owner/repo/git/trees/feature%2Fsubmissions"
+		if r.URL.RawPath != expectedPath {
+			t.Errorf("expected RawPath %q, got %q", expectedPath, r.URL.RawPath)
+		}
+		resp := githubTreeResponse{SHA: "abc", Tree: []githubTreeEntry{}}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	_, err := FetchGithubTree(context.Background(), server.URL, "owner/repo", "feature/submissions", "test-token")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestFetchGithubAssessment_CustomBranch(t *testing.T) {
 	assessmentJSON := `{"overall_score": 70.0}`
 	encoded := base64.StdEncoding.EncodeToString([]byte(assessmentJSON))
