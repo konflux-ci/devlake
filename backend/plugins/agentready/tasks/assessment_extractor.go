@@ -77,7 +77,7 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	if config := data.Options.ScopeConfig; config != nil && config.SubmissionsRepo != "" {
-		submissionIds, subErr := discoverSubmissionRepoIds(db, config.SubmissionsConnectionId)
+		submissionIds, subErr := discoverSubmissionRepoIds(db, config.SubmissionsConnectionId, data.Options.ProjectName)
 		if subErr != nil {
 			logger.Warn(nil, "Failed to discover submission repo IDs: %v", subErr)
 		} else {
@@ -219,7 +219,23 @@ func parseRawAssessment(rawJSON string) (*assessmentJSON, error) {
 	return &parsed, nil
 }
 
-func discoverSubmissionRepoIds(db dal.Dal, connectionId uint64) ([]string, error) {
+func discoverSubmissionRepoIds(db dal.Dal, connectionId uint64, projectName string) ([]string, error) {
+	if projectName != "" {
+		var mappings []projectMappingRow
+		err := db.All(&mappings,
+			dal.From(&projectMappingRow{}),
+			dal.Where("project_name = ? AND `table` = ? AND row_id LIKE ?", projectName, "repos", "submissions:%"),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("querying project_mapping for submissions: %w", err)
+		}
+		ids := make([]string, 0, len(mappings))
+		for _, m := range mappings {
+			ids = append(ids, m.RowId)
+		}
+		return ids, nil
+	}
+
 	var rows []struct {
 		RepoId string `gorm:"column:repo_id"`
 	}
