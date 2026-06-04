@@ -34,7 +34,7 @@ func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	if config := data.Options.ScopeConfig; config != nil && config.SubmissionsRepo != "" {
-		submissionIds, subErr := discoverSubmissionRepoIds(db, config.SubmissionsConnectionId)
+		submissionIds, subErr := discoverSubmissionRepoIds(db, config.SubmissionsConnectionId, data.Options.ProjectName)
 		if subErr != nil {
 			logger.Warn(nil, "Failed to discover submission repo IDs: %v", subErr)
 		} else {
