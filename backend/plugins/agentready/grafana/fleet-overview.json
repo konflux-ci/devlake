@@ -1,29 +1,15 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_DEVLAKE",
-      "label": "DevLake",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "mysql",
-      "pluginName": "MySQL"
-    }
-  ],
+  "__inputs": [],
   "annotations": {
     "list": []
   },
   "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": null,
-  "links": [],
-  "liveNow": false,
   "panels": [
     {
       "title": "Fleet Stats",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "datasource": "${DS_DEVLAKE}",
+      "datasource": "mysql",
       "targets": [
         {
           "rawSql": "SELECT AVG(a.overall_score) AS 'Avg Score'\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, MAX(aa.assessed_at) as max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project})",
@@ -52,7 +38,7 @@
       "title": "Total Repos Assessed",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-      "datasource": "${DS_DEVLAKE}",
+      "datasource": "mysql",
       "targets": [
         {
           "rawSql": "SELECT COUNT(DISTINCT a.repo_id) AS 'Total Repos'\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE a.id != '' AND pm.project_name in (${project})",
@@ -65,7 +51,7 @@
       "title": "Certification Distribution",
       "type": "piechart",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": "${DS_DEVLAKE}",
+      "datasource": "mysql",
       "targets": [
         {
           "rawSql": "SELECT\n  a.certification_level AS metric,\n  COUNT(*) AS value\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, MAX(aa.assessed_at) as max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project})\nGROUP BY a.certification_level",
@@ -118,7 +104,7 @@
       "title": "Score by Repository",
       "type": "table",
       "gridPos": { "h": 12, "w": 12, "x": 0, "y": 4 },
-      "datasource": "${DS_DEVLAKE}",
+      "datasource": "mysql",
       "targets": [
         {
           "rawSql": "SELECT\n  a.repo_name,\n  a.overall_score,\n  a.certification_level,\n  a.attributes_assessed,\n  a.attributes_total,\n  a.assessed_at\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, MAX(aa.assessed_at) as max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project})\nORDER BY a.overall_score DESC",
@@ -157,7 +143,7 @@
       "title": "Average Score Over Time",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": "${DS_DEVLAKE}",
+      "datasource": "mysql",
       "targets": [
         {
           "rawSql": "SELECT\n  DATE(a.assessed_at) AS time,\n  AVG(a.overall_score) AS 'Average Score'\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, DATE(aa.assessed_at) AS day, MAX(aa.assessed_at) AS max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id, DATE(aa.assessed_at)\n) latest ON a.repo_id = latest.repo_id AND DATE(a.assessed_at) = latest.day AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project}) AND $__timeFilter(a.assessed_at)\nGROUP BY DATE(a.assessed_at)\nORDER BY time",
@@ -185,11 +171,6 @@
   "tags": ["agentready", "devlake"],
   "templating": {
     "list": [
-      {
-        "name": "DS_DEVLAKE",
-        "type": "datasource",
-        "query": "mysql"
-      },
       {
         "current": {
           "selected": true,
