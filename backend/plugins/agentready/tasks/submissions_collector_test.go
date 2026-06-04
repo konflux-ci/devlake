@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -186,5 +187,31 @@ func TestFetchGithubTree_APIError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "403") {
 		t.Errorf("expected error containing '403', got %v", err)
+	}
+}
+
+func TestFetchGithubAssessment_CustomBranch(t *testing.T) {
+	assessmentJSON := `{"overall_score": 70.0}`
+	encoded := base64.StdEncoding.EncodeToString([]byte(assessmentJSON))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ref := r.URL.Query().Get("ref"); ref != "test" {
+			t.Errorf("expected ref=test, got ref=%s", ref)
+		}
+		resp := map[string]interface{}{
+			"content":  encoded,
+			"encoding": "base64",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	result, err := FetchGithubAssessment(context.Background(), server.URL, "org/submissions-repo", "submissions/myorg/myrepo/assessment.json", "test", "test-token")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != assessmentJSON {
+		t.Errorf("expected %q, got %q", assessmentJSON, result)
 	}
 }

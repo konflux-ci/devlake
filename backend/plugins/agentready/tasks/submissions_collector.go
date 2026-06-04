@@ -190,7 +190,7 @@ func collectFromSubmissionsRepo(ctx context.Context, db dal.Dal, logger log.Logg
 	now := time.Now()
 	for _, entry := range entries {
 		// Fetch the assessment file content via the Contents API
-		rawJSON, fetchErr := FetchGithubAssessment(ctx, endpoint, config.SubmissionsRepo, entry.TreePath, "", conn.Token)
+		rawJSON, fetchErr := FetchGithubAssessment(ctx, endpoint, config.SubmissionsRepo, entry.TreePath, branch, conn.Token)
 		if fetchErr != nil {
 			logger.Warn(nil, "Failed to fetch submission %s: %v", entry.TreePath, fetchErr)
 			taskCtx.IncProgress(1)
