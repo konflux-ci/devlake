@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -86,7 +87,7 @@ func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token stri
 	}
 
 	endpoint = strings.TrimSuffix(endpoint, "/")
-	apiURL := fmt.Sprintf("%s/repos/%s/git/trees/%s?recursive=1", endpoint, fullName, branch)
+	apiURL := fmt.Sprintf("%s/repos/%s/git/trees/%s?recursive=1", endpoint, fullName, url.PathEscape(branch))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
