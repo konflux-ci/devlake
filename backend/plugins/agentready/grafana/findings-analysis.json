@@ -12,7 +12,7 @@
       "datasource": "mysql",
       "targets": [
         {
-          "rawSql": "SELECT\n  f.attribute_name,\n  COUNT(*) AS failure_count\nFROM _tool_agentready_findings f\nJOIN project_mapping pm ON f.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE f.status = 'fail' AND pm.project_name in (${project})\nGROUP BY f.attribute_id, f.attribute_name\nORDER BY failure_count DESC\nLIMIT 15",
+          "rawSql": "SELECT\n  f.attribute_name,\n  COUNT(*) AS failure_count\nFROM _tool_agentready_findings f\nWHERE f.status = 'fail'\n  AND EXISTS (\n    SELECT 1 FROM project_mapping pm\n    WHERE f.repo_id = pm.row_id AND pm.`table` = 'repos'\n    AND pm.project_name in (${project})\n  )\nGROUP BY f.attribute_id, f.attribute_name\nORDER BY failure_count DESC\nLIMIT 15",
           "format": "table",
           "refId": "A"
         }
@@ -33,7 +33,7 @@
       "datasource": "mysql",
       "targets": [
         {
-          "rawSql": "SELECT\n  DATE(m.assessed_at) AS time,\n  AVG(m.tier1_pass_rate) AS 'Essential',\n  AVG(m.tier2_pass_rate) AS 'Critical',\n  AVG(m.tier3_pass_rate) AS 'Important',\n  AVG(m.tier4_pass_rate) AS 'Advanced'\nFROM _tool_agentready_metrics m\nJOIN project_mapping pm ON m.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE pm.project_name in (${project}) AND $__timeFilter(m.assessed_at)\nGROUP BY DATE(m.assessed_at)\nORDER BY time",
+          "rawSql": "SELECT\n  DATE(m.assessed_at) AS time,\n  AVG(m.tier1_pass_rate) AS 'Essential',\n  AVG(m.tier2_pass_rate) AS 'Critical',\n  AVG(m.tier3_pass_rate) AS 'Important',\n  AVG(m.tier4_pass_rate) AS 'Advanced'\nFROM _tool_agentready_metrics m\nWHERE EXISTS (\n    SELECT 1 FROM project_mapping pm\n    WHERE m.repo_id = pm.row_id AND pm.`table` = 'repos'\n    AND pm.project_name in (${project})\n  )\n  AND $__timeFilter(m.assessed_at)\nGROUP BY DATE(m.assessed_at)\nORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
