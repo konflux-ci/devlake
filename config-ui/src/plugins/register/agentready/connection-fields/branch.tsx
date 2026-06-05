@@ -16,21 +16,32 @@
  *
  */
 
-import { request } from '@/utils';
+import { useEffect } from 'react';
+import { Input } from 'antd';
 
-import * as aireview from './aireview';
-import * as jira from './jira';
-import * as tapd from './tapd';
-import * as webhook from './webhook';
+import { Block } from '@/components';
 
-export const list = (): Promise<[{ plugin: string }]> => request('/plugins');
+interface Props {
+  initialValue: string;
+  value: string;
+  error: string;
+  setValue: (value: string) => void;
+  setError: (error: string) => void;
+}
 
-export const plugin = {
-  list,
-  aireview,
-  jira,
-  tapd,
-  webhook,
+export const BranchInput = ({ initialValue, value, setValue }: Props) => {
+  useEffect(() => {
+    if (initialValue && !value) {
+      setValue(initialValue);
+    }
+  }, [initialValue]);
+
+  return (
+    <Block
+      title="Branch"
+      description="Branch to read from in the submissions repo. Leave empty for the default branch."
+    >
+      <Input style={{ width: 386 }} placeholder="main" value={value} onChange={(e) => setValue(e.target.value)} />
+    </Block>
+  );
 };
-
-export default plugin;

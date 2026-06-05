@@ -11,6 +11,8 @@ import (
 )
 
 func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	db := basicRes.GetDal()
+
 	page, _ := strconv.Atoi(input.Query.Get("page"))
 	if page <= 0 {
 		page = 1
@@ -24,14 +26,11 @@ func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 	var clauses []dal.Clause
 
 	if projectName := input.Query.Get("projectName"); projectName != "" {
-		// DISTINCT guards against duplicate rows from the project_mapping join.
-		// PK (project_name, table, row_id) prevents true duplicates for a single
-		// project, so db.Count (which drops DISTINCT) still returns correct totals.
 		clauses = []dal.Clause{
 			dal.Select("DISTINCT a.*"),
 			dal.From("_tool_agentready_assessments a"),
 			dal.Join("JOIN project_mapping pm ON a.repo_id = pm.row_id"),
-			dal.Where("pm.project_name = ? AND pm.`table` = ?", projectName, "repos"),
+			dal.Where("pm.project_name = ? AND pm.`table` = ?", projectName, models.ProjectMappingTable),
 		}
 	} else {
 		clauses = []dal.Clause{
@@ -66,7 +65,7 @@ func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 	}
 
 	return &plugin.ApiResourceOutput{
-		Body: map[string]interface{}{
+		Body: map[string]any{
 			"assessments": assessments,
 			"page":        page,
 			"pageSize":    pageSize,
@@ -77,6 +76,8 @@ func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 }
 
 func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	db := basicRes.GetDal()
+
 	id := input.Params["id"]
 	var assessment models.AgentReadyAssessment
 	err := db.First(&assessment, dal.Where("id = ?", id))
@@ -99,7 +100,7 @@ func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, e
 	}
 
 	return &plugin.ApiResourceOutput{
-		Body: map[string]interface{}{
+		Body: map[string]any{
 			"assessment": assessment,
 			"findings":   findings,
 		},
@@ -108,6 +109,8 @@ func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, e
 }
 
 func GetAssessmentFindings(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	db := basicRes.GetDal()
+
 	assessmentId := input.Params["id"]
 
 	clauses := []dal.Clause{

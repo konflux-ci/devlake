@@ -8,6 +8,7 @@ type AgentReadyFinding struct {
 	common.NoPKModel
 
 	Id                 string   `gorm:"primaryKey;type:varchar(255)"`
+	ConnectionId       uint64   `gorm:"primaryKey"`
 	AssessmentId       string   `gorm:"index;type:varchar(255)"`
 	RepoId             string   `gorm:"index;type:varchar(255)"`
 	AttributeId        string   `gorm:"type:varchar(255)"`

@@ -145,7 +145,7 @@ func TestParseFindings(t *testing.T) {
 	if parseErr != nil {
 		t.Fatalf("unexpected error: %v", parseErr)
 	}
-	findings, err := parseFindings(parsed, assessmentId, repoId)
+	findings, err := parseFindings(parsed, assessmentId, repoId, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

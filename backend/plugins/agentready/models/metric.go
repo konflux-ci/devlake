@@ -10,6 +10,7 @@ type AgentReadyMetric struct {
 	common.NoPKModel
 
 	Id             string    `gorm:"primaryKey;type:varchar(255)"`
+	ConnectionId   uint64    `gorm:"primaryKey"`
 	RepoId         string    `gorm:"index;type:varchar(255)"`
 	AssessedAt     time.Time `gorm:"index"`
 	PassCount      int       `gorm:"type:int"`

@@ -1,0 +1,109 @@
+package api
+
+import (
+	gocontext "context"
+	"fmt"
+	"net/http"
+
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/plugins/agentready/models"
+)
+
+func PostConnections(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ConnApi.Post(input)
+}
+
+func PatchConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ConnApi.Patch(input)
+}
+
+func DeleteConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ConnApi.Delete(input)
+}
+
+func ListConnections(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ConnApi.GetAll(input)
+}
+
+func GetConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ConnApi.GetDetail(input)
+}
+
+type githubConn struct {
+	ID       uint64 `gorm:"primaryKey;column:id"`
+	Endpoint string `gorm:"column:endpoint"`
+	Token    string `gorm:"column:token;serializer:encdec"`
+}
+
+func (githubConn) TableName() string { return "_tool_github_connections" }
+
+func TestConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	var conn models.AgentReadyConnection
+	if err := api.Decode(input.Body, &conn, nil); err != nil {
+		return nil, errors.BadInput.Wrap(err, "failed to decode connection")
+	}
+	return testAgentReadyConnection(&conn)
+}
+
+func TestExistingConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	connection, err := dsHelper.ConnApi.GetMergedConnection(input)
+	if err != nil {
+		return nil, errors.Convert(err)
+	}
+	return testAgentReadyConnection(connection)
+}
+
+func testAgentReadyConnection(conn *models.AgentReadyConnection) (*plugin.ApiResourceOutput, errors.Error) {
+	if conn.GitHubConnectionId == 0 {
+		return nil, errors.BadInput.New("githubConnectionId is required")
+	}
+	if conn.SubmissionsRepo == "" {
+		return nil, errors.BadInput.New("submissionsRepo is required")
+	}
+
+	db := basicRes.GetDal()
+	var ghConn githubConn
+	if err := db.First(&ghConn, dal.Where("id = ?", conn.GitHubConnectionId)); err != nil {
+		return nil, errors.BadInput.New(fmt.Sprintf("GitHub connection %d not found", conn.GitHubConnectionId))
+	}
+
+	endpoint := ghConn.Endpoint
+	if endpoint == "" {
+		endpoint = "https://api.github.com"
+	}
+	token := ghConn.Token
+	if token == "" {
+		return nil, errors.BadInput.New("referenced GitHub connection has no token")
+	}
+
+	apiClient, err := api.NewApiClient(gocontext.TODO(), endpoint, nil, 0, "", basicRes)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to create API client")
+	}
+	apiClient.SetHeaders(map[string]string{
+		"Authorization": fmt.Sprintf("Bearer %s", token),
+	})
+
+	repoURL := fmt.Sprintf("repos/%s", conn.SubmissionsRepo)
+	resp, err := apiClient.Get(repoURL, nil, nil)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "failed to reach GitHub API")
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, errors.BadInput.New(fmt.Sprintf("repository %q not found or not accessible", conn.SubmissionsRepo))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Default.New(fmt.Sprintf("GitHub API returned %d for repo %s", resp.StatusCode, conn.SubmissionsRepo))
+	}
+
+	return &plugin.ApiResourceOutput{
+		Body: map[string]any{
+			"success": true,
+			"message": fmt.Sprintf("Successfully connected to %s", conn.SubmissionsRepo),
+		},
+		Status: http.StatusOK,
+	}, nil
+}

@@ -12,7 +12,7 @@ type AgentReadyAssessment struct {
 	Id                 string    `gorm:"primaryKey;type:varchar(255)"`
 	RepoId             string    `gorm:"index;type:varchar(255)"`
 	RepoName           string    `gorm:"type:varchar(255)"`
-	ConnectionId       uint64    `gorm:"index"`
+	ConnectionId       uint64    `gorm:"primaryKey"`
 	Provider           string    `gorm:"type:varchar(50)"`
 	SchemaVersion      string    `gorm:"type:varchar(20)"`
 	OverallScore       float64   `gorm:"type:float"`
@@ -38,4 +38,6 @@ const (
 	CertBronze           = "Bronze"
 	CertNeedsImprovement = "Needs Improvement"
 	CertNone             = "None"
+
+	ProjectMappingTable = "repos"
 )

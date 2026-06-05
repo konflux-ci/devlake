@@ -7,7 +7,6 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
@@ -18,7 +17,7 @@ var ExtractAssessmentsMeta = plugin.SubTaskMeta{
 	EnabledByDefault: true,
 	Description:      "Parse raw assessment JSON into structured assessment and finding rows",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE},
-	Dependencies:     []*plugin.SubTaskMeta{&CollectAssessmentsMeta},
+	Dependencies:     []*plugin.SubTaskMeta{&CollectSubmissionsMeta},
 }
 
 type assessmentJSON struct {
@@ -65,77 +64,47 @@ type remediationJSON struct {
 func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
-
 	data := taskCtx.GetData().(*AgentReadyTaskData)
-	repos, err := discoverRepos(db, data.Options, logger)
-	if err != nil {
-		return errors.Default.Wrap(err, "failed to discover repos for extraction")
-	}
-	repoIds := make([]string, 0, len(repos))
-	for _, r := range repos {
-		repoIds = append(repoIds, r.DomainRepoId)
-	}
 
-	if config := data.Options.ScopeConfig; config != nil && config.SubmissionsRepo != "" {
-		submissionIds, subErr := discoverSubmissionRepoIds(db, config.SubmissionsConnectionId, data.Options.ProjectName)
-		if subErr != nil {
-			logger.Warn(nil, "Failed to discover submission repo IDs: %v", subErr)
-		} else {
-			repoIds = append(repoIds, submissionIds...)
-		}
-	}
-
-	if len(repoIds) == 0 {
-		logger.Info("No repos found for extraction, skipping")
-		return nil
-	}
+	connectionId := data.Connection.ID
+	repoId := data.Options.FullName
 
 	var rawAssessments []models.AgentReadyAssessment
-	clauses := []dal.Clause{
+	err := db.All(&rawAssessments,
 		dal.From(&models.AgentReadyAssessment{}),
-		dal.Where("raw_json != '' AND repo_id IN (?)", repoIds),
-	}
-	if data.Options.TimeAfter != "" {
-		timeAfter, parseErr := common.ConvertStringToTime(data.Options.TimeAfter)
-		if parseErr != nil {
-			return errors.BadInput.Wrap(parseErr, "invalid timeAfter format")
-		}
-		clauses = append(clauses, dal.Where("collected_at >= ?", timeAfter))
-	}
-	err = db.All(&rawAssessments, clauses...)
+		dal.Where("connection_id = ? AND repo_id = ? AND raw_json != ''", connectionId, repoId),
+	)
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to query raw assessments")
 	}
 
-	logger.Info("Extracting %d assessments for %d repos", len(rawAssessments), len(repoIds))
+	logger.Info("Extracting %d assessments for scope %s", len(rawAssessments), repoId)
 	taskCtx.SetProgress(0, len(rawAssessments))
 
 	for i := range rawAssessments {
 		parsed, parseErr := parseRawAssessment(rawAssessments[i].RawJSON)
 		if parseErr != nil {
-			logger.Warn(nil, "Failed to parse assessment for repo %s: %v", rawAssessments[i].RepoId, parseErr)
+			logger.Warn(nil, "Failed to parse assessment for %s: %v", repoId, parseErr)
 			taskCtx.IncProgress(1)
 			continue
 		}
 		assessment, assessErr := parseAssessmentJSON(&rawAssessments[i], parsed)
 		if assessErr != nil {
-			logger.Warn(nil, "Failed to extract assessment for repo %s: %v", rawAssessments[i].RepoId, assessErr)
+			logger.Warn(nil, "Failed to extract assessment for %s: %v", repoId, assessErr)
 			taskCtx.IncProgress(1)
 			continue
 		}
 
-		dbErr := db.CreateOrUpdate(assessment)
-		if dbErr != nil {
+		if dbErr := db.CreateOrUpdate(assessment); dbErr != nil {
 			logger.Warn(dbErr, "Failed to save parsed assessment %s", assessment.Id)
 		}
 
-		findings, findErr := parseFindings(parsed, assessment.Id, assessment.RepoId)
+		findings, findErr := parseFindings(parsed, assessment.Id, assessment.RepoId, connectionId)
 		if findErr != nil {
-			logger.Warn(nil, "Failed to parse assessment findings for repo %s: %v", assessment.RepoId, findErr)
+			logger.Warn(nil, "Failed to parse findings for %s: %v", repoId, findErr)
 		}
 		for _, f := range findings {
-			dbErr = db.CreateOrUpdate(f)
-			if dbErr != nil {
+			if dbErr := db.CreateOrUpdate(f); dbErr != nil {
 				logger.Warn(dbErr, "Failed to save finding %s", f.Id)
 			}
 		}
@@ -166,7 +135,7 @@ func parseAssessmentJSON(assessment *models.AgentReadyAssessment, parsed *assess
 	return assessment, nil
 }
 
-func parseFindings(parsed *assessmentJSON, assessmentId, repoId string) ([]*models.AgentReadyFinding, error) {
+func parseFindings(parsed *assessmentJSON, assessmentId, repoId string, connectionId uint64) ([]*models.AgentReadyFinding, error) {
 	var findings []*models.AgentReadyFinding
 	for _, f := range parsed.Findings {
 		if f.Status == models.FindingStatusNotApplicable {
@@ -175,6 +144,7 @@ func parseFindings(parsed *assessmentJSON, assessmentId, repoId string) ([]*mode
 
 		finding := &models.AgentReadyFinding{
 			Id:            fmt.Sprintf("%s:%s", assessmentId, f.Attribute.Id),
+			ConnectionId:  connectionId,
 			AssessmentId:  assessmentId,
 			RepoId:        repoId,
 			AttributeId:   f.Attribute.Id,
@@ -217,43 +187,4 @@ func parseRawAssessment(rawJSON string) (*assessmentJSON, error) {
 		return nil, fmt.Errorf("parsing assessment JSON: %w", err)
 	}
 	return &parsed, nil
-}
-
-func discoverSubmissionRepoIds(db dal.Dal, connectionId uint64, projectName string) ([]string, error) {
-	if projectName != "" {
-		var mappings []projectMappingRow
-		err := db.All(&mappings,
-			dal.From(&projectMappingRow{}),
-			dal.Where("project_name = ? AND `table` = ? AND row_id LIKE ?", projectName, "repos", "submissions:%"),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("querying project_mapping for submissions: %w", err)
-		}
-		ids := make([]string, 0, len(mappings))
-		for _, m := range mappings {
-			ids = append(ids, m.RowId)
-		}
-		return ids, nil
-	}
-
-	var rows []struct {
-		RepoId string `gorm:"column:repo_id"`
-	}
-	clauses := []dal.Clause{
-		dal.Select("DISTINCT repo_id"),
-		dal.From(&models.AgentReadyAssessment{}),
-		dal.Where("provider = ?", "submissions"),
-	}
-	if connectionId > 0 {
-		clauses = append(clauses, dal.Where("connection_id = ?", connectionId))
-	}
-	err := db.All(&rows, clauses...)
-	if err != nil {
-		return nil, fmt.Errorf("querying submission repo IDs: %w", err)
-	}
-	ids := make([]string, 0, len(rows))
-	for _, r := range rows {
-		ids = append(ids, r.RepoId)
-	}
-	return ids, nil
 }

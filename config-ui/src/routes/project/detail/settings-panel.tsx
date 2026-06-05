@@ -26,7 +26,6 @@ import { PATHS } from '@/config';
 import { IProject } from '@/types';
 import { operator } from '@/utils';
 
-import { AgentReadyScopeConfigModal } from './agentready-scope-config-modal';
 import { AiReviewScopeConfigModal } from './aireview-scope-config-modal';
 import * as S from './styled';
 
@@ -54,11 +53,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
     scopeConfigId: undefined as number | undefined,
   });
   const [aiReviewModalOpen, setAiReviewModalOpen] = useState(false);
-  const [agentReady, setAgentReady] = useState({
-    enable: false,
-    scopeConfigId: undefined as number | undefined,
-  });
-  const [agentReadyModalOpen, setAgentReadyModalOpen] = useState(false);
   const [operating, setOperating] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -69,8 +63,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
     const linker = project.metrics.find((ms) => ms.pluginName === 'linker');
     const issueTrace = project.metrics.find((ms) => ms.pluginName === 'issue_trace');
     const aireview = project.metrics.find((ms) => ms.pluginName === 'aireview');
-    const agentready = project.metrics.find((ms) => ms.pluginName === 'agentready');
-
     setName(project.name);
     setDora({
       enable: dora?.enable ?? false,
@@ -85,10 +77,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
     setAiReview({
       enable: aireview?.enable ?? false,
       scopeConfigId: aireview?.pluginOption?.scopeConfigId,
-    });
-    setAgentReady({
-      enable: agentready?.enable ?? false,
-      scopeConfigId: agentready?.pluginOption?.scopeConfigId,
     });
   }, [project]);
 
@@ -122,13 +110,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
                 scopeConfigId: aiReview.scopeConfigId,
               },
               enable: aiReview.enable,
-            },
-            {
-              pluginName: 'agentready',
-              pluginOption: {
-                scopeConfigId: agentReady.scopeConfigId,
-              },
-              enable: agentReady.enable,
             },
           ],
         }),
@@ -244,23 +225,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
               </Button>
             )}
           </Block>
-          <Block
-            title={
-              <Checkbox
-                checked={agentReady.enable}
-                onChange={(e) => setAgentReady({ ...agentReady, enable: e.target.checked })}
-              >
-                Enable Agent Ready Assessments
-              </Checkbox>
-            }
-            description="Collect and analyze AI readiness assessments from repositories. Requires assessment data committed to your repos."
-          >
-            {agentReady.enable && (
-              <Button onClick={() => setAgentReadyModalOpen(true)}>
-                {agentReady.scopeConfigId ? 'Edit Configuration' : 'Configure'}
-              </Button>
-            )}
-          </Block>
           <Block>
             <Button type="primary" loading={operating} disabled={!name} onClick={handleUpdate}>
               Save
@@ -280,16 +244,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
           onSave={(id) => {
             setAiReview({ ...aiReview, scopeConfigId: id });
             setAiReviewModalOpen(false);
-          }}
-        />
-      )}
-      {agentReadyModalOpen && (
-        <AgentReadyScopeConfigModal
-          scopeConfigId={agentReady.scopeConfigId}
-          onCancel={() => setAgentReadyModalOpen(false)}
-          onSave={(id) => {
-            setAgentReady({ ...agentReady, scopeConfigId: id });
-            setAgentReadyModalOpen(false);
           }}
         />
       )}

@@ -7,7 +7,5 @@ import (
 func All() []plugin.MigrationScript {
 	return []plugin.MigrationScript{
 		&initSchema{},
-		&addSubmissionsConfig{},
-		&addSubmissionsBranch{},
 	}
 }
