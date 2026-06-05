@@ -88,7 +88,7 @@ export const AgentReadyConfig: IPluginConfig = {
     title: 'Repositories',
   },
   scopeConfig: {
-    entities: ['CICD'],
+    entities: ['CODE'],
     transformation: {},
   },
 };

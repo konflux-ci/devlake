@@ -14,33 +14,36 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package models
+
+package api
 
 import (
 	"testing"
 )
 
-func TestConnectionTableName(t *testing.T) {
-	conn := AgentReadyConnection{}
-	want := "_tool_agentready_connections"
-	if got := conn.TableName(); got != want {
-		t.Errorf("TableName() = %q, want %q", got, want)
+func TestParseConnectionId(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  map[string]string
+		want    uint64
+		wantErr bool
+	}{
+		{"valid id", map[string]string{"connectionId": "42"}, 42, false},
+		{"missing id", map[string]string{}, 0, true},
+		{"invalid id", map[string]string{"connectionId": "abc"}, 0, true},
+		{"zero id", map[string]string{"connectionId": "0"}, 0, true},
 	}
-}
 
-func TestConnectionSanitize(t *testing.T) {
-	conn := AgentReadyConnection{
-		Project:            "my-project",
-		GitHubConnectionId: 42,
-		SubmissionsRepo:    "ambient-code/agentready",
-		SubmissionsPath:    "submissions",
-		Branch:             "main",
-	}
-	sanitized := conn.Sanitize()
-	if sanitized.Project != "my-project" {
-		t.Errorf("Sanitize() changed Project")
-	}
-	if sanitized.SubmissionsRepo != "ambient-code/agentready" {
-		t.Errorf("Sanitize() changed SubmissionsRepo")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseConnectionId(tt.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseConnectionId() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("parseConnectionId() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
