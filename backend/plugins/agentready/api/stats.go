@@ -1,3 +1,19 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package api
 
 import (
@@ -22,17 +38,23 @@ type CertCount struct {
 func GetStats(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	db := basicRes.GetDal()
 
+	connectionId, pErr := parseConnectionId(input.Params)
+	if pErr != nil {
+		return nil, errors.BadInput.Wrap(pErr, "invalid connectionId")
+	}
+
 	var baseClauses []dal.Clause
 
 	if projectName := input.Query.Get("projectName"); projectName != "" {
 		baseClauses = []dal.Clause{
 			dal.From("_tool_agentready_assessments a"),
 			dal.Join("JOIN project_mapping pm ON a.repo_id = pm.row_id"),
-			dal.Where("pm.project_name = ? AND pm.`table` = ?", projectName, models.ProjectMappingTable),
+			dal.Where("pm.project_name = ? AND pm.`table` = ? AND a.connection_id = ?", projectName, models.ProjectMappingTable, connectionId),
 		}
 	} else {
 		baseClauses = []dal.Clause{
 			dal.From(&models.AgentReadyAssessment{}),
+			dal.Where("connection_id = ?", connectionId),
 		}
 	}
 	baseClauses = append(baseClauses, dal.Where("id != ''"))

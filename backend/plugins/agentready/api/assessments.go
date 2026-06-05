@@ -1,6 +1,23 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -10,8 +27,28 @@ import (
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
 
+func parseConnectionId(params map[string]string) (uint64, error) {
+	raw, ok := params["connectionId"]
+	if !ok || raw == "" {
+		return 0, fmt.Errorf("missing connectionId")
+	}
+	id, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid connectionId %q: %w", raw, err)
+	}
+	if id == 0 {
+		return 0, fmt.Errorf("connectionId must be > 0")
+	}
+	return id, nil
+}
+
 func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	db := basicRes.GetDal()
+
+	connectionId, pErr := parseConnectionId(input.Params)
+	if pErr != nil {
+		return nil, errors.BadInput.Wrap(pErr, "invalid connectionId")
+	}
 
 	page, _ := strconv.Atoi(input.Query.Get("page"))
 	if page <= 0 {
@@ -30,11 +67,12 @@ func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 			dal.Select("DISTINCT a.*"),
 			dal.From("_tool_agentready_assessments a"),
 			dal.Join("JOIN project_mapping pm ON a.repo_id = pm.row_id"),
-			dal.Where("pm.project_name = ? AND pm.`table` = ?", projectName, models.ProjectMappingTable),
+			dal.Where("pm.project_name = ? AND pm.`table` = ? AND a.connection_id = ?", projectName, models.ProjectMappingTable, connectionId),
 		}
 	} else {
 		clauses = []dal.Clause{
 			dal.From(&models.AgentReadyAssessment{}),
+			dal.Where("connection_id = ?", connectionId),
 		}
 		if repoId := input.Query.Get("repoId"); repoId != "" {
 			clauses = append(clauses, dal.Where("repo_id = ?", repoId))
@@ -78,9 +116,14 @@ func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	db := basicRes.GetDal()
 
+	connectionId, pErr := parseConnectionId(input.Params)
+	if pErr != nil {
+		return nil, errors.BadInput.Wrap(pErr, "invalid connectionId")
+	}
+
 	id := input.Params["id"]
 	var assessment models.AgentReadyAssessment
-	err := db.First(&assessment, dal.Where("id = ?", id))
+	err := db.First(&assessment, dal.Where("id = ? AND connection_id = ?", id, connectionId))
 	if err != nil {
 		if db.IsErrorNotFound(err) {
 			return nil, errors.HttpStatus(http.StatusNotFound).Wrap(err, "assessment not found")
@@ -91,7 +134,7 @@ func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, e
 	var findings []models.AgentReadyFinding
 	err = db.All(&findings,
 		dal.From(&models.AgentReadyFinding{}),
-		dal.Where("assessment_id = ?", id),
+		dal.Where("assessment_id = ? AND connection_id = ?", id, connectionId),
 		dal.Orderby("tier ASC, status ASC"),
 	)
 
@@ -111,11 +154,16 @@ func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, e
 func GetAssessmentFindings(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	db := basicRes.GetDal()
 
+	connectionId, pErr := parseConnectionId(input.Params)
+	if pErr != nil {
+		return nil, errors.BadInput.Wrap(pErr, "invalid connectionId")
+	}
+
 	assessmentId := input.Params["id"]
 
 	clauses := []dal.Clause{
 		dal.From(&models.AgentReadyFinding{}),
-		dal.Where("assessment_id = ?", assessmentId),
+		dal.Where("assessment_id = ? AND connection_id = ?", assessmentId, connectionId),
 	}
 
 	if tier := input.Query.Get("tier"); tier != "" {
