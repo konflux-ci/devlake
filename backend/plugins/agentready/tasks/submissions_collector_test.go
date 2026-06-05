@@ -11,7 +11,7 @@ import (
 )
 
 func TestParseSubmissionEntries(t *testing.T) {
-	tree := []githubTreeEntry{
+	tree := []GithubTreeEntry{
 		{Path: "submissions/org1/repo1/2026-02-07T14-42-31-assessment.json", Type: "blob"},
 		{Path: "submissions/org1/repo1/2026-03-01T10-00-00-assessment.json", Type: "blob"},
 		{Path: "submissions/org2/repoA/2026-01-15T09-00-00-assessment.json", Type: "blob"},
@@ -73,7 +73,7 @@ func TestParseSubmissionEntries(t *testing.T) {
 }
 
 func TestParseSubmissionEntries_CustomPath(t *testing.T) {
-	tree := []githubTreeEntry{
+	tree := []GithubTreeEntry{
 		{Path: "data/assessments/org1/repo1/test.json", Type: "blob"},
 		{Path: "submissions/org1/repo1/test.json", Type: "blob"},
 	}
@@ -102,14 +102,6 @@ func TestParseSubmissionEntries_Empty(t *testing.T) {
 	}
 }
 
-func TestMakeSubmissionsRepoId(t *testing.T) {
-	got := MakeSubmissionsRepoId("Red-Hat-AI-Innovation-Team", "sdg_hub")
-	want := "submissions:Red-Hat-AI-Innovation-Team/sdg_hub"
-	if got != want {
-		t.Errorf("MakeSubmissionsRepoId() = %q, want %q", got, want)
-	}
-}
-
 func TestFetchGithubTree(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/repos/owner/repo/git/trees/main" {
@@ -125,7 +117,7 @@ func TestFetchGithubTree(t *testing.T) {
 		resp := githubTreeResponse{
 			SHA:       "abc123",
 			Truncated: false,
-			Tree: []githubTreeEntry{
+			Tree: []GithubTreeEntry{
 				{Path: "submissions/org1/repo1/test.json", Mode: "100644", Type: "blob", SHA: "def456", Size: 1024},
 			},
 		}
@@ -162,7 +154,7 @@ func TestFetchGithubTree_DefaultBranch(t *testing.T) {
 			t.Errorf("expected path /repos/owner/repo/git/trees/main, got %s", r.URL.Path)
 		}
 
-		resp := githubTreeResponse{SHA: "abc", Tree: []githubTreeEntry{}}
+		resp := githubTreeResponse{SHA: "abc", Tree: []GithubTreeEntry{}}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -196,7 +188,7 @@ func TestFetchGithubTree_BranchWithSlash(t *testing.T) {
 		if r.URL.RawPath != expectedPath {
 			t.Errorf("expected RawPath %q, got %q", expectedPath, r.URL.RawPath)
 		}
-		resp := githubTreeResponse{SHA: "abc", Tree: []githubTreeEntry{}}
+		resp := githubTreeResponse{SHA: "abc", Tree: []GithubTreeEntry{}}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -216,7 +208,7 @@ func TestFetchGithubAssessment_CustomBranch(t *testing.T) {
 		if ref := r.URL.Query().Get("ref"); ref != "test" {
 			t.Errorf("expected ref=test, got ref=%s", ref)
 		}
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"content":  encoded,
 			"encoding": "base64",
 		}

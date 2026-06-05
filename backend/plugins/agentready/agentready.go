@@ -6,18 +6,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// PluginEntry is the AgentReady plugin instance registered with DevLake.
 var PluginEntry impl.AgentReady
 
 func main() {
 	cmd := &cobra.Command{Use: "agentready"}
-	projectName := cmd.Flags().StringP("project", "p", "", "project name to analyze")
-	repoId := cmd.Flags().StringP("repoId", "r", "", "single repository domain ID")
+	connectionId := cmd.Flags().Uint64P("connectionId", "c", 0, "connection ID")
+	fullName := cmd.Flags().StringP("fullName", "f", "", "scope full name (org/repo)")
 
 	cmd.Run = func(_ *cobra.Command, args []string) {
-		runner.DirectRun(cmd, args, PluginEntry, map[string]interface{}{
-			"projectName": *projectName,
-			"repoId":      *repoId,
+		runner.DirectRun(cmd, args, PluginEntry, map[string]any{
+			"connectionId": *connectionId,
+			"fullName":     *fullName,
 		}, "")
 	}
 	runner.RunCmd(cmd)

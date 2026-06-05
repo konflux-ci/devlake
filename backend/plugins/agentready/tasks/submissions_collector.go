@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,29 +12,35 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
-	"github.com/apache/incubator-devlake/core/log"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
 
-const maxTreeResponseSize = 5 << 20 // 5 MB
+const maxTreeResponseSize = 5 << 20
 
-// SubmissionEntry represents a single assessment file discovered in the
-// submissions directory tree.
+var CollectSubmissionsMeta = plugin.SubTaskMeta{
+	Name:             "collectSubmissions",
+	EntryPoint:       CollectSubmissions,
+	EnabledByDefault: true,
+	Description:      "Fetch assessment JSON files from the submissions repository for a specific scope",
+	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE},
+}
+
 type SubmissionEntry struct {
 	Org      string
 	Repo     string
 	Filename string
-	TreePath string // full path like "submissions/org/repo/file.json"
+	TreePath string
 }
 
 type githubTreeResponse struct {
 	SHA       string            `json:"sha"`
-	Tree      []githubTreeEntry `json:"tree"`
+	Tree      []GithubTreeEntry `json:"tree"`
 	Truncated bool              `json:"truncated"`
 }
 
-type githubTreeEntry struct {
+type GithubTreeEntry struct {
 	Path string `json:"path"`
 	Mode string `json:"mode"`
 	Type string `json:"type"`
@@ -41,9 +48,115 @@ type githubTreeEntry struct {
 	Size int    `json:"size"`
 }
 
-// ParseSubmissionEntries filters tree entries to find assessment JSON files
-// matching the expected {submissionsPath}/{org}/{repo}/{filename}.json structure.
-func ParseSubmissionEntries(tree []githubTreeEntry, submissionsPath string) []SubmissionEntry {
+type githubConnLookup struct {
+	ID       uint64 `gorm:"primaryKey;column:id"`
+	Endpoint string `gorm:"column:endpoint"`
+	Token    string `gorm:"column:token;serializer:encdec"`
+}
+
+func (githubConnLookup) TableName() string { return "_tool_github_connections" }
+
+type collectorAssessmentJSON struct {
+	Repository struct {
+		CommitHash string `json:"commit_hash"`
+	} `json:"repository"`
+}
+
+var defaultHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
+func CollectSubmissions(taskCtx plugin.SubTaskContext) errors.Error {
+	ctx := taskCtx.GetContext()
+	db := taskCtx.GetDal()
+	logger := taskCtx.GetLogger()
+	data := taskCtx.GetData().(*AgentReadyTaskData)
+	conn := data.Connection
+
+	var ghConn githubConnLookup
+	if err := db.First(&ghConn, dal.Where("id = ?", conn.GitHubConnectionId)); err != nil {
+		return errors.Default.Wrap(err, fmt.Sprintf("GitHub connection %d not found", conn.GitHubConnectionId))
+	}
+
+	endpoint := ghConn.Endpoint
+	if endpoint == "" {
+		endpoint = "https://api.github.com"
+	}
+
+	submissionsPath := conn.SubmissionsPath
+	if submissionsPath == "" {
+		submissionsPath = "submissions"
+	}
+
+	treeResp, fetchErr := FetchGithubTree(ctx, endpoint, conn.SubmissionsRepo, conn.Branch, ghConn.Token)
+	if fetchErr != nil {
+		return errors.Default.Wrap(fetchErr, "failed to fetch submissions tree")
+	}
+
+	if treeResp.Truncated {
+		logger.Warn(nil, "Submissions repo tree is truncated; some entries may be missing")
+	}
+
+	allEntries := ParseSubmissionEntries(treeResp.Tree, submissionsPath)
+
+	scopeFullName := data.Options.FullName
+	var entries []SubmissionEntry
+	for _, e := range allEntries {
+		entryFullName := fmt.Sprintf("%s/%s", e.Org, e.Repo)
+		if entryFullName == scopeFullName {
+			entries = append(entries, e)
+		}
+	}
+
+	logger.Info("Found %d assessment files for scope %s", len(entries), scopeFullName)
+	taskCtx.SetProgress(0, len(entries))
+
+	now := time.Now()
+	for _, entry := range entries {
+		rawJSON, fetchErr := FetchGithubAssessment(ctx, endpoint, conn.SubmissionsRepo, entry.TreePath, conn.Branch, ghConn.Token)
+		if fetchErr != nil {
+			logger.Warn(nil, "Failed to fetch submission %s: %v", entry.TreePath, fetchErr)
+			taskCtx.IncProgress(1)
+			continue
+		}
+		if rawJSON == "" {
+			taskCtx.IncProgress(1)
+			continue
+		}
+
+		var partial collectorAssessmentJSON
+		if jsonErr := json.Unmarshal([]byte(rawJSON), &partial); jsonErr != nil {
+			logger.Warn(nil, "Failed to parse submission JSON %s: %v", entry.TreePath, jsonErr)
+			taskCtx.IncProgress(1)
+			continue
+		}
+
+		commitHash := partial.Repository.CommitHash
+		if commitHash == "" {
+			logger.Warn(nil, "Submission %s has no commit_hash, skipping", entry.TreePath)
+			taskCtx.IncProgress(1)
+			continue
+		}
+
+		repoId := scopeFullName
+		assessment := &models.AgentReadyAssessment{
+			Id:           fmt.Sprintf("%s:%s", repoId, commitHash),
+			RepoId:       repoId,
+			RepoName:     scopeFullName,
+			ConnectionId: conn.ID,
+			Provider:     "github",
+			CollectedAt:  now,
+			RawJSON:      rawJSON,
+		}
+
+		if saveErr := db.CreateOrUpdate(assessment); saveErr != nil {
+			logger.Warn(saveErr, "Failed to save submission assessment for %s", entry.TreePath)
+		}
+		taskCtx.IncProgress(1)
+	}
+
+	return nil
+}
+
+func ParseSubmissionEntries(tree []GithubTreeEntry, submissionsPath string) []SubmissionEntry {
 	prefix := submissionsPath + "/"
 	var entries []SubmissionEntry
 
@@ -58,7 +171,6 @@ func ParseSubmissionEntries(tree []githubTreeEntry, submissionsPath string) []Su
 			continue
 		}
 
-		// Strip prefix to get "org/repo/filename.json"; reject deeper nesting
 		relPath := strings.TrimPrefix(entry.Path, prefix)
 		parts := strings.SplitN(relPath, "/", 4)
 		if len(parts) != 3 {
@@ -76,14 +188,17 @@ func ParseSubmissionEntries(tree []githubTreeEntry, submissionsPath string) []Su
 	return entries
 }
 
-// FetchGithubTree fetches the full recursive tree for a branch via the
-// GitHub Git Trees API.
-func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token string) (*githubTreeResponse, error) {
+func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token string, client ...*http.Client) (*githubTreeResponse, error) {
 	if token == "" {
 		return nil, fmt.Errorf("a GitHub token is required to fetch the tree")
 	}
 	if branch == "" {
 		branch = "main"
+	}
+
+	hc := defaultHTTPClient
+	if len(client) > 0 && client[0] != nil {
+		hc = client[0]
 	}
 
 	endpoint = strings.TrimSuffix(endpoint, "/")
@@ -96,7 +211,7 @@ func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token stri
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := hc.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching tree from GitHub: %w", err)
 	}
@@ -123,115 +238,70 @@ func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token stri
 	return &treeResp, nil
 }
 
-// MakeSubmissionsRepoId creates a synthetic repo ID for submissions-sourced
-// assessments in the format "submissions:{org}/{repo}".
-func MakeSubmissionsRepoId(org, repo string) string {
-	return fmt.Sprintf("submissions:%s/%s", org, repo)
-}
+const maxAssessmentSize = 10 << 20
 
-// collectFromSubmissionsRepo fetches all assessment JSON files from a
-// centralized submissions repository and stores them as assessments.
-func collectFromSubmissionsRepo(ctx context.Context, db dal.Dal, logger log.Logger, taskCtx plugin.SubTaskContext, config *models.AgentReadyScopeConfig, projectName string) {
-	submissionsPath := config.SubmissionsPath
-	if submissionsPath == "" {
-		submissionsPath = models.DefaultSubmissionsPath
+func FetchGithubAssessment(ctx context.Context, endpoint, fullName, filePath, branch, token string, client ...*http.Client) (string, error) {
+	hc := defaultHTTPClient
+	if len(client) > 0 && client[0] != nil {
+		hc = client[0]
 	}
 
-	// Look up the GitHub connection for authentication
-	var conn githubConn
-	dbErr := db.First(&conn, dal.Where("id = ?", config.SubmissionsConnectionId))
-	if dbErr != nil {
-		logger.Warn(dbErr, "GitHub connection %d not found for submissions repo", config.SubmissionsConnectionId)
-		return
-	}
+	endpoint = strings.TrimSuffix(endpoint, "/")
+	apiURL := fmt.Sprintf("%s/repos/%s/contents/%s", endpoint, fullName, filePath)
 
-	endpoint := conn.Endpoint
-	if endpoint == "" {
-		endpoint = "https://api.github.com"
-	}
-
-	branch := config.SubmissionsBranch
-
-	// Fetch the full recursive tree
-	treeResp, err := FetchGithubTree(ctx, endpoint, config.SubmissionsRepo, branch, conn.Token)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
-		logger.Warn(nil, "Failed to fetch tree for submissions repo %s: %v", config.SubmissionsRepo, err)
-		return
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	if branch != "" {
+		q := req.URL.Query()
+		q.Set("ref", branch)
+		req.URL.RawQuery = q.Encode()
+	}
+	if token == "" {
+		return "", fmt.Errorf("a GitHub token is required to make requests")
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := hc.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching from GitHub: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		return "", fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	if treeResp.Truncated {
-		logger.Warn(nil, "Submissions repo tree is truncated; some entries may be missing")
+	var result struct {
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAssessmentSize+1))
+	if err != nil {
+		return "", fmt.Errorf("reading GitHub response: %w", err)
+	}
+	if len(body) > maxAssessmentSize {
+		return "", fmt.Errorf("GitHub response exceeds %d bytes limit", maxAssessmentSize)
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("decoding GitHub response: %w", err)
 	}
 
-	// Parse entries from the tree
-	entries := ParseSubmissionEntries(treeResp.Tree, submissionsPath)
-	logger.Info("Found %d submission entries in %s", len(entries), config.SubmissionsRepo)
-
-	// Register submission repos in project_mapping so Grafana dashboards
-	// (which JOIN on project_mapping) can find them.
-	if projectName != "" {
-		seen := map[string]bool{}
-		for _, entry := range entries {
-			repoId := MakeSubmissionsRepoId(entry.Org, entry.Repo)
-			if seen[repoId] {
-				continue
-			}
-			seen[repoId] = true
-			mapping := &projectMappingRow{
-				ProjectName: projectName,
-				Table:       "repos",
-				RowId:       repoId,
-			}
-			if mapErr := db.CreateOrUpdate(mapping); mapErr != nil {
-				logger.Warn(mapErr, "Failed to insert project_mapping for %s", repoId)
-			}
-		}
+	if result.Encoding != "base64" {
+		return "", fmt.Errorf("unexpected encoding: %s", result.Encoding)
 	}
 
-	now := time.Now()
-	for _, entry := range entries {
-		// Fetch the assessment file content via the Contents API
-		rawJSON, fetchErr := FetchGithubAssessment(ctx, endpoint, config.SubmissionsRepo, entry.TreePath, branch, conn.Token)
-		if fetchErr != nil {
-			logger.Warn(nil, "Failed to fetch submission %s: %v", entry.TreePath, fetchErr)
-			taskCtx.IncProgress(1)
-			continue
-		}
-		if rawJSON == "" {
-			logger.Info("Empty submission file %s, skipping", entry.TreePath)
-			taskCtx.IncProgress(1)
-			continue
-		}
-
-		// Parse partial JSON to extract commit hash
-		var partial collectorAssessmentJSON
-		if jsonErr := json.Unmarshal([]byte(rawJSON), &partial); jsonErr != nil {
-			logger.Warn(nil, "Failed to parse submission JSON %s: %v", entry.TreePath, jsonErr)
-			taskCtx.IncProgress(1)
-			continue
-		}
-
-		commitHash := partial.Repository.CommitHash
-		if commitHash == "" {
-			logger.Warn(nil, "Submission %s has no commit_hash, skipping", entry.TreePath)
-			taskCtx.IncProgress(1)
-			continue
-		}
-
-		repoId := MakeSubmissionsRepoId(entry.Org, entry.Repo)
-		assessment := &models.AgentReadyAssessment{
-			Id:           fmt.Sprintf("%s:%s", repoId, commitHash),
-			RepoId:       repoId,
-			RepoName:     fmt.Sprintf("%s/%s", entry.Org, entry.Repo),
-			ConnectionId: config.SubmissionsConnectionId,
-			Provider:     "submissions",
-			CollectedAt:  now,
-			RawJSON:      rawJSON,
-		}
-
-		if saveErr := db.CreateOrUpdate(assessment); saveErr != nil {
-			logger.Warn(saveErr, "Failed to save submission assessment for %s", entry.TreePath)
-		}
-		taskCtx.IncProgress(1)
+	cleaned := strings.ReplaceAll(result.Content, "\n", "")
+	decoded, err := base64.StdEncoding.DecodeString(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("decoding base64 content: %w", err)
 	}
+
+	return string(decoded), nil
 }

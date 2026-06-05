@@ -20,13 +20,15 @@ type CertCount struct {
 }
 
 func GetStats(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	db := basicRes.GetDal()
+
 	var baseClauses []dal.Clause
 
 	if projectName := input.Query.Get("projectName"); projectName != "" {
 		baseClauses = []dal.Clause{
 			dal.From("_tool_agentready_assessments a"),
 			dal.Join("JOIN project_mapping pm ON a.repo_id = pm.row_id"),
-			dal.Where("pm.project_name = ? AND pm.`table` = ?", projectName, "repos"),
+			dal.Where("pm.project_name = ? AND pm.`table` = ?", projectName, models.ProjectMappingTable),
 		}
 	} else {
 		baseClauses = []dal.Clause{
@@ -65,7 +67,7 @@ func GetStats(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors
 	}
 
 	return &plugin.ApiResourceOutput{
-		Body: map[string]interface{}{
+		Body: map[string]any{
 			"totalAssessments":          agg.Total,
 			"averageScore":              agg.AvgScore,
 			"certificationDistribution": certDist,
