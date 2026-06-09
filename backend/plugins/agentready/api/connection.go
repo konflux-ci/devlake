@@ -26,14 +26,33 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
+	"github.com/apache/incubator-devlake/plugins/agentready/tasks"
 )
 
 func PostConnections(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	var conn models.AgentReadyConnection
+	if err := api.Decode(input.Body, &conn, nil); err != nil {
+		return nil, errors.BadInput.Wrap(err, "failed to decode connection")
+	}
+	resolveDefaultBranch(&conn)
+	if conn.Branch != "" {
+		input.Body["branch"] = conn.Branch
+	}
 	return dsHelper.ConnApi.Post(input)
 }
 
 func PatchConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	return dsHelper.ConnApi.Patch(input)
+	model, err := dsHelper.ConnApi.PatchModel(input, true)
+	if err != nil {
+		return nil, errors.Convert(err)
+	}
+	resolveDefaultBranch(model)
+	if updateErr := dsHelper.ConnApi.ConnectionSrvHelper.Update(model); updateErr != nil {
+		return nil, updateErr
+	}
+	return &plugin.ApiResourceOutput{
+		Body: dsHelper.ConnApi.Sanitize(model),
+	}, nil
 }
 
 func DeleteConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
@@ -55,6 +74,41 @@ type githubConn struct {
 }
 
 func (githubConn) TableName() string { return "_tool_github_connections" }
+
+func resolveDefaultBranch(conn *models.AgentReadyConnection) {
+	if conn.Branch != "" {
+		return
+	}
+	if conn.SubmissionsRepo == "" {
+		return
+	}
+	if conn.GitHubConnectionId == 0 {
+		return
+	}
+
+	logger := basicRes.GetLogger()
+
+	db := basicRes.GetDal()
+	var ghConn githubConn
+	if err := db.First(&ghConn, dal.Where("id = ?", conn.GitHubConnectionId)); err != nil {
+		logger.Warn(err, "could not look up GitHub connection %d for branch resolution, defaulting to main", conn.GitHubConnectionId)
+		conn.Branch = "main"
+		return
+	}
+
+	endpoint := ghConn.Endpoint
+	if endpoint == "" {
+		endpoint = "https://api.github.com"
+	}
+
+	branch, fetchErr := tasks.FetchDefaultBranch(gocontext.TODO(), endpoint, conn.SubmissionsRepo, ghConn.Token)
+	if fetchErr != nil {
+		logger.Warn(nil, "could not resolve default branch for %s: %v, defaulting to main", conn.SubmissionsRepo, fetchErr)
+		conn.Branch = "main"
+		return
+	}
+	conn.Branch = branch
+}
 
 func TestConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	var conn models.AgentReadyConnection
