@@ -254,6 +254,59 @@ func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token stri
 	return &treeResp, nil
 }
 
+func FetchDefaultBranch(ctx context.Context, endpoint, fullName, token string, client ...*http.Client) (string, error) {
+	if token == "" {
+		return "", fmt.Errorf("a GitHub token is required to fetch the default branch")
+	}
+
+	hc := defaultHTTPClient
+	if len(client) > 0 && client[0] != nil {
+		hc = client[0]
+	}
+
+	endpoint = strings.TrimSuffix(endpoint, "/")
+	apiURL := fmt.Sprintf("%s/repos/%s", endpoint, fullName)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := hc.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching from GitHub: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		return "", fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxTreeResponseSize+1))
+	if err != nil {
+		return "", fmt.Errorf("reading response: %w", err)
+	}
+	if len(body) > maxTreeResponseSize {
+		return "", fmt.Errorf("response exceeds %d bytes limit", maxTreeResponseSize)
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("decoding response: %w", err)
+	}
+
+	if result.DefaultBranch == "" {
+		return "", fmt.Errorf("default_branch is empty in response")
+	}
+
+	return result.DefaultBranch, nil
+}
+
 const maxAssessmentSize = 10 << 20
 
 func FetchGithubAssessment(ctx context.Context, endpoint, fullName, filePath, branch, token string, client ...*http.Client) (string, error) {

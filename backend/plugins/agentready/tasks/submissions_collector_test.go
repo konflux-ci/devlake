@@ -241,3 +241,71 @@ func TestFetchGithubAssessment_CustomBranch(t *testing.T) {
 		t.Errorf("expected %q, got %q", assessmentJSON, result)
 	}
 }
+
+func TestFetchDefaultBranch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/owner/repo" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("expected Bearer test-token, got %s", r.Header.Get("Authorization"))
+		}
+
+		resp := map[string]any{
+			"default_branch": "develop",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	result, err := FetchDefaultBranch(context.Background(), server.URL, "owner/repo", "test-token")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "develop" {
+		t.Errorf("expected %q, got %q", "develop", result)
+	}
+}
+
+func TestFetchDefaultBranch_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"message": "Not Found"}`))
+	}))
+	defer server.Close()
+
+	_, err := FetchDefaultBranch(context.Background(), server.URL, "owner/repo", "test-token")
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+	if !strings.Contains(err.Error(), "404") {
+		t.Errorf("expected error containing '404', got %v", err)
+	}
+}
+
+func TestFetchDefaultBranch_EmptyDefault(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"default_branch": ""}`))
+	}))
+	defer server.Close()
+
+	_, err := FetchDefaultBranch(context.Background(), server.URL, "owner/repo", "test-token")
+	if err == nil {
+		t.Fatal("expected error for empty default_branch")
+	}
+	if !strings.Contains(err.Error(), "empty") {
+		t.Errorf("expected error containing 'empty', got %v", err)
+	}
+}
+
+func TestFetchDefaultBranch_NoToken(t *testing.T) {
+	_, err := FetchDefaultBranch(context.Background(), "https://api.github.com", "owner/repo", "")
+	if err == nil {
+		t.Fatal("expected error for empty token")
+	}
+	if !strings.Contains(err.Error(), "token is required") {
+		t.Errorf("expected error containing 'token is required', got %v", err)
+	}
+}
