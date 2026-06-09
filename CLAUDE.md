@@ -781,3 +781,6 @@ podman compose -f docker-compose-dev.yml exec mysql mysql -uroot -padmin -e "
 - Tests next to source: `foo.go` → `foo_test.go`
 - E2E test fixtures: `e2e/raw_tables/*.csv`
 - Migrations: `models/migrationscripts/`
+
+Also follow the rules in [AGENTS.md](./AGENTS.md) — plugin ownership and upstream
+divergence tracking.

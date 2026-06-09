@@ -26,13 +26,24 @@ Key components: `backend/` (Go server + plugins), `config-ui/` (React frontend),
 
 ## Owned Plugins
 
-This is a fork of Apache DevLake. Our team owns **only** three plugins. Do NOT modify upstream code outside these directories:
+This is a fork of Apache DevLake. An **owned plugin** is identified by having an
+`AGENTS.md` file in its directory (`backend/plugins/<name>/AGENTS.md`).
+Read the plugin's `AGENTS.md` before making changes.
 
-- `backend/plugins/aireview/` — AI review metrics ([AGENTS.md](backend/plugins/aireview/AGENTS.md))
-- `backend/plugins/codecov/` — code coverage ([AGENTS.md](backend/plugins/codecov/AGENTS.md))
-- `backend/plugins/testregistry/` — CI test results ([AGENTS.md](backend/plugins/testregistry/AGENTS.md))
+To add a new owned plugin, create `backend/plugins/<name>/AGENTS.md` with
+build/test commands, layout, and conventions for that plugin.
 
-Each plugin has its own `AGENTS.md` with layout, conventions, and pattern references. Read it before making changes. Each plugin also has a `skills/` directory with detailed checklists (e.g., PR definition of done).
+## Upstream Divergence
+
+This fork occasionally modifies files from upstream Apache DevLake. All such
+modifications are tracked in [`docs/upstream-diffs.md`](docs/upstream-diffs.md).
+
+**Before modifying any file outside an owned plugin directory:**
+
+1. Check `docs/upstream-diffs.md` — if the file is listed, follow the noted constraints.
+2. If introducing a new divergence, add an entry to `docs/upstream-diffs.md` with:
+   files changed, reason, upstream status, upstream PR link, owner, and rebase notes.
+3. Use `Upstream-Status:` trailer in commit messages for upstream-divergent changes.
 
 ## Quick Reference
 
