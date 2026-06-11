@@ -48,12 +48,19 @@ func RemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, er
 	}
 
 	branch := connection.Branch
+	if branch == "" {
+		resolvedBranch, branchErr := tasks.FetchDefaultBranch(gocontext.Background(), endpoint, connection.SubmissionsRepo, ghConn.Token)
+		if branchErr != nil {
+			return nil, errors.Default.Wrap(branchErr, "failed to resolve default branch")
+		}
+		branch = resolvedBranch
+	}
 	submissionsPath := connection.SubmissionsPath
 	if submissionsPath == "" {
 		submissionsPath = "submissions"
 	}
 
-	treeResp, fetchErr := tasks.FetchGithubTree(gocontext.TODO(), endpoint, connection.SubmissionsRepo, branch, ghConn.Token)
+	treeResp, fetchErr := tasks.FetchGithubTree(gocontext.Background(), endpoint, connection.SubmissionsRepo, branch, ghConn.Token)
 	if fetchErr != nil {
 		return nil, errors.Default.Wrap(fetchErr, "failed to fetch submissions tree")
 	}

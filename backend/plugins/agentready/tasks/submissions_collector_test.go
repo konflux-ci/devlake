@@ -164,21 +164,13 @@ func TestFetchGithubTree_NoToken(t *testing.T) {
 	}
 }
 
-func TestFetchGithubTree_DefaultBranch(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/owner/repo/git/trees/main" {
-			t.Errorf("expected path /repos/owner/repo/git/trees/main, got %s", r.URL.Path)
-		}
-
-		resp := githubTreeResponse{SHA: "abc", Tree: []GithubTreeEntry{}}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer server.Close()
-
-	_, err := FetchGithubTree(context.Background(), server.URL, "owner/repo", "", "test-token")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestFetchGithubTree_EmptyBranch(t *testing.T) {
+	_, err := FetchGithubTree(context.Background(), "https://api.github.com", "owner/repo", "", "test-token")
+	if err == nil {
+		t.Fatal("expected error for empty branch")
+	}
+	if !strings.Contains(err.Error(), "branch is required") {
+		t.Errorf("expected error about branch required, got: %v", err)
 	}
 }
 
