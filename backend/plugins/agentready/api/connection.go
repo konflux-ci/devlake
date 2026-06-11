@@ -34,7 +34,7 @@ func PostConnections(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 	if err := api.Decode(input.Body, &conn, nil); err != nil {
 		return nil, errors.BadInput.Wrap(err, "failed to decode connection")
 	}
-	resolveDefaultBranch(&conn)
+	resolveDefaultBranch(gocontext.Background(), &conn)
 	if conn.Branch != "" {
 		input.Body["branch"] = conn.Branch
 	}
@@ -46,7 +46,7 @@ func PatchConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 	if err != nil {
 		return nil, errors.Convert(err)
 	}
-	resolveDefaultBranch(model)
+	resolveDefaultBranch(gocontext.Background(), model)
 	if updateErr := dsHelper.ConnApi.ConnectionSrvHelper.Update(model); updateErr != nil {
 		return nil, updateErr
 	}
@@ -75,7 +75,7 @@ type githubConn struct {
 
 func (githubConn) TableName() string { return "_tool_github_connections" }
 
-func resolveDefaultBranch(conn *models.AgentReadyConnection) {
+func resolveDefaultBranch(ctx gocontext.Context, conn *models.AgentReadyConnection) {
 	if conn.Branch != "" {
 		return
 	}
@@ -101,7 +101,7 @@ func resolveDefaultBranch(conn *models.AgentReadyConnection) {
 		endpoint = "https://api.github.com"
 	}
 
-	branch, fetchErr := tasks.FetchDefaultBranch(gocontext.TODO(), endpoint, conn.SubmissionsRepo, ghConn.Token)
+	branch, fetchErr := tasks.FetchDefaultBranch(ctx, endpoint, conn.SubmissionsRepo, ghConn.Token)
 	if fetchErr != nil {
 		logger.Warn(nil, "could not resolve default branch for %s: %v, defaulting to main", conn.SubmissionsRepo, fetchErr)
 		conn.Branch = "main"
@@ -115,7 +115,7 @@ func TestConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 	if err := api.Decode(input.Body, &conn, nil); err != nil {
 		return nil, errors.BadInput.Wrap(err, "failed to decode connection")
 	}
-	return testAgentReadyConnection(&conn)
+	return testAgentReadyConnection(gocontext.Background(), &conn)
 }
 
 func TestExistingConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
@@ -123,10 +123,10 @@ func TestExistingConnection(input *plugin.ApiResourceInput) (*plugin.ApiResource
 	if err != nil {
 		return nil, errors.Convert(err)
 	}
-	return testAgentReadyConnection(connection)
+	return testAgentReadyConnection(gocontext.Background(), connection)
 }
 
-func testAgentReadyConnection(conn *models.AgentReadyConnection) (*plugin.ApiResourceOutput, errors.Error) {
+func testAgentReadyConnection(ctx gocontext.Context, conn *models.AgentReadyConnection) (*plugin.ApiResourceOutput, errors.Error) {
 	if conn.GitHubConnectionId == 0 {
 		return nil, errors.BadInput.New("githubConnectionId is required")
 	}
@@ -149,7 +149,7 @@ func testAgentReadyConnection(conn *models.AgentReadyConnection) (*plugin.ApiRes
 		return nil, errors.BadInput.New("referenced GitHub connection has no token")
 	}
 
-	apiClient, err := api.NewApiClient(gocontext.TODO(), endpoint, nil, 0, "", basicRes)
+	apiClient, err := api.NewApiClient(ctx, endpoint, nil, 0, "", basicRes)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "failed to create API client")
 	}

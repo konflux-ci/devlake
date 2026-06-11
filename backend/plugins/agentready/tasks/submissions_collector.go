@@ -209,7 +209,7 @@ func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token stri
 		return nil, fmt.Errorf("a GitHub token is required to fetch the tree")
 	}
 	if branch == "" {
-		branch = "main"
+		return nil, fmt.Errorf("branch is required; resolve the default branch before calling FetchGithubTree")
 	}
 
 	hc := defaultHTTPClient
@@ -234,7 +234,10 @@ func FetchGithubTree(ctx context.Context, endpoint, fullName, branch, token stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 256))
+		if readErr != nil {
+			return nil, fmt.Errorf("GitHub Trees API returned %d (body unreadable: %w)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("GitHub Trees API returned %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -281,7 +284,10 @@ func FetchDefaultBranch(ctx context.Context, endpoint, fullName, token string, c
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 256))
+		if readErr != nil {
+			return "", fmt.Errorf("GitHub API returned %d (body unreadable: %w)", resp.StatusCode, readErr)
+		}
 		return "", fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -343,7 +349,10 @@ func FetchGithubAssessment(ctx context.Context, endpoint, fullName, filePath, br
 		return "", nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 256))
+		if readErr != nil {
+			return "", fmt.Errorf("GitHub API returned %d (body unreadable: %w)", resp.StatusCode, readErr)
+		}
 		return "", fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, string(body))
 	}
 

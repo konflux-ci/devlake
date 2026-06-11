@@ -34,7 +34,7 @@ func Init(br context.BasicRes, p plugin.PluginMeta) {
 	](
 		br,
 		p.Name(),
-		[]string{"fullName"},
+		[]string{"full_name"},
 		func(c models.AgentReadyConnection) models.AgentReadyConnection {
 			return c.Sanitize()
 		},
