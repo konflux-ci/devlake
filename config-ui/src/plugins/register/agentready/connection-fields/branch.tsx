@@ -16,21 +16,32 @@
  *
  */
 
-import { request } from '@/utils';
+import { useEffect } from 'react';
+import { Input } from 'antd';
 
-export interface IAgentReadyScopeConfig {
-  id?: number;
-  name?: string;
-  branch: string;
-  assessmentFilePath: string;
-  excludeRepos: string;
+import { Block } from '@/components';
+
+interface Props {
+  initialValue: string;
+  value: string;
+  error: string;
+  setValue: (value: string) => void;
+  setError: (error: string) => void;
 }
 
-export const getScopeConfig = (id: number): Promise<IAgentReadyScopeConfig> =>
-  request(`/plugins/agentready/scope-configs/${id}`);
+export const BranchInput = ({ initialValue, value, setValue }: Props) => {
+  useEffect(() => {
+    if (initialValue && !value) {
+      setValue(initialValue);
+    }
+  }, [initialValue]);
 
-export const createScopeConfig = (data: Partial<IAgentReadyScopeConfig>): Promise<IAgentReadyScopeConfig> =>
-  request('/plugins/agentready/scope-configs', { method: 'post', data });
-
-export const updateScopeConfig = (id: number, data: Partial<IAgentReadyScopeConfig>): Promise<IAgentReadyScopeConfig> =>
-  request(`/plugins/agentready/scope-configs/${id}`, { method: 'patch', data });
+  return (
+    <Block
+      title="Branch"
+      description="Branch to read from in the submissions repo. Leave empty for the default branch."
+    >
+      <Input style={{ width: 386 }} placeholder="main" value={value} onChange={(e) => setValue(e.target.value)} />
+    </Block>
+  );
+};

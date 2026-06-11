@@ -18,6 +18,7 @@
 
 import { IPluginConfig } from '@/types';
 
+import { AgentReadyConfig } from './agentready';
 import { ArgoCDConfig } from './argocd';
 import { AzureConfig, AzureGoConfig } from './azure';
 import { BambooConfig } from './bamboo';
@@ -42,6 +43,7 @@ import { TestRegistryConfig } from './testregistry';
 import { SlackConfig } from './slack/config';
 
 export const pluginConfigs: IPluginConfig[] = [
+  AgentReadyConfig,
   ArgoCDConfig,
   AzureConfig,
   AzureGoConfig,

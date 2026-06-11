@@ -1,3 +1,19 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package migrationscripts
 
 import (
@@ -7,6 +23,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
 )
 
@@ -14,12 +31,43 @@ var _ plugin.MigrationScript = (*initSchema)(nil)
 
 type initSchema struct{}
 
-type agentReadyAssessment20260511 struct {
+type agentReadyConnection20260604 struct {
+	helper.BaseConnection `mapstructure:",squash"`
+	Project               string `gorm:"column:project;type:varchar(200)"`
+	GitHubConnectionId    uint64 `gorm:"column:github_connection_id;not null"`
+	SubmissionsRepo       string `gorm:"column:submissions_repo;type:varchar(255);not null"`
+	SubmissionsPath       string `gorm:"column:submissions_path;type:varchar(255);default:submissions"`
+	Branch                string `gorm:"column:branch;type:varchar(255)"`
+}
+
+func (agentReadyConnection20260604) TableName() string {
+	return "_tool_agentready_connections"
+}
+
+type agentReadyScope20260604 struct {
+	common.Scope `mapstructure:",squash"`
+	FullName     string `gorm:"primaryKey;type:varchar(255)"`
+	Name         string `gorm:"type:varchar(255)"`
+}
+
+func (agentReadyScope20260604) TableName() string {
+	return "_tool_agentready_scopes"
+}
+
+type agentReadyScopeConfig20260604 struct {
+	common.ScopeConfig `gorm:"embedded"`
+}
+
+func (agentReadyScopeConfig20260604) TableName() string {
+	return "_tool_agentready_scope_configs"
+}
+
+type agentReadyAssessment20260604 struct {
 	common.NoPKModel
 	Id                 string    `gorm:"primaryKey;type:varchar(255)"`
 	RepoId             string    `gorm:"index;type:varchar(255)"`
 	RepoName           string    `gorm:"type:varchar(255)"`
-	ConnectionId       uint64    `gorm:"index"`
+	ConnectionId       uint64    `gorm:"primaryKey"`
 	Provider           string    `gorm:"type:varchar(50)"`
 	SchemaVersion      string    `gorm:"type:varchar(20)"`
 	OverallScore       float64   `gorm:"type:float"`
@@ -34,13 +82,14 @@ type agentReadyAssessment20260511 struct {
 	RawJSON            string `gorm:"type:longtext"`
 }
 
-func (agentReadyAssessment20260511) TableName() string {
+func (agentReadyAssessment20260604) TableName() string {
 	return "_tool_agentready_assessments"
 }
 
-type agentReadyFinding20260511 struct {
+type agentReadyFinding20260604 struct {
 	common.NoPKModel
 	Id                 string   `gorm:"primaryKey;type:varchar(255)"`
+	ConnectionId       uint64   `gorm:"primaryKey"`
 	AssessmentId       string   `gorm:"index;type:varchar(255)"`
 	RepoId             string   `gorm:"index;type:varchar(255)"`
 	AttributeId        string   `gorm:"type:varchar(255)"`
@@ -57,13 +106,14 @@ type agentReadyFinding20260511 struct {
 	DefaultWeight      float64  `gorm:"type:float"`
 }
 
-func (agentReadyFinding20260511) TableName() string {
+func (agentReadyFinding20260604) TableName() string {
 	return "_tool_agentready_findings"
 }
 
-type agentReadyMetric20260511 struct {
+type agentReadyMetric20260604 struct {
 	common.NoPKModel
 	Id             string    `gorm:"primaryKey;type:varchar(255)"`
+	ConnectionId   uint64    `gorm:"primaryKey"`
 	RepoId         string    `gorm:"index;type:varchar(255)"`
 	AssessedAt     time.Time `gorm:"index"`
 	PassCount      int       `gorm:"type:int"`
@@ -76,33 +126,24 @@ type agentReadyMetric20260511 struct {
 	CategoryScores string    `gorm:"type:text"`
 }
 
-func (agentReadyMetric20260511) TableName() string {
+func (agentReadyMetric20260604) TableName() string {
 	return "_tool_agentready_metrics"
-}
-
-type agentReadyScopeConfig20260511 struct {
-	common.ScopeConfig `gorm:"embedded"`
-	Branch             string `gorm:"type:varchar(255)"`
-	AssessmentFilePath string `gorm:"type:varchar(500)"`
-	ExcludeRepos       string `gorm:"type:text"`
-}
-
-func (agentReadyScopeConfig20260511) TableName() string {
-	return "_tool_agentready_scope_configs"
 }
 
 func (script *initSchema) Up(basicRes context.BasicRes) errors.Error {
 	return migrationhelper.AutoMigrateTables(
 		basicRes,
-		&agentReadyAssessment20260511{},
-		&agentReadyFinding20260511{},
-		&agentReadyMetric20260511{},
-		&agentReadyScopeConfig20260511{},
+		&agentReadyConnection20260604{},
+		&agentReadyScope20260604{},
+		&agentReadyScopeConfig20260604{},
+		&agentReadyAssessment20260604{},
+		&agentReadyFinding20260604{},
+		&agentReadyMetric20260604{},
 	)
 }
 
 func (script *initSchema) Version() uint64 {
-	return 20260511000001
+	return 20260604000001
 }
 
 func (script *initSchema) Name() string {

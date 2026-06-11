@@ -1,103 +1,46 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package api
 
 import (
-	"net/http"
-	"strconv"
-
-	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
-	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
-	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
 
-func GetScopeConfigs(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	var configs []models.AgentReadyScopeConfig
-	err := db.All(&configs, dal.From(&models.AgentReadyScopeConfig{}))
-	if err != nil {
-		return nil, errors.Default.Wrap(err, "failed to query scope configs")
-	}
-	return &plugin.ApiResourceOutput{
-		Body:   configs,
-		Status: http.StatusOK,
-	}, nil
-}
-
 func CreateScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	var config models.AgentReadyScopeConfig
-	err := helper.Decode(input.Body, &config, nil)
-	if err != nil {
-		return nil, errors.BadInput.Wrap(err, "failed to decode scope config")
-	}
-	if config.AssessmentFilePath == "" {
-		config.AssessmentFilePath = models.DefaultAssessmentFilePath
-	}
-	dbErr := db.Create(&config)
-	if dbErr != nil {
-		return nil, errors.Default.Wrap(dbErr, "failed to create scope config")
-	}
-	return &plugin.ApiResourceOutput{
-		Body:   config,
-		Status: http.StatusCreated,
-	}, nil
-}
-
-func GetScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	id, parseErr := strconv.ParseUint(input.Params["id"], 10, 64)
-	if parseErr != nil {
-		return nil, errors.BadInput.Wrap(parseErr, "invalid scope config id")
-	}
-	var config models.AgentReadyScopeConfig
-	err := db.First(&config, dal.Where("id = ?", id))
-	if err != nil {
-		if db.IsErrorNotFound(err) {
-			return nil, errors.HttpStatus(http.StatusNotFound).Wrap(err, "scope config not found")
-		}
-		return nil, errors.Default.Wrap(err, "failed to get scope config")
-	}
-	return &plugin.ApiResourceOutput{
-		Body:   config,
-		Status: http.StatusOK,
-	}, nil
+	return dsHelper.ScopeConfigApi.Post(input)
 }
 
 func UpdateScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	id, parseErr := strconv.ParseUint(input.Params["id"], 10, 64)
-	if parseErr != nil {
-		return nil, errors.BadInput.Wrap(parseErr, "invalid scope config id")
-	}
-	var config models.AgentReadyScopeConfig
-	err := db.First(&config, dal.Where("id = ?", id))
-	if err != nil {
-		if db.IsErrorNotFound(err) {
-			return nil, errors.HttpStatus(http.StatusNotFound).Wrap(err, "scope config not found")
-		}
-		return nil, errors.Default.Wrap(err, "failed to get scope config")
-	}
-	decodeErr := helper.Decode(input.Body, &config, nil)
-	if decodeErr != nil {
-		return nil, errors.BadInput.Wrap(decodeErr, "failed to decode update")
-	}
-	dbErr := db.Update(&config)
-	if dbErr != nil {
-		return nil, errors.Default.Wrap(dbErr, "failed to update scope config")
-	}
-	return &plugin.ApiResourceOutput{
-		Body:   config,
-		Status: http.StatusOK,
-	}, nil
+	return dsHelper.ScopeConfigApi.Patch(input)
+}
+
+func GetScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ScopeConfigApi.GetDetail(input)
 }
 
 func DeleteScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	id, parseErr := strconv.ParseUint(input.Params["id"], 10, 64)
-	if parseErr != nil {
-		return nil, errors.BadInput.Wrap(parseErr, "invalid scope config id")
-	}
-	err := db.Delete(&models.AgentReadyScopeConfig{}, dal.Where("id = ?", id))
-	if err != nil {
-		return nil, errors.Default.Wrap(err, "failed to delete scope config")
-	}
-	return &plugin.ApiResourceOutput{
-		Status: http.StatusNoContent,
-	}, nil
+	return dsHelper.ScopeConfigApi.Delete(input)
+}
+
+func GetScopeConfigList(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ScopeConfigApi.GetAll(input)
+}
+
+func GetProjectsByScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	return dsHelper.ScopeConfigApi.GetProjectsByScopeConfig(input)
 }

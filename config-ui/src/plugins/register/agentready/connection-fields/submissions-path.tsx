@@ -16,21 +16,37 @@
  *
  */
 
-import { request } from '@/utils';
+import { useEffect } from 'react';
+import { Input } from 'antd';
 
-import * as aireview from './aireview';
-import * as jira from './jira';
-import * as tapd from './tapd';
-import * as webhook from './webhook';
+import { Block } from '@/components';
 
-export const list = (): Promise<[{ plugin: string }]> => request('/plugins');
+interface Props {
+  initialValue: string;
+  value: string;
+  error: string;
+  setValue: (value: string) => void;
+  setError: (error: string) => void;
+}
 
-export const plugin = {
-  list,
-  aireview,
-  jira,
-  tapd,
-  webhook,
+export const SubmissionsPath = ({ initialValue, value, setValue }: Props) => {
+  useEffect(() => {
+    if (initialValue && !value) {
+      setValue(initialValue);
+    }
+  }, [initialValue]);
+
+  return (
+    <Block
+      title="Submissions Path"
+      description="Subdirectory within the repo containing {org}/{repo}/{file}.json structure."
+    >
+      <Input
+        style={{ width: 386 }}
+        placeholder="submissions"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+    </Block>
+  );
 };
-
-export default plugin;

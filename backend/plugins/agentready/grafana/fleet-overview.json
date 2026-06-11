@@ -26,7 +26,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT AVG(a.overall_score) AS 'Avg Score'\nFROM _tool_agentready_assessments a\nINNER JOIN (\n  SELECT repo_id, MAX(assessed_at) as max_assessed\n  FROM _tool_agentready_assessments WHERE id != ''\n  GROUP BY repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed",
+          "rawSql": "SELECT AVG(a.overall_score) AS 'Avg Score'\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, MAX(aa.assessed_at) as max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project})",
           "format": "table",
           "refId": "A"
         }
@@ -55,7 +55,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT COUNT(DISTINCT repo_id) AS 'Total Repos'\nFROM _tool_agentready_assessments WHERE id != ''",
+          "rawSql": "SELECT COUNT(DISTINCT a.repo_id) AS 'Total Repos'\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE a.id != '' AND pm.project_name in (${project})",
           "format": "table",
           "refId": "A"
         }
@@ -68,7 +68,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT\n  a.certification_level AS metric,\n  COUNT(*) AS value\nFROM _tool_agentready_assessments a\nINNER JOIN (\n  SELECT repo_id, MAX(assessed_at) as max_assessed\n  FROM _tool_agentready_assessments WHERE id != ''\n  GROUP BY repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nGROUP BY a.certification_level",
+          "rawSql": "SELECT\n  a.certification_level AS metric,\n  COUNT(*) AS value\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, MAX(aa.assessed_at) as max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project})\nGROUP BY a.certification_level",
           "format": "table",
           "refId": "A"
         }
@@ -121,7 +121,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT\n  a.repo_name,\n  a.overall_score,\n  a.certification_level,\n  a.attributes_assessed,\n  a.attributes_total,\n  a.assessed_at\nFROM _tool_agentready_assessments a\nINNER JOIN (\n  SELECT repo_id, MAX(assessed_at) as max_assessed\n  FROM _tool_agentready_assessments\n  WHERE id != ''\n  GROUP BY repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nORDER BY a.overall_score DESC",
+          "rawSql": "SELECT\n  a.repo_name,\n  a.overall_score,\n  a.certification_level,\n  a.attributes_assessed,\n  a.attributes_total,\n  a.assessed_at\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, MAX(aa.assessed_at) as max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id\n) latest ON a.repo_id = latest.repo_id AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project})\nORDER BY a.overall_score DESC",
           "format": "table",
           "refId": "A"
         }
@@ -160,7 +160,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT\n  DATE(a.assessed_at) AS time,\n  AVG(a.overall_score) AS 'Average Score'\nFROM _tool_agentready_assessments a\nINNER JOIN (\n  SELECT repo_id, DATE(assessed_at) AS day, MAX(assessed_at) AS max_assessed\n  FROM _tool_agentready_assessments\n  WHERE id != ''\n  GROUP BY repo_id, DATE(assessed_at)\n) latest ON a.repo_id = latest.repo_id AND DATE(a.assessed_at) = latest.day AND a.assessed_at = latest.max_assessed\nWHERE $__timeFilter(a.assessed_at)\nGROUP BY DATE(a.assessed_at)\nORDER BY time",
+          "rawSql": "SELECT\n  DATE(a.assessed_at) AS time,\n  AVG(a.overall_score) AS 'Average Score'\nFROM _tool_agentready_assessments a\nJOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos'\nINNER JOIN (\n  SELECT aa.repo_id, DATE(aa.assessed_at) AS day, MAX(aa.assessed_at) AS max_assessed\n  FROM _tool_agentready_assessments aa\n  JOIN project_mapping pm2 ON aa.repo_id = pm2.row_id AND pm2.`table` = 'repos'\n  WHERE aa.id != '' AND pm2.project_name in (${project})\n  GROUP BY aa.repo_id, DATE(aa.assessed_at)\n) latest ON a.repo_id = latest.repo_id AND DATE(a.assessed_at) = latest.day AND a.assessed_at = latest.max_assessed\nWHERE pm.project_name in (${project}) AND $__timeFilter(a.assessed_at)\nGROUP BY DATE(a.assessed_at)\nORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
@@ -189,6 +189,27 @@
         "name": "DS_DEVLAKE",
         "type": "datasource",
         "query": "mysql"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": ["All"],
+          "value": ["$__all"]
+        },
+        "datasource": "${DS_DEVLAKE}",
+        "definition": "select distinct name from projects",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select distinct name from projects",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
