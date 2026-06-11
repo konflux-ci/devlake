@@ -14,7 +14,7 @@
 # limitations under the License.
 
 codecov:
-  require_ci_to_pass: false
+  require_ci_to_pass: true
 
 coverage:
   status:
