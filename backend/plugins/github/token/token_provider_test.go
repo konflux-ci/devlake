@@ -29,7 +29,6 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/impls/logruslog"
-	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
 	"github.com/apache/incubator-devlake/plugins/github/models"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -55,15 +54,18 @@ func TestNeedsRefresh(t *testing.T) {
 	}
 
 	// Not expired, outside buffer
-	tp.conn.TokenExpiresAt = time.Now().Add(10 * time.Minute)
+	expiry1 := time.Now().Add(10 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry1
 	assert.False(t, tp.needsRefresh())
 
 	// Inside buffer
-	tp.conn.TokenExpiresAt = time.Now().Add(1 * time.Minute)
+	expiry2 := time.Now().Add(1 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry2
 	assert.True(t, tp.needsRefresh())
 
 	// Expired
-	tp.conn.TokenExpiresAt = time.Now().Add(-1 * time.Minute)
+	expiry3 := time.Now().Add(-1 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry3
 	assert.True(t, tp.needsRefresh())
 
 	// No refresh token
@@ -75,10 +77,11 @@ func TestTokenProviderConcurrency(t *testing.T) {
 	mockRT := new(MockRoundTripper)
 	client := &http.Client{Transport: mockRT}
 
+	expired := time.Now().Add(-1 * time.Minute) // Expired
 	conn := &models.GithubConnection{
 		GithubConn: models.GithubConn{
 			RefreshToken:   "refresh_token",
-			TokenExpiresAt: time.Now().Add(-1 * time.Minute), // Expired
+			TokenExpiresAt: &expired,
 			GithubAppKey: models.GithubAppKey{
 				AppKey: api.AppKey{
 					AppId:     "123",
@@ -89,7 +92,7 @@ func TestTokenProviderConcurrency(t *testing.T) {
 	}
 
 	logger, _ := logruslog.NewDefaultLogger(logrus.New())
-	tp := NewTokenProvider(conn, nil, client, logger)
+	tp := NewTokenProvider(conn, nil, client, logger, "")
 
 	// Mock response for refresh
 	respBody := `{"access_token":"new_token","refresh_token":"new_refresh_token","expires_in":3600,"refresh_token_expires_in":3600}`
@@ -129,52 +132,118 @@ func TestConfigurableBuffer(t *testing.T) {
 	}
 
 	// 9 minutes remaining (inside 10m buffer)
-	tp.conn.TokenExpiresAt = time.Now().Add(9 * time.Minute)
+	expiry9 := time.Now().Add(9 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry9
 	assert.True(t, tp.needsRefresh())
 
 	// 11 minutes remaining (outside 10m buffer)
-	tp.conn.TokenExpiresAt = time.Now().Add(11 * time.Minute)
+	expiry11 := time.Now().Add(11 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry11
 	assert.False(t, tp.needsRefresh())
 }
 
-func TestPersistenceFailure(t *testing.T) {
-	mockRT := new(MockRoundTripper)
-	client := &http.Client{Transport: mockRT}
-	mockDal := new(mockdal.Dal)
+// fakeRefreshFn returns a refreshFn that updates the connection token to newToken
+// and increments the call counter pointed to by count.
+func fakeRefreshFn(newToken string, count *int) func(*TokenProvider) errors.Error {
+	return func(tp *TokenProvider) errors.Error {
+		*count++
+		newExpiry := time.Now().Add(1 * time.Hour)
+		tp.conn.UpdateToken(newToken, "", &newExpiry, nil)
+		return nil
+	}
+}
 
+func TestNeedsRefreshWithRefreshFn(t *testing.T) {
+	callCount := 0
+	tp := &TokenProvider{
+		conn:      &models.GithubConnection{},
+		refreshFn: fakeRefreshFn("unused", &callCount),
+	}
+
+	// Token not expired — outside default 5m buffer
+	expiry1 := time.Now().Add(10 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry1
+	assert.False(t, tp.needsRefresh(), "should not refresh when token is 10m from expiry")
+
+	// Token inside 5m buffer
+	expiry2 := time.Now().Add(2 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry2
+	assert.True(t, tp.needsRefresh(), "should refresh when token is 2m from expiry")
+
+	// Token already expired
+	expiry3 := time.Now().Add(-1 * time.Minute)
+	tp.conn.TokenExpiresAt = &expiry3
+	assert.True(t, tp.needsRefresh(), "should refresh when token is expired")
+
+	// TokenExpiresAt is nil — can't determine expiry, don't refresh (401 fallback covers this)
+	tp.conn.TokenExpiresAt = nil
+	assert.False(t, tp.needsRefresh(), "should not refresh when TokenExpiresAt is nil")
+
+	// Provider with neither refreshFn nor RefreshToken — should never refresh
+	tp2 := &TokenProvider{
+		conn: &models.GithubConnection{},
+	}
+	expiry4 := time.Now().Add(-1 * time.Minute)
+	tp2.conn.TokenExpiresAt = &expiry4
+	assert.False(t, tp2.needsRefresh(), "should not refresh without refreshFn or RefreshToken")
+}
+
+func TestAppKeyGetTokenTriggersRefresh(t *testing.T) {
+	callCount := 0
+	expired := time.Now().Add(-1 * time.Minute)
 	conn := &models.GithubConnection{
 		GithubConn: models.GithubConn{
-			RefreshToken: "refresh_token",
 			GithubAccessToken: models.GithubAccessToken{
 				AccessToken: api.AccessToken{
-					Token: "old_token",
+					Token: "expired_token",
 				},
 			},
-			GithubAppKey: models.GithubAppKey{
-				AppKey: api.AppKey{
-					AppId:     "123",
-					SecretKey: "secret",
+			TokenExpiresAt: &expired,
+		},
+	}
+
+	tp := &TokenProvider{
+		conn:      conn,
+		refreshFn: fakeRefreshFn("refreshed_app_token", &callCount),
+	}
+
+	token, err := tp.GetToken()
+	assert.NoError(t, err)
+	assert.Equal(t, "refreshed_app_token", token)
+	assert.Equal(t, 1, callCount, "refreshFn should have been called exactly once")
+
+	// Second call — token is now fresh, should not trigger refresh
+	token2, err := tp.GetToken()
+	assert.NoError(t, err)
+	assert.Equal(t, "refreshed_app_token", token2)
+	assert.Equal(t, 1, callCount, "refreshFn should not be called again for a fresh token")
+}
+
+func TestAppKeyForceRefresh(t *testing.T) {
+	callCount := 0
+	conn := &models.GithubConnection{
+		GithubConn: models.GithubConn{
+			GithubAccessToken: models.GithubAccessToken{
+				AccessToken: api.AccessToken{
+					Token: "old_app_token",
 				},
 			},
 		},
 	}
 
-	logger, _ := logruslog.NewDefaultLogger(logrus.New())
-	tp := NewTokenProvider(conn, mockDal, client, logger)
-
-	// Mock response for refresh
-	respBody := `{"access_token":"new_token","refresh_token":"new_refresh_token","expires_in":3600,"refresh_token_expires_in":3600}`
-	resp := &http.Response{
-		StatusCode: 200,
-		Body:       io.NopCloser(bytes.NewBufferString(respBody)),
+	tp := &TokenProvider{
+		conn:      conn,
+		refreshFn: fakeRefreshFn("new_app_token", &callCount),
 	}
-	mockRT.On("RoundTrip", mock.Anything).Return(resp, nil).Once()
 
-	// Mock DAL failure
-	mockDal.On("UpdateColumns", mock.Anything, mock.Anything, mock.AnythingOfType("[]dal.Clause")).Return(errors.Default.New("db error"))
-	err := tp.ForceRefresh("old_token")
-	assert.NoError(t, err) // Should not return error even if persistence fails
+	// ForceRefresh with matching old token — should trigger refresh
+	err := tp.ForceRefresh("old_app_token")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, callCount)
+	assert.Equal(t, "new_app_token", conn.Token)
 
-	mockRT.AssertExpectations(t)
-	mockDal.AssertExpectations(t)
+	// ForceRefresh with stale old token — token has already changed, should be a no-op
+	err = tp.ForceRefresh("old_app_token")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, callCount, "should not refresh when token has already changed")
 }

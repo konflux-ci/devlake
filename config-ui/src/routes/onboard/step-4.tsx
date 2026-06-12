@@ -80,6 +80,7 @@ export const DashboardURLMap: Record<string, string> = {
   gitlab: import.meta.env.DEVLAKE_DASHBOARD_URL_GITLAB,
   bitbucket: import.meta.env.DEVLAKE_DASHBOARD_URL_BITBUCKET,
   azuredevops: import.meta.env.DEVLAKE_DASHBOARD_URL_AZUREDEVOPS,
+  asana: import.meta.env.DEVLAKE_DASHBOARD_URL_ASANA,
 };
 
 const getStatus = (data: any) => {
@@ -111,7 +112,10 @@ export const Step4 = () => {
 
   const { data } = useAutoRefresh(
     async () => {
-      return await API.pipeline.subTasks(record?.pipelineId as string);
+      if (!record?.pipelineId) {
+        return;
+      }
+      return await API.pipeline.subTasks(record.pipelineId as string);
     },
     [record],
     {
