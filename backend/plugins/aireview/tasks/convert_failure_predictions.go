@@ -20,10 +20,10 @@ package tasks
 import (
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
-	domainCode "github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
+	"github.com/apache/incubator-devlake/plugins/aireview/models/domain"
 )
 
 var ConvertFailurePredictionsMeta = plugin.SubTaskMeta{
@@ -49,7 +49,7 @@ func ConvertFailurePredictions(taskCtx plugin.SubTaskContext) errors.Error {
 		return nil
 	}
 
-	if err := db.Delete(&domainCode.AiFailurePrediction{}, dal.Where("project_name = ?", projectName)); err != nil {
+	if err := db.Delete(&domain.AiFailurePrediction{}, dal.Where("project_name = ?", projectName)); err != nil {
 		return errors.Default.Wrap(err, "failed to delete existing ai_failure_predictions for project")
 	}
 
@@ -64,14 +64,14 @@ func ConvertFailurePredictions(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 	defer cursor.Close()
 
-	batch := make([]*domainCode.AiFailurePrediction, 0, 100)
+	batch := make([]*domain.AiFailurePrediction, 0, 100)
 	for cursor.Next() {
 		var src models.AiFailurePrediction
 		if fetchErr := db.Fetch(cursor, &src); fetchErr != nil {
 			return errors.Default.Wrap(fetchErr, "failed to fetch failure prediction row")
 		}
 
-		batch = append(batch, &domainCode.AiFailurePrediction{
+		batch = append(batch, &domain.AiFailurePrediction{
 			DomainEntity: domainlayer.DomainEntity{
 				Id: generateAiDomainId("afp", projectName, src.Id),
 			},
@@ -112,7 +112,7 @@ func ConvertFailurePredictions(taskCtx plugin.SubTaskContext) errors.Error {
 	return nil
 }
 
-func saveFailurePredictionBatch(db dal.Dal, batch []*domainCode.AiFailurePrediction) errors.Error {
+func saveFailurePredictionBatch(db dal.Dal, batch []*domain.AiFailurePrediction) errors.Error {
 	for _, p := range batch {
 		if err := db.CreateOrUpdate(p); err != nil {
 			return errors.Default.Wrap(err, "failed to save domain failure prediction")

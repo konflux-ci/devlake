@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/errors"
-	domainCode "github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
+	"github.com/apache/incubator-devlake/plugins/aireview/models/domain"
 	mocklog "github.com/apache/incubator-devlake/mocks/core/log"
 	mockplugin "github.com/apache/incubator-devlake/mocks/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
@@ -72,7 +72,7 @@ func TestSaveAiReviewBatch(t *testing.T) {
 		mockDal := new(mockdal.Dal)
 		mockDal.On("CreateOrUpdate", mock.Anything, mock.Anything).Return(nil)
 
-		batch := []*domainCode.AiReview{
+		batch := []*domain.AiReview{
 			{ProjectName: "proj1"},
 			{ProjectName: "proj2"},
 		}
@@ -83,7 +83,7 @@ func TestSaveAiReviewBatch(t *testing.T) {
 
 	t.Run("empty batch", func(t *testing.T) {
 		mockDal := new(mockdal.Dal)
-		err := saveAiReviewBatch(mockDal, []*domainCode.AiReview{})
+		err := saveAiReviewBatch(mockDal, []*domain.AiReview{})
 		assert.Nil(t, err)
 	})
 
@@ -92,7 +92,7 @@ func TestSaveAiReviewBatch(t *testing.T) {
 		mockDal.On("CreateOrUpdate", mock.Anything, mock.Anything).
 			Return(errors.Default.New("db error"))
 
-		batch := []*domainCode.AiReview{{ProjectName: "p1"}}
+		batch := []*domain.AiReview{{ProjectName: "p1"}}
 		err := saveAiReviewBatch(mockDal, batch)
 		assert.NotNil(t, err)
 	})

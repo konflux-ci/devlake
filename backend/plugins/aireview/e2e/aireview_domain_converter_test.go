@@ -25,6 +25,7 @@ import (
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
 	"github.com/apache/incubator-devlake/plugins/aireview/impl"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
+	"github.com/apache/incubator-devlake/plugins/aireview/models/domain"
 	"github.com/apache/incubator-devlake/plugins/aireview/tasks"
 )
 
@@ -52,7 +53,7 @@ func TestConvertAiReviews(t *testing.T) {
 	tester.FlushTabler(&domainCode.PullRequest{})
 	tester.FlushTabler(&domainCode.PullRequestComment{})
 	tester.FlushTabler(&models.AiReview{})
-	tester.FlushTabler(&domainCode.AiReview{})
+	tester.FlushTabler(&domain.AiReview{})
 	tester.FlushTabler(&crossdomain.ProjectMapping{})
 	tester.FlushTabler(&repoRow{})
 
@@ -64,7 +65,7 @@ func TestConvertAiReviews(t *testing.T) {
 	tester.Subtask(tasks.ExtractAiReviewsMeta, taskData)
 	tester.Subtask(tasks.ConvertAiReviewsMeta, taskData)
 
-	var reviews []domainCode.AiReview
+	var reviews []domain.AiReview
 	if err := tester.Dal.All(&reviews); err != nil {
 		t.Fatalf("Failed to query ai_reviews: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestConvertAiReviews_SkipsInRepoIdMode(t *testing.T) {
 	tester.FlushTabler(&domainCode.PullRequest{})
 	tester.FlushTabler(&domainCode.PullRequestComment{})
 	tester.FlushTabler(&models.AiReview{})
-	tester.FlushTabler(&domainCode.AiReview{})
+	tester.FlushTabler(&domain.AiReview{})
 	tester.FlushTabler(&repoRow{})
 
 	tester.ImportCsvIntoTabler("./raw_tables/ci_pull_requests.csv", &domainCode.PullRequest{})
@@ -119,7 +120,7 @@ func TestConvertAiReviews_SkipsInRepoIdMode(t *testing.T) {
 	tester.Subtask(tasks.ExtractAiReviewsMeta, taskData)
 	tester.Subtask(tasks.ConvertAiReviewsMeta, taskData)
 
-	var reviews []domainCode.AiReview
+	var reviews []domain.AiReview
 	if err := tester.Dal.All(&reviews); err != nil {
 		t.Fatalf("Failed to query ai_reviews: %v", err)
 	}
@@ -153,7 +154,7 @@ func TestConvertFailurePredictions(t *testing.T) {
 	tester.FlushTabler(&domainCode.PullRequestComment{})
 	tester.FlushTabler(&models.AiReview{})
 	tester.FlushTabler(&models.AiFailurePrediction{})
-	tester.FlushTabler(&domainCode.AiFailurePrediction{})
+	tester.FlushTabler(&domain.AiFailurePrediction{})
 	tester.FlushTabler(&ciTestJob{})
 	tester.FlushTabler(&ciTestCase{})
 	tester.FlushTabler(&repoRow{})
@@ -170,7 +171,7 @@ func TestConvertFailurePredictions(t *testing.T) {
 	tester.Subtask(tasks.CalculateFailurePredictionsMeta, taskData)
 	tester.Subtask(tasks.ConvertFailurePredictionsMeta, taskData)
 
-	var predictions []domainCode.AiFailurePrediction
+	var predictions []domain.AiFailurePrediction
 	if err := tester.Dal.All(&predictions); err != nil {
 		t.Fatalf("Failed to query ai_failure_predictions: %v", err)
 	}
@@ -215,7 +216,7 @@ func TestConvertFailurePredictions_IsolatedByProject(t *testing.T) {
 	tester.FlushTabler(&domainCode.PullRequestComment{})
 	tester.FlushTabler(&models.AiReview{})
 	tester.FlushTabler(&models.AiFailurePrediction{})
-	tester.FlushTabler(&domainCode.AiFailurePrediction{})
+	tester.FlushTabler(&domain.AiFailurePrediction{})
 	tester.FlushTabler(&ciTestJob{})
 	tester.FlushTabler(&ciTestCase{})
 	tester.FlushTabler(&repoRow{})
@@ -246,7 +247,7 @@ func TestConvertFailurePredictions_IsolatedByProject(t *testing.T) {
 	// project_mapping for other-project doesn't exist so converter writes 0 rows.
 	tester.Subtask(tasks.ConvertFailurePredictionsMeta, dataB)
 
-	var allPredictions []domainCode.AiFailurePrediction
+	var allPredictions []domain.AiFailurePrediction
 	if err := tester.Dal.All(&allPredictions); err != nil {
 		t.Fatalf("Failed to query all ai_failure_predictions: %v", err)
 	}
@@ -283,7 +284,7 @@ func TestConvertPredictionMetrics(t *testing.T) {
 	tester.FlushTabler(&models.AiReview{})
 	tester.FlushTabler(&models.AiFailurePrediction{})
 	tester.FlushTabler(&models.AiPredictionMetrics{})
-	tester.FlushTabler(&domainCode.AiPredictionMetrics{})
+	tester.FlushTabler(&domain.AiPredictionMetrics{})
 	tester.FlushTabler(&ciTestJob{})
 	tester.FlushTabler(&ciTestCase{})
 	tester.FlushTabler(&repoRow{})
@@ -301,7 +302,7 @@ func TestConvertPredictionMetrics(t *testing.T) {
 	tester.Subtask(tasks.CalculatePredictionMetricsMeta, taskData)
 	tester.Subtask(tasks.ConvertPredictionMetricsMeta, taskData)
 
-	var metrics []domainCode.AiPredictionMetrics
+	var metrics []domain.AiPredictionMetrics
 	if err := tester.Dal.All(&metrics); err != nil {
 		t.Fatalf("Failed to query ai_prediction_metrics: %v", err)
 	}

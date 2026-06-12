@@ -24,10 +24,10 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
-	domainCode "github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
+	"github.com/apache/incubator-devlake/plugins/aireview/models/domain"
 )
 
 var ConvertAiReviewsMeta = plugin.SubTaskMeta{
@@ -54,7 +54,7 @@ func ConvertAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	// Clear existing domain records for this project so re-runs are idempotent.
-	if err := db.Delete(&domainCode.AiReview{}, dal.Where("project_name = ?", projectName)); err != nil {
+	if err := db.Delete(&domain.AiReview{}, dal.Where("project_name = ?", projectName)); err != nil {
 		return errors.Default.Wrap(err, "failed to delete existing ai_reviews for project")
 	}
 
@@ -68,14 +68,14 @@ func ConvertAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 	defer cursor.Close()
 
-	batch := make([]*domainCode.AiReview, 0, 100)
+	batch := make([]*domain.AiReview, 0, 100)
 	for cursor.Next() {
 		var src models.AiReview
 		if fetchErr := db.Fetch(cursor, &src); fetchErr != nil {
 			return errors.Default.Wrap(fetchErr, "failed to fetch ai review row")
 		}
 
-		batch = append(batch, &domainCode.AiReview{
+		batch = append(batch, &domain.AiReview{
 			DomainEntity: domainlayer.DomainEntity{
 				Id: generateAiDomainId("ar", projectName, src.Id),
 			},
@@ -114,7 +114,7 @@ func ConvertAiReviews(taskCtx plugin.SubTaskContext) errors.Error {
 	return nil
 }
 
-func saveAiReviewBatch(db dal.Dal, batch []*domainCode.AiReview) errors.Error {
+func saveAiReviewBatch(db dal.Dal, batch []*domain.AiReview) errors.Error {
 	for _, r := range batch {
 		if err := db.CreateOrUpdate(r); err != nil {
 			return errors.Default.Wrap(err, "failed to save domain ai review")

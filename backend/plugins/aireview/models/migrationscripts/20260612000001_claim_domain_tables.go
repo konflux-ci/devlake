@@ -25,14 +25,16 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 )
 
-var _ plugin.MigrationScript = (*addAiReviewDomainTables)(nil)
+var _ plugin.MigrationScript = (*claimDomainTables)(nil)
 
-type addAiReviewDomainTables struct{}
+type claimDomainTables struct{}
 
 // Archived snapshots of the three domain structs — frozen at migration time so
 // future model changes do not affect the schema this migration creates.
+// These tables were previously created by core migration 20260422000001/20260422000002;
+// this migration is idempotent (AutoMigrate is a no-op when tables/columns already exist).
 
-type archivedAiReview20260422 struct {
+type aiReview20260612 struct {
 	Id string `gorm:"primaryKey;type:varchar(255)"`
 
 	ProjectName   string    `gorm:"index;type:varchar(255)"`
@@ -57,13 +59,17 @@ type archivedAiReview20260422 struct {
 	ReviewState string `gorm:"type:varchar(50)"`
 	SourceUrl   string `gorm:"type:varchar(500)"`
 
-	CreatedAt time.Time
-	UpdatedAt *time.Time
+	RawDataParams string  `gorm:"column:_raw_data_params;type:varchar(255)"`
+	RawDataTable  string  `gorm:"column:_raw_data_table;type:varchar(255)"`
+	RawDataId     uint64  `gorm:"column:_raw_data_id"`
+	RawDataRemark string  `gorm:"column:_raw_data_remark;type:longtext"`
+	CreatedAt     time.Time
+	UpdatedAt     *time.Time
 }
 
-func (archivedAiReview20260422) TableName() string { return "ai_reviews" }
+func (aiReview20260612) TableName() string { return "ai_reviews" }
 
-type archivedAiFailurePrediction20260422 struct {
+type aiFailurePrediction20260612 struct {
 	Id string `gorm:"primaryKey;type:varchar(255)"`
 
 	ProjectName     string    `gorm:"index;type:varchar(255)"`
@@ -86,13 +92,17 @@ type archivedAiFailurePrediction20260422 struct {
 	HadCiFailure      bool
 	PredictionOutcome string `gorm:"type:varchar(20)"`
 
-	CreatedAt time.Time
-	UpdatedAt *time.Time
+	RawDataParams string  `gorm:"column:_raw_data_params;type:varchar(255)"`
+	RawDataTable  string  `gorm:"column:_raw_data_table;type:varchar(255)"`
+	RawDataId     uint64  `gorm:"column:_raw_data_id"`
+	RawDataRemark string  `gorm:"column:_raw_data_remark;type:longtext"`
+	CreatedAt     time.Time
+	UpdatedAt     *time.Time
 }
 
-func (archivedAiFailurePrediction20260422) TableName() string { return "ai_failure_predictions" }
+func (aiFailurePrediction20260612) TableName() string { return "ai_failure_predictions" }
 
-type archivedAiPredictionMetrics20260422 struct {
+type aiPredictionMetrics20260612 struct {
 	Id string `gorm:"primaryKey;type:varchar(255)"`
 
 	ProjectName     string    `gorm:"index;type:varchar(255)"`
@@ -124,27 +134,34 @@ type archivedAiPredictionMetrics20260422 struct {
 	RecommendedAutonomyLevel string `gorm:"type:varchar(50)"`
 	CalculatedAt             time.Time
 
-	CreatedAt time.Time
-	UpdatedAt *time.Time
+	RawDataParams string  `gorm:"column:_raw_data_params;type:varchar(255)"`
+	RawDataTable  string  `gorm:"column:_raw_data_table;type:varchar(255)"`
+	RawDataId     uint64  `gorm:"column:_raw_data_id"`
+	RawDataRemark string  `gorm:"column:_raw_data_remark;type:longtext"`
+	CreatedAt     time.Time
+	UpdatedAt     *time.Time
 }
 
-func (archivedAiPredictionMetrics20260422) TableName() string { return "ai_prediction_metrics" }
+func (aiPredictionMetrics20260612) TableName() string { return "ai_prediction_metrics" }
 
-func (*addAiReviewDomainTables) Up(basicRes context.BasicRes) errors.Error {
+func (*claimDomainTables) Up(basicRes context.BasicRes) errors.Error {
 	db := basicRes.GetDal()
-	if err := db.AutoMigrate(&archivedAiReview20260422{}); err != nil {
-		return err
+	if err := db.AutoMigrate(&aiReview20260612{}); err != nil {
+		return errors.Default.Wrap(err, "failed to migrate ai_reviews")
 	}
-	if err := db.AutoMigrate(&archivedAiFailurePrediction20260422{}); err != nil {
-		return err
+	if err := db.AutoMigrate(&aiFailurePrediction20260612{}); err != nil {
+		return errors.Default.Wrap(err, "failed to migrate ai_failure_predictions")
 	}
-	return db.AutoMigrate(&archivedAiPredictionMetrics20260422{})
+	if err := db.AutoMigrate(&aiPredictionMetrics20260612{}); err != nil {
+		return errors.Default.Wrap(err, "failed to migrate ai_prediction_metrics")
+	}
+	return nil
 }
 
-func (*addAiReviewDomainTables) Version() uint64 {
-	return 20260422000001
+func (*claimDomainTables) Version() uint64 {
+	return 20260612000001
 }
 
-func (*addAiReviewDomainTables) Name() string {
-	return "add ai_reviews, ai_failure_predictions, ai_prediction_metrics domain tables"
+func (*claimDomainTables) Name() string {
+	return "aireview claim domain tables ai_reviews, ai_failure_predictions, ai_prediction_metrics"
 }
