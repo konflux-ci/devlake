@@ -137,6 +137,10 @@ func ConnectLocalServer(t *testing.T, clientConfig *LocalClientConfig) *DevlakeC
 	fmt.Printf("Using test temp directory: %s\n", throwawayDir)
 	logger := logruslog.Global.Nested("test")
 	cfg := config.GetConfig()
+	// E2E helpers issue direct API requests without session or API-key auth.
+	// Keep local test servers aligned with that contract.
+	t.Setenv("AUTH_ENABLED", "false")
+	cfg.Set("AUTH_ENABLED", false)
 	cfg.Set("DB_URL", clientConfig.DbURL)
 	db, err := runner.NewGormDb(cfg, logger)
 	require.NoError(t, err)
@@ -176,6 +180,7 @@ func ConnectLocalServer(t *testing.T, clientConfig *LocalClientConfig) *DevlakeC
 				api.CreateAndRunApiServer()
 			})
 		}()
+		// NOTE: /proceed-db-migration now requires authentication. If AUTH_ENABLED=true, this test must provide credentials.
 		req, err2 := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/proceed-db-migration", addr), nil)
 		require.NoError(t, err2)
 		d.forceSendHttpRequest(100, req, func(err errors.Error) bool {
@@ -345,7 +350,7 @@ func runWithTimeout(timeout time.Duration, f func() (bool, errors.Error)) errors
 		select {
 		case <-timer:
 			if !resp.completed {
-				return errors.Default.New(fmt.Sprintf("timed out calling function after %d miliseconds", timeout.Milliseconds()))
+				return errors.Default.New(fmt.Sprintf("timed out calling function after %d milliseconds", timeout.Milliseconds()))
 			}
 			return nil
 		case resp = <-resChan:
