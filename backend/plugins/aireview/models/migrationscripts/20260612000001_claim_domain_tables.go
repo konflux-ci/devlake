@@ -31,8 +31,6 @@ type claimDomainTables struct{}
 
 // Archived snapshots of the three domain structs — frozen at migration time so
 // future model changes do not affect the schema this migration creates.
-// These tables were previously created by core migration 20260422000001/20260422000002;
-// this migration is idempotent (AutoMigrate is a no-op when tables/columns already exist).
 
 type aiReview20260612 struct {
 	Id string `gorm:"primaryKey;type:varchar(255)"`
