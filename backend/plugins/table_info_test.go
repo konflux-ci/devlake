@@ -31,6 +31,7 @@ import (
 	claudeCode "github.com/apache/incubator-devlake/plugins/claude_code/impl"
 	circleci "github.com/apache/incubator-devlake/plugins/circleci/impl"
 	customize "github.com/apache/incubator-devlake/plugins/customize/impl"
+	dedup "github.com/apache/incubator-devlake/plugins/dedup/impl"
 	dbt "github.com/apache/incubator-devlake/plugins/dbt/impl"
 	dora "github.com/apache/incubator-devlake/plugins/dora/impl"
 	feishu "github.com/apache/incubator-devlake/plugins/feishu/impl"
@@ -103,6 +104,7 @@ func Test_GetPluginTablesInfo(t *testing.T) {
 	checker.FeedIn("zentao/models", zentao.Zentao{}.GetTablesInfo)
 	checker.FeedIn("claude_code/models", claudeCode.ClaudeCode{}.GetTablesInfo)
 	checker.FeedIn("circleci/models", circleci.Circleci{}.GetTablesInfo)
+	checker.FeedIn("dedup/models", dedup.Dedup{}.GetTablesInfo)
 	checker.FeedIn("opsgenie/models", opsgenie.Opsgenie{}.GetTablesInfo)
 	checker.FeedIn("linker/models", linker.Linker{}.GetTablesInfo)
 	checker.FeedIn("issue_trace/models", issueTrace.IssueTrace{}.GetTablesInfo)

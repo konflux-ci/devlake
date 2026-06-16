@@ -3,7 +3,7 @@
 This file tracks modifications to files originating from [apache/incubator-devlake](https://github.com/apache/incubator-devlake)
 that must be maintained during upstream syncs.
 
-Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`) are additions,
+Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`, `dedup`) are additions,
 not modifications, and are not tracked here.
 
 ## gitextractor: ForceFullClone / FORCE_FULL_GIT_HISTORY
@@ -26,7 +26,7 @@ directory leak in `doubleClone()`.
 **Rebase notes:** Touches clone strategy selection in `clone_gitcli.go`.
 Watch for upstream changes to `CloneRepo()`, `shallowClone()`, or `doubleClone()`.
 
- ## jira: Scope collectParentIssues to current board
+## jira: Scope collectParentIssues to current board
   
   **Files:**
   - `backend/plugins/jira/tasks/parent_issue_collector.go` 
