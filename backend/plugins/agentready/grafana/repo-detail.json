@@ -194,10 +194,31 @@
         "query": "mysql"
       },
       {
+        "current": {
+          "selected": true,
+          "text": ["All"],
+          "value": ["$__all"]
+        },
+        "datasource": "${DS_DEVLAKE}",
+        "definition": "select distinct name from projects",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select distinct name from projects",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
         "name": "repo_id",
         "type": "query",
         "datasource": "${DS_DEVLAKE}",
-        "query": "SELECT COALESCE(repo_name, repo_id) AS __text, repo_id AS __value FROM _tool_agentready_assessments WHERE id != '' GROUP BY repo_id, repo_name ORDER BY repo_name",
+        "query": "SELECT COALESCE(a.repo_name, a.repo_id) AS __text, a.repo_id AS __value FROM _tool_agentready_assessments a JOIN project_mapping pm ON a.repo_id = pm.row_id AND pm.`table` = 'repos' WHERE a.id != '' AND pm.project_name in (${project}) GROUP BY a.repo_id, a.repo_name ORDER BY a.repo_name",
         "refresh": 1,
         "sort": 0
       }

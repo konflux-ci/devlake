@@ -16,48 +16,37 @@
  *
  */
 
-import styled from 'styled-components';
+import { useEffect } from 'react';
+import { Input } from 'antd';
 
-const Wrapper = styled.div`
-  & > h4 {
-    display: flex;
-
-    & > i {
-      margin-left: 4px;
-      color: #ff8b8b;
-    }
-  }
-
-  & > p {
-    margin-top: 5px;
-  }
-
-  & + & {
-    margin-top: 16px;
-  }
-`;
+import { Block } from '@/components';
 
 interface Props {
-  style?: React.CSSProperties;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  required?: boolean;
-  error?: string;
-  children?: React.ReactNode;
+  initialValue: string;
+  value: string;
+  error: string;
+  setValue: (value: string) => void;
+  setError: (error: string) => void;
 }
 
-export const Block = ({ style, title, description, required, error, children }: Props) => {
+export const SubmissionsPath = ({ initialValue, value, setValue }: Props) => {
+  useEffect(() => {
+    if (initialValue && !value) {
+      setValue(initialValue);
+    }
+  }, [initialValue]);
+
   return (
-    <Wrapper style={style}>
-      {title && (
-        <h4>
-          {title}
-          {required && <i>*</i>}
-        </h4>
-      )}
-      {description && <p>{description}</p>}
-      {children}
-      {error && <p style={{ color: '#ff4d4f', marginTop: 4 }}>{error}</p>}
-    </Wrapper>
+    <Block
+      title="Submissions Path"
+      description="Subdirectory within the repo containing {org}/{repo}/{file}.json structure."
+    >
+      <Input
+        style={{ width: 386 }}
+        placeholder="submissions"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+    </Block>
   );
 };
