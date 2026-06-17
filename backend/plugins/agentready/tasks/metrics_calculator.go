@@ -1,3 +1,19 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package tasks
 
 import (
@@ -22,59 +38,45 @@ var CalculateMetricsMeta = plugin.SubTaskMeta{
 func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
-
 	data := taskCtx.GetData().(*AgentReadyTaskData)
-	repos, err := discoverRepos(db, data.Options, logger)
-	if err != nil {
-		return errors.Default.Wrap(err, "failed to discover repos for metrics calculation")
-	}
-	if len(repos) == 0 {
-		logger.Info("No repos found for metrics calculation, skipping")
-		return nil
-	}
-	repoIds := make([]string, 0, len(repos))
-	for _, r := range repos {
-		repoIds = append(repoIds, r.DomainRepoId)
-	}
-	var assessments []models.AgentReadyAssessment
-	clauses := []dal.Clause{
-		dal.From(&models.AgentReadyAssessment{}),
-		dal.Where("repo_id IN (?)", repoIds),
-	}
 
-	err = db.All(&assessments, clauses...)
+	connectionId := data.Connection.ID
+	repoId := data.Options.FullName
+
+	var assessments []models.AgentReadyAssessment
+	err := db.All(&assessments,
+		dal.From(&models.AgentReadyAssessment{}),
+		dal.Where("connection_id = ? AND repo_id = ?", connectionId, repoId),
+	)
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to query assessments")
 	}
 
 	if len(assessments) == 0 {
-		logger.Info("No assessments found, skipping metrics")
+		logger.Info("No assessments found for scope %s, skipping metrics", repoId)
 		return nil
 	}
 
 	logger.Info("Calculating metrics for %d assessments", len(assessments))
 	taskCtx.SetProgress(0, len(assessments))
 
-	var allFindings []*models.AgentReadyFinding
 	assessmentIds := make([]string, 0, len(assessments))
 	for _, a := range assessments {
 		assessmentIds = append(assessmentIds, a.Id)
 	}
+
+	var allFindings []*models.AgentReadyFinding
 	err = db.All(&allFindings,
 		dal.From(&models.AgentReadyFinding{}),
-		dal.Where("assessment_id IN (?)", assessmentIds),
+		dal.Where("connection_id = ? AND assessment_id IN (?)", connectionId, assessmentIds),
 	)
-
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to query findings")
 	}
 
 	findingsByAssessment := map[string][]*models.AgentReadyFinding{}
-
 	for _, f := range allFindings {
-		findingsByAssessment[f.AssessmentId] = append(
-			findingsByAssessment[f.AssessmentId], f,
-		)
+		findingsByAssessment[f.AssessmentId] = append(findingsByAssessment[f.AssessmentId], f)
 	}
 
 	for _, assessment := range assessments {
@@ -84,11 +86,11 @@ func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 			logger.Warn(nil, "Failed to calculate metrics for assessment %s: %v", assessment.Id, calcErr)
 		}
 		metric.Id = fmt.Sprintf("%s:%s:%s", assessment.RepoId, assessment.AssessedAt.Format("20060102T150405"), assessment.Id)
+		metric.ConnectionId = connectionId
 		metric.RepoId = assessment.RepoId
 		metric.AssessedAt = assessment.AssessedAt
 
-		dbErr := db.CreateOrUpdate(metric)
-		if dbErr != nil {
+		if dbErr := db.CreateOrUpdate(metric); dbErr != nil {
 			logger.Warn(dbErr, "Failed to save metric %s", metric.Id)
 		}
 		taskCtx.IncProgress(1)

@@ -1,3 +1,19 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package main
 
 import (
@@ -6,18 +22,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// PluginEntry is the AgentReady plugin instance registered with DevLake.
 var PluginEntry impl.AgentReady
 
 func main() {
 	cmd := &cobra.Command{Use: "agentready"}
-	projectName := cmd.Flags().StringP("project", "p", "", "project name to analyze")
-	repoId := cmd.Flags().StringP("repoId", "r", "", "single repository domain ID")
+	connectionId := cmd.Flags().Uint64P("connectionId", "c", 0, "connection ID")
+	fullName := cmd.Flags().StringP("fullName", "f", "", "scope full name (org/repo)")
 
 	cmd.Run = func(_ *cobra.Command, args []string) {
-		runner.DirectRun(cmd, args, PluginEntry, map[string]interface{}{
-			"projectName": *projectName,
-			"repoId":      *repoId,
+		runner.DirectRun(cmd, args, PluginEntry, map[string]any{
+			"connectionId": *connectionId,
+			"fullName":     *fullName,
 		}, "")
 	}
 	runner.RunCmd(cmd)

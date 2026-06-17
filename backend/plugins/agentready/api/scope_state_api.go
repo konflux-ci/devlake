@@ -14,16 +14,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package models
+package api
 
 import (
-	"github.com/apache/incubator-devlake/core/models/common"
+	"strings"
+
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/plugin"
 )
 
-type AgentReadyScopeConfig struct {
-	common.ScopeConfig `mapstructure:",squash" json:",inline" gorm:"embedded"`
-}
-
-func (AgentReadyScopeConfig) TableName() string {
-	return "_tool_agentready_scope_configs"
+func GetScopeLatestSyncState(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	input.Params["scopeId"] = strings.TrimLeft(input.Params["scopeId"], "/")
+	return dsHelper.ScopeApi.GetScopeLatestSyncState(input)
 }

@@ -1,3 +1,19 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package tasks
 
 import (
@@ -7,7 +23,6 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
@@ -18,7 +33,7 @@ var ExtractAssessmentsMeta = plugin.SubTaskMeta{
 	EnabledByDefault: true,
 	Description:      "Parse raw assessment JSON into structured assessment and finding rows",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE},
-	Dependencies:     []*plugin.SubTaskMeta{&CollectAssessmentsMeta},
+	Dependencies:     []*plugin.SubTaskMeta{&CollectSubmissionsMeta},
 }
 
 type assessmentJSON struct {
@@ -65,67 +80,47 @@ type remediationJSON struct {
 func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
-
 	data := taskCtx.GetData().(*AgentReadyTaskData)
-	repos, err := discoverRepos(db, data.Options, logger)
-	if err != nil {
-		return errors.Default.Wrap(err, "failed to discover repos for extraction")
-	}
-	if len(repos) == 0 {
-		logger.Info("No repos found for extraction, skipping")
-		return nil
-	}
-	repoIds := make([]string, 0, len(repos))
-	for _, r := range repos {
-		repoIds = append(repoIds, r.DomainRepoId)
-	}
+
+	connectionId := data.Connection.ID
+	repoId := data.Options.FullName
 
 	var rawAssessments []models.AgentReadyAssessment
-	clauses := []dal.Clause{
+	err := db.All(&rawAssessments,
 		dal.From(&models.AgentReadyAssessment{}),
-		dal.Where("raw_json != '' AND repo_id IN (?)", repoIds),
-	}
-	if data.Options.TimeAfter != "" {
-		timeAfter, parseErr := common.ConvertStringToTime(data.Options.TimeAfter)
-		if parseErr != nil {
-			return errors.BadInput.Wrap(parseErr, "invalid timeAfter format")
-		}
-		clauses = append(clauses, dal.Where("collected_at >= ?", timeAfter))
-	}
-	err = db.All(&rawAssessments, clauses...)
+		dal.Where("connection_id = ? AND repo_id = ? AND raw_json != ''", connectionId, repoId),
+	)
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to query raw assessments")
 	}
 
-	logger.Info("Extracting %d assessments for %d repos", len(rawAssessments), len(repoIds))
+	logger.Info("Extracting %d assessments for scope %s", len(rawAssessments), repoId)
 	taskCtx.SetProgress(0, len(rawAssessments))
 
 	for i := range rawAssessments {
 		parsed, parseErr := parseRawAssessment(rawAssessments[i].RawJSON)
 		if parseErr != nil {
-			logger.Warn(nil, "Failed to parse assessment for repo %s: %v", rawAssessments[i].RepoId, parseErr)
+			logger.Warn(nil, "Failed to parse assessment for %s: %v", repoId, parseErr)
 			taskCtx.IncProgress(1)
 			continue
 		}
 		assessment, assessErr := parseAssessmentJSON(&rawAssessments[i], parsed)
 		if assessErr != nil {
-			logger.Warn(nil, "Failed to extract assessment for repo %s: %v", rawAssessments[i].RepoId, assessErr)
+			logger.Warn(nil, "Failed to extract assessment for %s: %v", repoId, assessErr)
 			taskCtx.IncProgress(1)
 			continue
 		}
 
-		dbErr := db.CreateOrUpdate(assessment)
-		if dbErr != nil {
+		if dbErr := db.CreateOrUpdate(assessment); dbErr != nil {
 			logger.Warn(dbErr, "Failed to save parsed assessment %s", assessment.Id)
 		}
 
-		findings, findErr := parseFindings(parsed, assessment.Id, assessment.RepoId)
+		findings, findErr := parseFindings(parsed, assessment.Id, assessment.RepoId, connectionId)
 		if findErr != nil {
-			logger.Warn(nil, "Failed to parse assessment findings for repo %s: %v", assessment.RepoId, findErr)
+			logger.Warn(nil, "Failed to parse findings for %s: %v", repoId, findErr)
 		}
 		for _, f := range findings {
-			dbErr = db.CreateOrUpdate(f)
-			if dbErr != nil {
+			if dbErr := db.CreateOrUpdate(f); dbErr != nil {
 				logger.Warn(dbErr, "Failed to save finding %s", f.Id)
 			}
 		}
@@ -156,7 +151,7 @@ func parseAssessmentJSON(assessment *models.AgentReadyAssessment, parsed *assess
 	return assessment, nil
 }
 
-func parseFindings(parsed *assessmentJSON, assessmentId, repoId string) ([]*models.AgentReadyFinding, error) {
+func parseFindings(parsed *assessmentJSON, assessmentId, repoId string, connectionId uint64) ([]*models.AgentReadyFinding, error) {
 	var findings []*models.AgentReadyFinding
 	for _, f := range parsed.Findings {
 		if f.Status == models.FindingStatusNotApplicable {
@@ -165,6 +160,7 @@ func parseFindings(parsed *assessmentJSON, assessmentId, repoId string) ([]*mode
 
 		finding := &models.AgentReadyFinding{
 			Id:            fmt.Sprintf("%s:%s", assessmentId, f.Attribute.Id),
+			ConnectionId:  connectionId,
 			AssessmentId:  assessmentId,
 			RepoId:        repoId,
 			AttributeId:   f.Attribute.Id,

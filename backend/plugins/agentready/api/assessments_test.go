@@ -14,16 +14,36 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package models
+
+package api
 
 import (
-	"github.com/apache/incubator-devlake/core/models/common"
+	"testing"
 )
 
-type AgentReadyScopeConfig struct {
-	common.ScopeConfig `mapstructure:",squash" json:",inline" gorm:"embedded"`
-}
+func TestParseConnectionId(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  map[string]string
+		want    uint64
+		wantErr bool
+	}{
+		{"valid id", map[string]string{"connectionId": "42"}, 42, false},
+		{"missing id", map[string]string{}, 0, true},
+		{"invalid id", map[string]string{"connectionId": "abc"}, 0, true},
+		{"zero id", map[string]string{"connectionId": "0"}, 0, true},
+	}
 
-func (AgentReadyScopeConfig) TableName() string {
-	return "_tool_agentready_scope_configs"
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseConnectionId(tt.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseConnectionId() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("parseConnectionId() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

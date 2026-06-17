@@ -21,7 +21,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT\n  f.attribute_name,\n  COUNT(*) AS failure_count\nFROM _tool_agentready_findings f\nWHERE f.status = 'fail'\nGROUP BY f.attribute_id, f.attribute_name\nORDER BY failure_count DESC\nLIMIT 15",
+          "rawSql": "SELECT\n  f.attribute_name,\n  COUNT(*) AS failure_count\nFROM _tool_agentready_findings f\nJOIN project_mapping pm ON f.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE f.status = 'fail' AND pm.project_name in (${project})\nGROUP BY f.attribute_id, f.attribute_name\nORDER BY failure_count DESC\nLIMIT 15",
           "format": "table",
           "refId": "A"
         }
@@ -42,7 +42,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT\n  DATE(m.assessed_at) AS time,\n  AVG(m.tier1_pass_rate) AS 'Essential',\n  AVG(m.tier2_pass_rate) AS 'Critical',\n  AVG(m.tier3_pass_rate) AS 'Important',\n  AVG(m.tier4_pass_rate) AS 'Advanced'\nFROM _tool_agentready_metrics m\nWHERE $__timeFilter(m.assessed_at)\nGROUP BY DATE(m.assessed_at)\nORDER BY time",
+          "rawSql": "SELECT\n  DATE(m.assessed_at) AS time,\n  AVG(m.tier1_pass_rate) AS 'Essential',\n  AVG(m.tier2_pass_rate) AS 'Critical',\n  AVG(m.tier3_pass_rate) AS 'Important',\n  AVG(m.tier4_pass_rate) AS 'Advanced'\nFROM _tool_agentready_metrics m\nJOIN project_mapping pm ON m.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE pm.project_name in (${project}) AND $__timeFilter(m.assessed_at)\nGROUP BY DATE(m.assessed_at)\nORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
@@ -66,7 +66,7 @@
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT\n  f.attribute_name,\n  f.category,\n  f.tier,\n  f.default_weight,\n  COUNT(DISTINCT f.repo_id) AS affected_repos,\n  f.remediation_summary\nFROM _tool_agentready_findings f\nWHERE f.status = 'fail'\nGROUP BY f.attribute_id, f.attribute_name, f.category, f.tier, f.default_weight, f.remediation_summary\nORDER BY f.tier ASC, f.default_weight DESC",
+          "rawSql": "SELECT\n  f.attribute_name,\n  f.category,\n  f.tier,\n  f.default_weight,\n  COUNT(DISTINCT f.repo_id) AS affected_repos,\n  f.remediation_summary\nFROM _tool_agentready_findings f\nJOIN project_mapping pm ON f.repo_id = pm.row_id AND pm.`table` = 'repos'\nWHERE f.status = 'fail' AND pm.project_name in (${project})\nGROUP BY f.attribute_id, f.attribute_name, f.category, f.tier, f.default_weight, f.remediation_summary\nORDER BY f.tier ASC, f.default_weight DESC",
           "format": "table",
           "refId": "A"
         }
@@ -106,6 +106,27 @@
         "name": "DS_DEVLAKE",
         "type": "datasource",
         "query": "mysql"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": ["All"],
+          "value": ["$__all"]
+        },
+        "datasource": "${DS_DEVLAKE}",
+        "definition": "select distinct name from projects",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select distinct name from projects",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },

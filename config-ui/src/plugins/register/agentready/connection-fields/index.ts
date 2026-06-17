@@ -16,21 +16,8 @@
  *
  */
 
-import { request } from '@/utils';
-
-import * as aireview from './aireview';
-import * as jira from './jira';
-import * as tapd from './tapd';
-import * as webhook from './webhook';
-
-export const list = (): Promise<[{ plugin: string }]> => request('/plugins');
-
-export const plugin = {
-  list,
-  aireview,
-  jira,
-  tapd,
-  webhook,
-};
-
-export default plugin;
+export { ProjectSelect } from './project-select';
+export { GitHubConnectionSelect } from './github-connection-select';
+export { SubmissionsRepo } from './submissions-repo';
+export { SubmissionsPath } from './submissions-path';
+export { BranchInput } from './branch';
