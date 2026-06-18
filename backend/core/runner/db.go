@@ -147,7 +147,7 @@ func MakeDbConnection(dbUrl string, conf *gorm.Config) (*gorm.DB, error) {
 			}
 			gormDB, err := gorm.Open(mysql.New(mysql.Config{
 				Conn: db,
-			}), &gorm.Config{})
+			}), conf)
 
 			return gormDB, err
 		}
