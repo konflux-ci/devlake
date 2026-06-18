@@ -70,6 +70,7 @@ func (p Codecov) GetTablesInfo() []dal.Tabler {
 		&models.CodecovCoverage{},
 		&models.CodecovCoverageTrend{},
 		&models.CodecovCommitCoverage{},
+		&models.CodecovRepoConfig{},
 	}
 }
 
@@ -150,7 +151,9 @@ func (p Codecov) SubTaskMetas() []plugin.SubTaskMeta {
 		tasks.CollectCommitCoverageMeta,
 		tasks.CollectComparisonMeta,
 		tasks.CollectFlagCoverageTrendMeta,
-		// Step 4: Convert coverage data
+		// Step 4: Collect repo config (codecov.yml) from the code host
+		tasks.CollectRepoConfigMeta,
+		// Step 5: Convert coverage data
 		tasks.ConvertComparisonMeta,
 		tasks.ConvertCoverageMeta,
 		tasks.ConvertCommitCoverageMeta,

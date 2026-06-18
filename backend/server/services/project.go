@@ -19,10 +19,12 @@ package services
 
 import (
 	"fmt"
-	"golang.org/x/exp/slices"
-	"golang.org/x/sync/errgroup"
+	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slices"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -30,6 +32,8 @@ import (
 	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
+
+const defaultSyncDays = 180
 
 type ProjectService interface {
 	RenameProject(db dal.Transaction, oldProjectName, newProjectName string) errors.Error
@@ -147,7 +151,18 @@ func CreateProject(projectInput *models.ApiInputProject) (*models.ApiOutputProje
 		IsManual:    false,
 		SyncPolicy: models.SyncPolicy{
 			TimeAfter: func() *time.Time {
-				t := time.Now().AddDate(0, -6, 0)
+				days := defaultSyncDays
+				if v := cfg.GetString("DEFAULT_SYNC_DAYS"); v != "" {
+					v = strings.TrimSpace(v)
+					if parsed, err := strconv.Atoi(v); err != nil {
+						logger.Warn(nil, "DEFAULT_SYNC_DAYS has invalid value %q, falling back to %d days", v, defaultSyncDays)
+					} else if parsed <= 0 {
+						logger.Warn(nil, "DEFAULT_SYNC_DAYS must be positive (got %d), falling back to %d days", parsed, defaultSyncDays)
+					} else {
+						days = parsed
+					}
+				}
+				t := time.Now().AddDate(0, 0, -days)
 				t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 				return &t
 			}(),

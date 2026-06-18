@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -147,9 +146,8 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 				ParentSha:       commit.Parent,
 			}
 
-			// Use CreateOrUpdate to handle duplicates
-			if err := db.CreateOrUpdate(codecovCommit, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ?",
-				codecovCommit.ConnectionId, codecovCommit.RepoId, codecovCommit.CommitSha)); err != nil {
+			// Upsert: PK is (connection_id, repo_id, commit_sha) so ON CONFLICT fires on duplicates
+			if err := db.CreateOrUpdate(codecovCommit); err != nil {
 				logger.Warn(err, "failed to save commit %s", commit.CommitID)
 			} else {
 				totalCollected++

@@ -65,11 +65,14 @@ func CollectFlagCoverageTrend(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Create iterator from collected flags (skip empty flag names)
+	// Create iterator from collected flags, skipping empty names and names with
+	// control characters (newlines, tabs, etc.) that would produce invalid URLs.
+	// Some repos have misconfigured flag names like "ARM64-3.10\n3.11".
 	clauses := []dal.Clause{
 		dal.Select("flag_name AS flag_name"),
 		dal.From(&models.CodecovFlag{}),
-		dal.Where("connection_id = ? AND repo_id = ? AND flag_name != ''", data.Options.ConnectionId, data.Options.FullName),
+		dal.Where("connection_id = ? AND repo_id = ? AND flag_name != '' AND flag_name NOT REGEXP '[[:cntrl:]]'",
+			data.Options.ConnectionId, data.Options.FullName),
 	}
 
 	cursor, err := db.Cursor(clauses...)
