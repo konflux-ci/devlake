@@ -8919,12 +8919,12 @@ __metadata:
   linkType: hard
 
 "react-medium-image-zoom@npm:^5.1.10":
-  version: 5.1.10
-  resolution: "react-medium-image-zoom@npm:5.1.10"
+  version: 5.4.8
+  resolution: "react-medium-image-zoom@npm:5.4.8"
   peerDependencies:
-    react: ^16.8.0 || ^17.0.0 || ^18.0.0
-    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
-  checksum: 9c2cf83fc63eb705f1696ad6b50c457d8a77f0b458d7d9cc8975f20ebd3ee8ef6fbdc39af145fb9a5fd81191ceb37de1fb362bf67d6d31a183aa407b2a522030
+    react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: e52fed5c284e8c5a0d1dd1d49e3e767a14d86829fe457bbc2c0d8e1cfcfc36801924ecf29fa3a466790fc6ffe3a7daf3c6108601c293039fd96e69a8985c2b12
   languageName: node
   linkType: hard
 
