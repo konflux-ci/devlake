@@ -69,9 +69,10 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 		logger.Info("[Codecov] Comparison: Using default 90 days from %s", startDate.Format("2006-01-02"))
 	}
 
-	// Get commits ordered by timestamp, filtered by sync policy
+	// Get commits ordered newest-first so the most recent (most valuable) data is collected first;
+	// if the task is killed or times out, older data is what gets skipped rather than recent data
 	var commits []models.CodecovCommit
-	err = db.All(&commits, dal.Where("connection_id = ? AND repo_id = ? AND commit_timestamp >= ?", data.Options.ConnectionId, data.Options.FullName, startDate), dal.Orderby("commit_timestamp ASC"))
+	err = db.All(&commits, dal.Where("connection_id = ? AND repo_id = ? AND commit_timestamp >= ?", data.Options.ConnectionId, data.Options.FullName, startDate), dal.Orderby("commit_timestamp DESC"))
 	if err != nil {
 		return err
 	}
@@ -83,19 +84,40 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Get existing comparisons to skip already collected data (OPTIMIZATION)
-	var existingComparisons []ComparisonData
-	err = db.All(&existingComparisons, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
-	if err != nil {
-		return err
+	// Build skip-list from the raw API table (_raw_codecov_api_comparisons) instead of
+	// the tool table (_tool_codecov_comparisons). The raw table is populated by the collector
+	// before the converter runs, so it reflects all previously fetched API responses.
+	paramsJSON, jsonErr := json.Marshal(CodecovApiParams{
+		ConnectionId: data.Options.ConnectionId,
+		Name:         data.Options.FullName,
+	})
+	if jsonErr != nil {
+		return errors.Default.Wrap(jsonErr, "failed to marshal params for skip-list query")
 	}
 
-	// Build a set of already collected comparison combinations
 	collectedSet := make(map[string]bool)
-	for _, comp := range existingComparisons {
-		key := fmt.Sprintf("%s|%s|%s", comp.CommitSha, comp.ParentSha, comp.FlagName)
-		collectedSet[key] = true
+	rawTable := "_raw_codecov_api_comparisons"
+	if db.HasTable(rawTable) {
+		var rawInputs []struct {
+			Input json.RawMessage `json:"input"`
+		}
+		err = db.All(&rawInputs,
+			dal.From(rawTable),
+			dal.Where("params = ?", string(paramsJSON)),
+			dal.Select("input"),
+		)
+		if err != nil {
+			return err
+		}
+		for _, row := range rawInputs {
+			var input ComparisonInput
+			if unmarshalErr := json.Unmarshal(row.Input, &input); unmarshalErr == nil {
+				key := fmt.Sprintf("%s|%s|%s", input.CommitSha, input.ParentSha, input.FlagName)
+				collectedSet[key] = true
+			}
+		}
 	}
+	logger.Info("[Codecov] Comparison: Loaded %d existing raw API responses into skip-list", len(collectedSet))
 
 	// Build comparison pairs for each commit × flag combination
 	// Use the actual ParentSha from the commit (from Codecov API) instead of assuming sequential order

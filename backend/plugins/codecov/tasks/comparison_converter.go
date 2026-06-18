@@ -104,6 +104,8 @@ func ConvertComparison(taskCtx plugin.SubTaskContext) errors.Error {
 					Patch *struct {
 						Files    int      `json:"files"`
 						Lines    int      `json:"lines"`
+						Hits     int      `json:"hits"`
+						Misses   int      `json:"misses"`
 						Coverage *float64 `json:"coverage"`
 					} `json:"patch"`
 				} `json:"totals"`
@@ -113,20 +115,23 @@ func ConvertComparison(taskCtx plugin.SubTaskContext) errors.Error {
 				return nil, err
 			}
 
-			// Extract patch coverage from totals.patch.coverage (can be null)
-			// Only store patch coverage if there are actual changes (files > 0 or lines > 0)
-			// If files=0 and lines=0, treat as NULL even if coverage is 0
+			// Extract patch coverage and line counts from totals.patch
+			// Only store patch coverage when there are actual coverable lines changed
+			// (lines > 0). A commit can have files > 0 but lines = 0 if the changed
+			// files contain no coverable code (e.g., only comments or config within
+			// a source file). In that case patch coverage is N/A, not 0%.
 			var patchCoverage *float64
-			if comparison.Totals.Patch != nil && comparison.Totals.Patch.Coverage != nil {
-				// Only set patch coverage if there are actual changes
-				if comparison.Totals.Patch.Files > 0 || comparison.Totals.Patch.Lines > 0 {
+			var patchFiles, patchLines, patchHits, patchMisses int
+			if comparison.Totals.Patch != nil {
+				patchFiles = comparison.Totals.Patch.Files
+				patchLines = comparison.Totals.Patch.Lines
+				patchHits = comparison.Totals.Patch.Hits
+				patchMisses = comparison.Totals.Patch.Misses
+				if comparison.Totals.Patch.Coverage != nil && patchLines > 0 {
 					patchCoverage = comparison.Totals.Patch.Coverage
 				}
-				// If files=0 and lines=0, patchCoverage remains nil (will be stored as NULL in DB)
 			}
-			// If patch is null or doesn't exist in response, patchCoverage remains nil (will be stored as NULL in DB)
 
-			// Store comparison data for later use in coverage conversion (per flag)
 			comparisonData := &ComparisonData{
 				NoPKModel:        common.NoPKModel{},
 				ConnectionId:     data.Options.ConnectionId,
@@ -135,12 +140,12 @@ func ConvertComparison(taskCtx plugin.SubTaskContext) errors.Error {
 				FlagName:         input.FlagName,
 				ParentSha:        input.ParentSha,
 				ModifiedCoverage: comparison.Diff.Totals.Coverage,
-				FilesChanged:     len(comparison.Diff.Files),
-				MethodsCovered:   comparison.Diff.Totals.Methods, // This might need adjustment based on API
-				MethodsTotal:     comparison.Diff.Totals.Methods, // This might need adjustment based on API
-				LinesCovered:     comparison.Diff.Totals.Hits,    // Lines covered in modified code
-				LinesTotal:       comparison.Diff.Totals.Lines,   // Total lines in modified code
-				LinesMissed:      comparison.Diff.Totals.Misses,  // Lines missed in modified code
+				FilesChanged:     patchFiles,
+				MethodsCovered:   comparison.Diff.Totals.Methods,
+				MethodsTotal:     comparison.Diff.Totals.Methods,
+				LinesCovered:     patchHits,
+				LinesTotal:       patchLines,
+				LinesMissed:      patchMisses,
 				Patch:            patchCoverage,
 			}
 
