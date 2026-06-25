@@ -181,11 +181,13 @@ significantly, and the domain model gains one new field:
 |------|-------------------|--------------------------|
 | `account_convertor.go` | Reversed join, custom struct, rewritten query, orphan pass (135 lines) | Revert join to upstream direction, keep only additive orphan pass (~40 lines) with `IsBot=true` |
 | `pr_convertor.go` | Removed zero-ID guard (13 lines) | **Reverted to upstream** (0 lines) |
-| `pr_extractor.go` | Removed MergedBy emission (12 lines) | **Reverted to upstream** (0 lines) |
+| `pr_extractor.go` | Removed MergedBy repo_account emission¹ (10 lines) | **Reverted to upstream** (0 lines) |
 | 4 GraphQL files | `... on Bot` fragment support (~160 lines) | Unchanged — candidate for upstream contribution |
 | `account.go` (domain model) | Matches upstream | +1 field: `IsBot bool` (~1 line) |
 
-**Net result:** 8 files / ~320 lines → 6 files / ~200 lines. Two files fully reverted.
+¹ The fork removed the repo_account emission for MergedBy users (the `results = append(results, mergedByUser)` block in the Extract function). The MergedBy *field extraction* in `convertGithubPullRequest()` (lines 209-212) is unchanged from upstream.
+
+**Net result:** 8 files / ~320 lines → 6 files / ~200 lines. `pr_convertor.go` fully reverts; `pr_extractor.go` fully reverts.
 Rebase risk drops significantly — the largest conflict source (`account_convertor.go`
 reversed query) is removed.
 
@@ -275,6 +277,12 @@ UPDATE pull_requests SET author_id = '', author_name = '' WHERE author_id LIKE '
 
 Alternatively, trigger a full re-collection which will correctly skip
 `AuthorId=0` with the guard restored.
+
+**Limitation:** After restoring the zero-ID guard, the 135K phantom PRs will have
+*empty* `author_id` — no `accounts` row to join on, so `IsBot` filtering cannot
+help them. These PRs require either re-collection via GraphQL (which correctly
+identifies bot authors with proper IDs) or a targeted backfill that resolves
+author identity from the GitHub API.
 
 **Step 6: Simplify n8n workflow queries**
 

@@ -26,8 +26,9 @@ directory leak in `doubleClone()`.
 **Rebase notes:** Touches clone strategy selection in `clone_gitcli.go`.
 Watch for upstream changes to `CloneRepo()`, `shallowClone()`, or `doubleClone()`.
 
- ## jira: Scope collectParentIssues to current board
-  
+## jira: Scope collectParentIssues to current board
+
+
 **Files:**
 - `backend/plugins/jira/tasks/parent_issue_collector.go` 
 - `backend/plugins/jira/impl/impl.go`
@@ -42,10 +43,12 @@ Watch for upstream changes to `CloneRepo()`, `shallowClone()`, or `doubleClone()
 **Rebase notes:** `parent_issue_collector.go` is Konflux-only, no upstream conflicts expected.
 `impl.go` has a Konflux addition (`CollectParentIssuesMeta` in `SubTaskMetas()`) — watch for upstream changes to the subtask registration list.
 
-## github: Bot identity — GraphQL Actor support & `IsBot` domain field
+## github: Bot identity — GraphQL Actor support & `IsBot` domain field (Planned)
 
-**Files:**
+**Files (currently diverged):**
 - `backend/plugins/github/tasks/account_convertor.go`
+- `backend/plugins/github/tasks/pr_convertor.go` — *will revert to upstream (restore zero-ID guard)*
+- `backend/plugins/github/tasks/pr_extractor.go` — *will revert to upstream (restore MergedBy repo_account emission)*
 - `backend/plugins/github_graphql/tasks/account_graphql_pre_extractor.go`
 - `backend/plugins/github_graphql/tasks/pr_collector.go`
 - `backend/plugins/github_graphql/tasks/pr_extractor.go`
