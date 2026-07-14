@@ -57,10 +57,10 @@ type aiReview20260612 struct {
 	ReviewState string `gorm:"type:varchar(50)"`
 	SourceUrl   string `gorm:"type:varchar(500)"`
 
-	RawDataParams string  `gorm:"column:_raw_data_params;type:varchar(255)"`
-	RawDataTable  string  `gorm:"column:_raw_data_table;type:varchar(255)"`
-	RawDataId     uint64  `gorm:"column:_raw_data_id"`
-	RawDataRemark string  `gorm:"column:_raw_data_remark;type:longtext"`
+	RawDataParams string `gorm:"column:_raw_data_params;type:varchar(255)"`
+	RawDataTable  string `gorm:"column:_raw_data_table;type:varchar(255)"`
+	RawDataId     uint64 `gorm:"column:_raw_data_id"`
+	RawDataRemark string `gorm:"column:_raw_data_remark;type:longtext"`
 	CreatedAt     time.Time
 	UpdatedAt     *time.Time
 }
@@ -70,16 +70,16 @@ func (aiReview20260612) TableName() string { return "ai_reviews" }
 type aiFailurePrediction20260612 struct {
 	Id string `gorm:"primaryKey;type:varchar(255)"`
 
-	ProjectName     string    `gorm:"index;type:varchar(255)"`
-	PullRequestId   string    `gorm:"index;type:varchar(255)"`
-	PullRequestKey  string    `gorm:"index;type:varchar(255)"`
-	RepoId          string    `gorm:"index;type:varchar(255)"`
-	RepoName        string    `gorm:"type:varchar(255)"`
-	AiTool          string    `gorm:"type:varchar(100)"`
-	CiFailureSource string    `gorm:"type:varchar(20);index"`
-	PrTitle         string    `gorm:"type:varchar(500)"`
-	PrUrl           string    `gorm:"type:varchar(1024)"`
-	PrAuthor        string    `gorm:"type:varchar(255)"`
+	ProjectName     string `gorm:"index;type:varchar(255)"`
+	PullRequestId   string `gorm:"index;type:varchar(255)"`
+	PullRequestKey  string `gorm:"index;type:varchar(255)"`
+	RepoId          string `gorm:"index;type:varchar(255)"`
+	RepoName        string `gorm:"type:varchar(255)"`
+	AiTool          string `gorm:"type:varchar(100)"`
+	CiFailureSource string `gorm:"type:varchar(20);index"`
+	PrTitle         string `gorm:"type:varchar(500)"`
+	PrUrl           string `gorm:"type:varchar(1024)"`
+	PrAuthor        string `gorm:"type:varchar(255)"`
 	PrCreatedAt     time.Time
 	Additions       int
 	Deletions       int
@@ -90,10 +90,10 @@ type aiFailurePrediction20260612 struct {
 	HadCiFailure      bool
 	PredictionOutcome string `gorm:"type:varchar(20)"`
 
-	RawDataParams string  `gorm:"column:_raw_data_params;type:varchar(255)"`
-	RawDataTable  string  `gorm:"column:_raw_data_table;type:varchar(255)"`
-	RawDataId     uint64  `gorm:"column:_raw_data_id"`
-	RawDataRemark string  `gorm:"column:_raw_data_remark;type:longtext"`
+	RawDataParams string `gorm:"column:_raw_data_params;type:varchar(255)"`
+	RawDataTable  string `gorm:"column:_raw_data_table;type:varchar(255)"`
+	RawDataId     uint64 `gorm:"column:_raw_data_id"`
+	RawDataRemark string `gorm:"column:_raw_data_remark;type:longtext"`
 	CreatedAt     time.Time
 	UpdatedAt     *time.Time
 }
@@ -132,10 +132,10 @@ type aiPredictionMetrics20260612 struct {
 	RecommendedAutonomyLevel string `gorm:"type:varchar(50)"`
 	CalculatedAt             time.Time
 
-	RawDataParams string  `gorm:"column:_raw_data_params;type:varchar(255)"`
-	RawDataTable  string  `gorm:"column:_raw_data_table;type:varchar(255)"`
-	RawDataId     uint64  `gorm:"column:_raw_data_id"`
-	RawDataRemark string  `gorm:"column:_raw_data_remark;type:longtext"`
+	RawDataParams string `gorm:"column:_raw_data_params;type:varchar(255)"`
+	RawDataTable  string `gorm:"column:_raw_data_table;type:varchar(255)"`
+	RawDataId     uint64 `gorm:"column:_raw_data_id"`
+	RawDataRemark string `gorm:"column:_raw_data_remark;type:longtext"`
 	CreatedAt     time.Time
 	UpdatedAt     *time.Time
 }
