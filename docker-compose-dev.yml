@@ -101,6 +101,9 @@ services:
       LOGGING_DIR: /app/logs
       TZ: UTC
       ENCRYPTION_SECRET: "SMOZVSJZAXOADJDZTMTWLEOJVSIHPWFMNONSWZWVIHDDMLTYLAXXXTRRVDDSMICPOZTCSREVORSVYQBFGYNIAPXVHIPIVLNLEKAIFWVWMLNMFOXESQDRGHRYYJRKJBQT"
+      # Overrides .env's DB_URL (host-oriented, 127.0.0.1) with the compose-network
+      # service name: from inside this container, 127.0.0.1 refers to itself, not mysql.
+      DB_URL: mysql://merico:merico@mysql:3306/lake?charset=utf8mb4&parseTime=True&loc=UTC
       # Run 4 pipelines in parallel
       PIPELINE_MAX_PARALLEL: "4"
       # LOGOUT_URI: https://xxx.amazoncognito.com/logout?client_id=yyy&logout_uri=http%3A%2F%2Flocalhost%3A4180%2Foauth2%2Fsign_out
