@@ -142,6 +142,7 @@ If upstream changes Makefile image targets or Dockerfiles, re-point builds at
 
 (`backend/Containerfile` and `config-ui/Containerfile` are fork additions, not
 tracked here.)
+
 ## jira: cleanup stale board associations after tickets leave/change board
 
 **Files:**
@@ -165,3 +166,97 @@ re-fetches current issue state, and deletes the stale associations.
 `ExtractEpicsMeta` — same conflict hotspot as `CollectParentIssuesMeta`.
 Cleanup reuses `collectAndExtractSingleIssue` from `parent_issue_collector.go`
 (also Konflux-only).
+
+## core: IsBot field on domain accounts model
+
+**Files:**
+- `backend/core/models/domainlayer/crossdomain/account.go`
+- `backend/core/models/migrationscripts/20260715_add_is_bot_to_accounts.go` (new file)
+- `backend/core/models/migrationscripts/register.go` (append-only)
+
+**Reason:** Added `IsBot bool` to the domain `Account` struct so GitHub/GitLab
+account convertors can flag bot identity once, instead of every downstream
+consumer (n8n workflows, Grafana dashboards) re-deriving it via provider-specific
+`author_name LIKE '%[bot]%'`-style patterns. See
+`docs/research/bot-commit-identification.md` for the full analysis. Tracked in
+DPROD-1342.
+
+**Upstream status:** Pending — not proposed upstream. This is a Konflux-specific
+domain-model addition; upstream has no equivalent field.
+**Upstream PR:** none
+**Owner:** @kpiwko
+
+**Rebase notes:** Pure field addition, low conflict risk. Migration file is new
+(no conflict); `register.go` only needs an append at the end of the `All()` slice.
+
+## github: IsBot field in account convertor
+
+**Files:**
+- `backend/plugins/github/tasks/account_convertor.go`
+
+**Reason:** Populate the new `IsBot` field via `isBotAccount()` (API
+`Type == "Bot"` or `[bot]`/`-bot`/`-robot`/copilot/dependabot/github-actions
+login patterns) plus `hasNoProfileData()` (an account with no `avatar_url`
+ever collected — real GitHub users always get a default identicon — is almost
+always a bot the login/type patterns missed).
+
+**History:** this fork previously carried a much larger divergence here — a
+two-pass design (`ConvertAccounts` + a separate `convertOrphanedRepoAccounts`
+pass) introduced by `cd9928159` ("fix: populate bot account identity...",
+2026-05-13, DPROD-1259) to handle accounts referenced only via
+`_tool_github_repo_accounts` with no matching `_tool_github_accounts` row.
+That divergence was never logged here. While implementing `IsBot`, we found
+upstream had independently fixed the exact same problem
+([apache/devlake#8894](https://github.com/apache/devlake/pull/8894), fixes
+[#8886](https://github.com/apache/devlake/issues/8886), merged 2026-06-12) via
+a more complete, unified-query design (also fixing `_raw_data` provenance,
+which our two-pass patch had broken). We adopted upstream's version verbatim
+instead of extending our own — `account_convertor.go` now matches upstream's
+`ConvertAccounts` exactly except for `IsBot` population, and the fork's
+`convertOrphanedRepoAccounts`/`buildOrphanDomainAccount` are gone.
+
+**Upstream status:** Pending — `IsBot` itself is not proposed upstream (the
+underlying query/struct now match upstream exactly, via #8894).
+**Upstream PR:** none yet (fork proposal: konflux-ci/devlake#118)
+**Owner:** @kpiwko
+
+**Rebase notes:** Low conflict risk — the query/struct match upstream's #8894
+version exactly (`Type` field + its `COALESCE(ga.type, '')` select and the
+`IsBot` line in `buildDomainAccount` are the only additions). Future upstream
+changes to `ConvertAccounts` should apply cleanly except around those two
+insertion points.
+
+## github: zero-ID guard and merged_by emission — adopted from upstream, no outstanding divergence
+
+**Files:**
+- `backend/plugins/github/tasks/pr_convertor.go`
+- `backend/plugins/github/tasks/pr_extractor.go`
+
+**Reason:** Both files previously diverged from upstream (missing zero-ID guard on
+`AuthorId`/`MergedById`; missing `merged_by` → `_tool_github_repo_accounts`
+emission). Both are now byte-identical to upstream's current code (verified via
+diff against `apache/incubator-devlake`, both fixed by
+[apache/devlake#8894](https://github.com/apache/devlake/pull/8894)). No entry
+needed going forward — listed here only for traceability since the fix landed
+alongside the `IsBot` work above.
+
+**Upstream status:** N/A — matches upstream exactly, zero divergence.
+**Owner:** @kpiwko
+
+## gitlab: Bot identity (IsBot) in account convertor
+
+**Files:**
+- `backend/plugins/gitlab/tasks/account_convertor.go`
+
+**Reason:** Populate `IsBot` via `isGitlabBotAccount()`. GitLab accounts have no
+API-reported type field (unlike GitHub), so detection is username/name-pattern
+only: `project_<id>_bot...`/`group_<id>_bot...` access-token prefixes,
+`-bot`/`-robot` suffixes, and "Service Account" in the display name.
+
+**Upstream status:** Pending — not proposed upstream.
+**Upstream PR:** none yet (fork proposal: konflux-ci/devlake#118)
+**Owner:** @kpiwko
+
+**Rebase notes:** Upstream's `account_convertor.go` for GitLab is currently
+unchanged from the version this fork started from (single `Convert` closure,
+no orphan handling) — low conflict risk, isolated to the `Convert` closure body.
