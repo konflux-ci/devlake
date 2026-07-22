@@ -79,16 +79,27 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 		},
 		Input: func(stateManager *api.SubtaskStateManager) (dal.Rows, errors.Error) {
 			clauses := []dal.Clause{
+				// Enrichment fields (name/email/avatar/type) prefer ga: it's the richer,
+				// individually-fetched profile. Raw-data provenance prefers the opposite —
+				// _tool_github_repo_accounts, not ga — because ga (_tool_github_accounts)
+				// is keyed by (connection_id, id) only, not repo-scoped, so a shared
+				// account's ga row can carry a different repo's raw scope. Full-refresh
+				// deletion matches domain rows by _raw_data_table/_raw_data_params against
+				// the current subtask's own scope; stamping a shared account with the
+				// wrong repo's provenance would make it deletable by that other repo's
+				// full sync. repo_accounts is always present (FROM, not LEFT JOIN) and its
+				// provenance is set by the repo-scoped extractor that created it, so it's
+				// always correctly scoped to this conversion run.
 				dal.Select(`_tool_github_repo_accounts.account_id AS id,
 					_tool_github_repo_accounts.login AS login,
 					COALESCE(ga.name, '') AS name,
 					COALESCE(ga.email, '') AS email,
 					COALESCE(ga.avatar_url, '') AS avatar_url,
 					COALESCE(ga.type, '') AS type,
-					COALESCE(ga._raw_data_params, _tool_github_repo_accounts._raw_data_params, '') AS _raw_data_params,
-					COALESCE(ga._raw_data_table, _tool_github_repo_accounts._raw_data_table, '') AS _raw_data_table,
-					COALESCE(ga._raw_data_id, _tool_github_repo_accounts._raw_data_id, 0) AS _raw_data_id,
-					COALESCE(ga._raw_data_remark, _tool_github_repo_accounts._raw_data_remark, '') AS _raw_data_remark`),
+					COALESCE(_tool_github_repo_accounts._raw_data_params, ga._raw_data_params, '') AS _raw_data_params,
+					COALESCE(_tool_github_repo_accounts._raw_data_table, ga._raw_data_table, '') AS _raw_data_table,
+					COALESCE(_tool_github_repo_accounts._raw_data_id, ga._raw_data_id, 0) AS _raw_data_id,
+					COALESCE(_tool_github_repo_accounts._raw_data_remark, ga._raw_data_remark, '') AS _raw_data_remark`),
 				dal.From(&models.GithubRepoAccount{}),
 				dal.Join(`left join _tool_github_accounts ga on (
 					ga.connection_id = _tool_github_repo_accounts.connection_id
