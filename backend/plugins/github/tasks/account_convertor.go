@@ -85,10 +85,10 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 					COALESCE(ga.email, '') AS email,
 					COALESCE(ga.avatar_url, '') AS avatar_url,
 					COALESCE(ga.type, '') AS type,
-					COALESCE(ga._raw_data_params, _tool_github_repo_accounts._raw_data_params) AS _raw_data_params,
-					COALESCE(ga._raw_data_table, _tool_github_repo_accounts._raw_data_table) AS _raw_data_table,
-					COALESCE(ga._raw_data_id, _tool_github_repo_accounts._raw_data_id) AS _raw_data_id,
-					COALESCE(ga._raw_data_remark, _tool_github_repo_accounts._raw_data_remark) AS _raw_data_remark`),
+					COALESCE(ga._raw_data_params, _tool_github_repo_accounts._raw_data_params, '') AS _raw_data_params,
+					COALESCE(ga._raw_data_table, _tool_github_repo_accounts._raw_data_table, '') AS _raw_data_table,
+					COALESCE(ga._raw_data_id, _tool_github_repo_accounts._raw_data_id, 0) AS _raw_data_id,
+					COALESCE(ga._raw_data_remark, _tool_github_repo_accounts._raw_data_remark, '') AS _raw_data_remark`),
 				dal.From(&models.GithubRepoAccount{}),
 				dal.Join(`left join _tool_github_accounts ga on (
 					ga.connection_id = _tool_github_repo_accounts.connection_id
@@ -105,7 +105,14 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 			if stateManager.IsIncremental() {
 				since := stateManager.GetSince()
 				if since != nil {
-					clauses = append(clauses, dal.Where("_tool_github_repo_accounts.updated_at >= ?", since))
+					// Either side of the join can be the one that changed: a repo_account
+					// row updates when the repo's membership changes, but the enrichment
+					// profile (name/email/avatar/type — including the signals IsBot reads)
+					// lives on ga and has its own updated_at.
+					clauses = append(clauses, dal.Where(
+						"(_tool_github_repo_accounts.updated_at >= ? OR ga.updated_at >= ?)",
+						since, since,
+					))
 				}
 			}
 			return db.Cursor(clauses...)
@@ -167,7 +174,9 @@ func isBotAccount(login string, accountType string) bool {
 // enriched with a _tool_github_accounts profile row. GitHub's REST API
 // returns 404 for most bot profiles, so an account with no avatar_url ever
 // collected (real GitHub users always have one, even a default identicon)
-// is almost always a bot that login/type pattern matching missed.
+// is almost always a bot that login/type pattern matching missed. Best
+// effort: a transient API timeout or rate-limit during collection can leave
+// a real user's profile uncollected too, not just a bot's.
 func hasNoProfileData(row *repoAccountForConvert) bool {
 	return row.AvatarUrl == ""
 }
@@ -176,10 +185,14 @@ func hasNoProfileData(row *repoAccountForConvert) bool {
 // profile detail when available) into a domain Account, flagging bot
 // identities via isBotAccount and hasNoProfileData.
 func buildDomainAccount(id string, row *repoAccountForConvert, orgStr string) *crossdomain.Account {
+	fullName := row.Name
+	if fullName == "" {
+		fullName = row.Login
+	}
 	return &crossdomain.Account{
 		DomainEntity: domainlayer.DomainEntity{Id: id},
 		Email:        row.Email,
-		FullName:     row.Name,
+		FullName:     fullName,
 		UserName:     row.Login,
 		AvatarUrl:    row.AvatarUrl,
 		Organization: orgStr,
