@@ -97,6 +97,24 @@ func TestBuildDomainAccount_SetsIsBot(t *testing.T) {
 	}
 }
 
+func TestBuildDomainAccount_FullNameFallsBackToLogin(t *testing.T) {
+	tests := []struct {
+		name         string
+		row          *repoAccountForConvert
+		wantFullName string
+	}{
+		{"no profile falls back to login", &repoAccountForConvert{Login: "konflux-ci-triage[bot]", Name: ""}, "konflux-ci-triage[bot]"},
+		{"real profile name is preserved", &repoAccountForConvert{Login: "octocat", Name: "The Octocat"}, "The Octocat"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildDomainAccount("github:GithubAccount:1:1", tt.row, "")
+			assert.Equal(t, tt.wantFullName, got.FullName)
+		})
+	}
+}
+
 func TestHasNoProfileData(t *testing.T) {
 	tests := []struct {
 		name string

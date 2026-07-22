@@ -234,13 +234,21 @@ insertion points.
 
 **Reason:** Both files previously diverged from upstream (missing zero-ID guard on
 `AuthorId`/`MergedById`; missing `merged_by` → `_tool_github_repo_accounts`
-emission). Both are now byte-identical to upstream's current code (verified via
-diff against `apache/incubator-devlake`, both fixed by
-[apache/devlake#8894](https://github.com/apache/devlake/pull/8894)). No entry
-needed going forward — listed here only for traceability since the fix landed
-alongside the `IsBot` work above.
+emission), both fixed by
+[apache/devlake#8894](https://github.com/apache/devlake/pull/8894).
 
-**Upstream status:** N/A — matches upstream exactly, zero divergence.
+- `pr_extractor.go` is byte-identical to upstream (verified via diff against
+  `apache/incubator-devlake`) — no outstanding divergence.
+- `pr_convertor.go` is behavior-identical (same zero-ID guard semantics) but
+  not byte-identical: we extracted the check into a named `hasValidAccountId()`
+  helper for unit-testability, which upstream doesn't have. This is a
+  deliberate, cosmetic divergence, not a functional one — worth a quick glance
+  on future upstream syncs to `pr_convertor.go`, but not a rebase risk.
+
+No entry needed going forward for either file — listed here only for
+traceability since the fix landed alongside the `IsBot` work above.
+
+**Upstream status:** N/A — functionally matches upstream, zero behavioral divergence.
 **Owner:** @kpiwko
 
 ## gitlab: Bot identity (IsBot) in account convertor
