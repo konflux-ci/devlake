@@ -194,7 +194,7 @@ func fetchBoardMembership(data *JiraTaskData, boardId uint64, issues []struct {
 				onBoard[issue.Key] = true
 			}
 
-			if startAt+len(result.Issues) >= result.Total {
+			if len(result.Issues) == 0 || startAt+len(result.Issues) >= result.Total {
 				break
 			}
 		}
