@@ -8958,20 +8958,20 @@ __metadata:
   linkType: hard
 
 "react-router-dom@npm:^7.0.0":
-  version: 7.12.0
-  resolution: "react-router-dom@npm:7.12.0"
+  version: 7.18.2
+  resolution: "react-router-dom@npm:7.18.2"
   dependencies:
-    react-router: 7.12.0
+    react-router: 7.18.2
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 3d0977127ff4f2cdab011a7fee2d1d9fbf63cdcd1bed2c97f4b7799af4da3da2542badb8419dcdcde323df9cd27b7e1263c03f6dd8a6f2b185fa6ef937ccc0b3
+  checksum: 7e5443a1bfb84878af72ea87bd1890514008399d6098a4b578ddedb938c6c5495c40dc7d17de8eccd8b00839a12dae0d80daf09270176dbbffa3ca38a7a0cadd
   languageName: node
   linkType: hard
 
-"react-router@npm:7.12.0":
-  version: 7.12.0
-  resolution: "react-router@npm:7.12.0"
+"react-router@npm:7.18.2":
+  version: 7.18.2
+  resolution: "react-router@npm:7.18.2"
   dependencies:
     cookie: ^1.0.1
     set-cookie-parser: ^2.6.0
@@ -8981,7 +8981,7 @@ __metadata:
   peerDependenciesMeta:
     react-dom:
       optional: true
-  checksum: f59b399a968cdd9254b711be74e35e1ae365e00a7c908e22a5d80a45ef3ff6ecaf5add40b31ecedfdbe1f82455bb451e0d3b053d64fa2dfb9364af0942c88ea6
+  checksum: 945d24fd3ec7f113f384fde00463fd75b7f1cf5bf76fc2cd1f46cfc2c5610516c538ec55f9294d11a72988179949ed1b8470e4b2571d4b7031016f83c55f51cc
   languageName: node
   linkType: hard
 
