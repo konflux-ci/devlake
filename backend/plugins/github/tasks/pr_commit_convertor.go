@@ -71,7 +71,7 @@ func ConvertPullRequestCommits(taskCtx plugin.SubTaskContext) (err errors.Error)
 			if stateManager.IsIncremental() {
 				since := stateManager.GetSince()
 				if since != nil {
-					clauses = append(clauses, dal.Where("_tool_github_pull_requests.github_updated_at >= ?", since))
+					clauses = append(clauses, dal.Where("_tool_github_pull_requests.updated_at >= ?", since))
 				}
 			}
 			return db.Cursor(clauses...)

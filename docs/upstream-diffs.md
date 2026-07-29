@@ -65,3 +65,33 @@ identical semantics, eliminating the `golang.org/x/exp` import entirely.
   
   **Rebase notes:** `parent_issue_collector.go` is Konflux-only, no upstream conflicts expected.
   `impl.go` has a Konflux addition (`CollectParentIssuesMeta` in `SubTaskMetas()`) — watch for upstream changes to the subtask registration list.
+
+## github: PR convertor incremental filtering by updated_at
+
+**Files:**
+- `backend/plugins/github/tasks/pr_convertor.go`
+- `backend/plugins/github/tasks/pr_comment_convertor.go`
+- `backend/plugins/github/tasks/pr_commit_convertor.go`
+- `backend/plugins/github/tasks/pr_issue_convertor.go`
+- `backend/plugins/github/tasks/pr_issue_enricher.go`
+- `backend/plugins/github/tasks/pr_label_convertor.go`
+- `backend/plugins/github/tasks/pr_review_convertor.go`
+- `backend/plugins/github/tasks/review_convertor.go`
+
+**Reason:** The convertor had no incremental filter. Filtering on `github_updated_at`
+(when GitHub last modified the PR) causes silent data loss: a PR merged during a long
+pipeline run gets its `github_updated_at` set before the watermark, so the next
+incremental run skips it even though the extractor correctly upserted it as `MERGED`.
+`lake.pull_requests` then permanently retains the stale `OPEN` status until a full re-sync.
+
+Observed on `konflux-ci/build-definitions` (June 29): a ~6h partial pipeline pushed
+the watermark to ~17:00; PRs closed between 15:00–17:00 were skipped by the convertor
+on the next nightly run.
+
+Fix: filter on `updated_at` (DB upsert timestamp), gated on `IsIncremental()`.
+
+**Upstream status:** TO DO
+**Upstream PR:** none yet
+**Owner:** @rsoaresd
+
+**Rebase notes:** Watch for upstream changes to `ConvertPullRequests()` input clause logic.
