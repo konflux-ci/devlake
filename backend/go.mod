@@ -52,7 +52,7 @@ require (
 	github.com/rogpeppe/go-internal v1.13.1
 	github.com/snowflakedb/gosnowflake v1.19.1
 	golang.org/x/mod v0.27.0
-	google.golang.org/api v0.230.0
+	google.golang.org/api v0.291.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
