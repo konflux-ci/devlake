@@ -32,7 +32,7 @@ type snowflakeGithubConnection20260731000001 struct {
 	Account               string `gorm:"column:account;not null"`
 	User                  string `gorm:"column:sf_user;not null"`
 	AuthType              string `gorm:"column:auth_type;default:keypair"`
-	PrivateKey            string `gorm:"column:private_key"`
+	PrivateKey            string `gorm:"column:private_key;type:text;serializer:encdec"`
 	Database              string `gorm:"column:sf_database;not null"`
 	Schema                string `gorm:"column:sf_schema;not null"`
 	Warehouse             string `gorm:"column:warehouse"`

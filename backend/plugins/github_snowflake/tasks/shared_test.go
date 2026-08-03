@@ -48,6 +48,6 @@ func TestNullInt(t *testing.T) {
 }
 
 func TestRepoShortName(t *testing.T) {
-	assert.Equal(t, "build-service", repoShortName("konflux-ci/build-service"))
-	assert.Equal(t, "alone", repoShortName("alone"))
+	assert.Equal(t, "build-service", RepoShortName("konflux-ci/build-service"))
+	assert.Equal(t, "alone", RepoShortName("alone"))
 }

@@ -92,15 +92,20 @@ func OpenSnowflakeDB(account, user, authType, privateKeyPEM, database, schema, w
 		cfg.Role = role
 	}
 
-	if authType == "externalbrowser" {
-		cfg.Authenticator = sf.AuthTypeExternalBrowser
-	} else {
+	switch authType {
+	case "", "keypair":
 		privKey, err := parseRSAPrivateKey(privateKeyPEM)
 		if err != nil {
 			return nil, errors.Default.Wrap(err, "failed to parse Snowflake private key")
 		}
 		cfg.Authenticator = sf.AuthTypeJwt
 		cfg.PrivateKey = privKey
+	case "externalbrowser":
+		cfg.Authenticator = sf.AuthTypeExternalBrowser
+	default:
+		return nil, errors.BadInput.New(fmt.Sprintf(
+			`unsupported authType %q; must be "keypair" or "externalbrowser"`, authType,
+		))
 	}
 
 	dsn, goErr := sf.DSN(cfg)

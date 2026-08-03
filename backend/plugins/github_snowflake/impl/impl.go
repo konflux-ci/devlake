@@ -124,19 +124,10 @@ func (p GithubSnowflake) PrepareTaskData(taskCtx plugin.TaskContext, options map
 	repo := &githubmodels.GithubRepo{}
 	dbErr := taskCtx.GetDal().First(repo, dal.Where("connection_id = ? AND github_id = ?", op.ConnectionId, op.GithubId))
 	if dbErr != nil && taskCtx.GetDal().IsErrorNotFound(dbErr) {
-		shortName := op.Name
-		if idx := len(op.Name) - 1; idx >= 0 {
-			for i := len(op.Name) - 1; i >= 0; i-- {
-				if op.Name[i] == '/' {
-					shortName = op.Name[i+1:]
-					break
-				}
-			}
-		}
 		repo = &githubmodels.GithubRepo{
 			Scope:    coremodels.Scope{ConnectionId: op.ConnectionId},
 			GithubId: op.GithubId,
-			Name:     shortName,
+			Name:     tasks.RepoShortName(op.Name),
 			FullName: op.Name,
 			HTMLUrl:  "https://github.com/" + op.Name,
 			CloneUrl: "https://github.com/" + op.Name + ".git",

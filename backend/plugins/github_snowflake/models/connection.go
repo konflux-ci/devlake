@@ -22,7 +22,7 @@ import (
 )
 
 // SnowflakeGithubConnection holds the credentials and config for a Snowflake-backed GitHub connection.
-// The private key PEM is stored encrypted (encrypt:"yes") using DevLake's field-level encryption.
+// The private key PEM is stored encrypted via GORM's encdec serializer.
 type SnowflakeGithubConnection struct {
 	helper.BaseConnection `mapstructure:",squash"`
 	// Account is the Snowflake account identifier, e.g. "myorg-myaccount"
@@ -35,7 +35,7 @@ type SnowflakeGithubConnection struct {
 	AuthType string `json:"authType" gorm:"column:auth_type;default:keypair" mapstructure:"authType"`
 	// PrivateKey is the RSA private key in PKCS#8 PEM format, stored encrypted.
 	// Required when AuthType is "keypair"; ignored for "externalbrowser".
-	PrivateKey string `json:"privateKey" encrypt:"yes" gorm:"column:private_key" mapstructure:"privateKey"`
+	PrivateKey string `json:"privateKey" gorm:"column:private_key;type:text;serializer:encdec" mapstructure:"privateKey"`
 	// Database is the Snowflake database, e.g. "GITHUB_DB"
 	Database string `json:"database" gorm:"column:sf_database;not null" mapstructure:"database" validate:"required"`
 	// Schema is the Snowflake schema, e.g. "MARTS"

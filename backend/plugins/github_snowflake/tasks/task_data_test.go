@@ -69,3 +69,32 @@ func TestDecodeAndValidateTaskOptions_MissingName(t *testing.T) {
 	})
 	assert.NotNil(t, err)
 }
+
+func TestDecodeAndValidateTaskOptions_InvalidNameFormat(t *testing.T) {
+	_, err := DecodeAndValidateTaskOptions(map[string]interface{}{
+		"connectionId": uint64(1),
+		"githubId":     123,
+		"name":         "not-a-repo",
+	})
+	assert.NotNil(t, err)
+
+	_, err = DecodeAndValidateTaskOptions(map[string]interface{}{
+		"connectionId": uint64(1),
+		"githubId":     123,
+		"name":         "/repo",
+	})
+	assert.NotNil(t, err)
+
+	_, err = DecodeAndValidateTaskOptions(map[string]interface{}{
+		"connectionId": uint64(1),
+		"githubId":     123,
+		"name":         "owner/",
+	})
+	assert.NotNil(t, err)
+}
+
+func TestOpenSnowflakeDB_InvalidAuthType(t *testing.T) {
+	_, err := OpenSnowflakeDB("acct", "user", "keypai", "", "db", "schema", "", "")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "unsupported authType")
+}

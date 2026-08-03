@@ -84,7 +84,22 @@ func DecodeAndValidateTaskOptions(options map[string]interface{}) (*GithubSnowfl
 	if op.Name == "" {
 		return nil, errors.BadInput.New("name (owner/repo full name) must not be empty")
 	}
+	if err := validateOwnerRepo(op.Name); err != nil {
+		return nil, err
+	}
 	return &op, nil
+}
+
+// validateOwnerRepo checks that name is in "owner/repo" format.
+func validateOwnerRepo(name string) errors.Error {
+	if strings.Count(name, "/") != 1 {
+		return errors.BadInput.New("name must be in owner/repo format")
+	}
+	owner, repo, _ := strings.Cut(name, "/")
+	if owner == "" || repo == "" {
+		return errors.BadInput.New("name must be in owner/repo format")
+	}
+	return nil
 }
 
 // OpenSnowflakeDB opens a database/sql connection to Snowflake.
@@ -107,15 +122,20 @@ func OpenSnowflakeDB(account, user, authType, privateKeyPEM, database, schema, w
 		cfg.Role = role
 	}
 
-	if authType == "externalbrowser" {
-		cfg.Authenticator = sf.AuthTypeExternalBrowser
-	} else {
+	switch authType {
+	case "", "keypair":
 		privKey, err := parseRSAPrivateKey(privateKeyPEM)
 		if err != nil {
 			return nil, errors.Default.Wrap(err, "failed to parse Snowflake private key")
 		}
 		cfg.Authenticator = sf.AuthTypeJwt
 		cfg.PrivateKey = privKey
+	case "externalbrowser":
+		cfg.Authenticator = sf.AuthTypeExternalBrowser
+	default:
+		return nil, errors.BadInput.New(fmt.Sprintf(
+			`unsupported authType %q; must be "keypair" or "externalbrowser"`, authType,
+		))
 	}
 
 	dsn, goErr := sf.DSN(cfg)
@@ -146,8 +166,8 @@ func parseRSAPrivateKey(pemStr string) (*rsa.PrivateKey, error) {
 	return rsaKey, nil
 }
 
-// repoShortName returns the short name from owner/repo full name.
-func repoShortName(fullName string) string {
+// RepoShortName returns the short name from owner/repo full name.
+func RepoShortName(fullName string) string {
 	parts := strings.Split(fullName, "/")
 	if len(parts) == 0 {
 		return fullName

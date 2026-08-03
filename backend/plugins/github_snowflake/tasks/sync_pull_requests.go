@@ -67,7 +67,7 @@ func SyncPullRequests(subtaskCtx plugin.SubTaskContext) errors.Error {
 			title          *string
 			body           *string
 			createdAt      time.Time
-			updatedAt      time.Time
+			updatedAt      *time.Time
 			closedAt       *time.Time
 			isDraft        *bool
 			mergeCommitSha *string
@@ -95,6 +95,10 @@ func SyncPullRequests(subtaskCtx plugin.SubTaskContext) errors.Error {
 			draft = *isDraft
 		}
 		merged := mergedAt != nil
+		prUpdatedAt := createdAt
+		if updatedAt != nil {
+			prUpdatedAt = *updatedAt
+		}
 
 		pr := &githubmodels.GithubPullRequest{
 			ConnectionId:    connectionId,
@@ -106,7 +110,7 @@ func SyncPullRequests(subtaskCtx plugin.SubTaskContext) errors.Error {
 			Title:           nullStr(title),
 			Body:            nullStr(body),
 			GithubCreatedAt: createdAt,
-			GithubUpdatedAt: updatedAt,
+			GithubUpdatedAt: prUpdatedAt,
 			ClosedAt:        closedAt,
 			IsDraft:         draft,
 			Merged:          merged,

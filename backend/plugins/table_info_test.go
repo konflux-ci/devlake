@@ -28,8 +28,8 @@ import (
 	bamboo "github.com/apache/incubator-devlake/plugins/bamboo/impl"
 	bitbucket "github.com/apache/incubator-devlake/plugins/bitbucket/impl"
 	bitbucket_server "github.com/apache/incubator-devlake/plugins/bitbucket_server/impl"
-	claudeCode "github.com/apache/incubator-devlake/plugins/claude_code/impl"
 	circleci "github.com/apache/incubator-devlake/plugins/circleci/impl"
+	claudeCode "github.com/apache/incubator-devlake/plugins/claude_code/impl"
 	customize "github.com/apache/incubator-devlake/plugins/customize/impl"
 	dbt "github.com/apache/incubator-devlake/plugins/dbt/impl"
 	dora "github.com/apache/incubator-devlake/plugins/dora/impl"
@@ -38,8 +38,8 @@ import (
 	gitee "github.com/apache/incubator-devlake/plugins/gitee/impl"
 	gitextractor "github.com/apache/incubator-devlake/plugins/gitextractor/impl"
 	github "github.com/apache/incubator-devlake/plugins/github/impl"
-	github_snowflake "github.com/apache/incubator-devlake/plugins/github_snowflake/impl"
 	githubGraphql "github.com/apache/incubator-devlake/plugins/github_graphql/impl"
+	github_snowflake "github.com/apache/incubator-devlake/plugins/github_snowflake/impl"
 	gitlab "github.com/apache/incubator-devlake/plugins/gitlab/impl"
 	icla "github.com/apache/incubator-devlake/plugins/icla/impl"
 	issueTrace "github.com/apache/incubator-devlake/plugins/issue_trace/impl"
@@ -84,8 +84,8 @@ func Test_GetPluginTablesInfo(t *testing.T) {
 	checker.FeedIn("gitee/models", gitee.Gitee{}.GetTablesInfo)
 	checker.FeedIn("gitextractor/models", gitextractor.GitExtractor{}.GetTablesInfo)
 	checker.FeedIn("github/models", github.Github{}.GetTablesInfo)
-	checker.FeedIn("github_snowflake/models", github_snowflake.GithubSnowflake{}.GetTablesInfo)
 	checker.FeedIn("github_graphql", githubGraphql.GithubGraphql{}.GetTablesInfo)
+	checker.FeedIn("github_snowflake/models", github_snowflake.GithubSnowflake{}.GetTablesInfo)
 	checker.FeedIn("gitlab/models", gitlab.Gitlab{}.GetTablesInfo)
 	checker.FeedIn("icla/models", icla.Icla{}.GetTablesInfo)
 	checker.FeedIn("jenkins/models", jenkins.Jenkins{}.GetTablesInfo)
