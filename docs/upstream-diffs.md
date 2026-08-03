@@ -6,6 +6,9 @@ that must be maintained during upstream syncs.
 Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`, `jira_snowflake`, `github_snowflake`) are additions,
 not modifications, and are not tracked here.
 
+Shared helper packages added for owned plugins (e.g. `backend/helpers/snowflakehelper/`) are also
+fork additions and are not tracked as file-level upstream diffs below.
+
 `jira_snowflake/tasks/convert_*.go` are adapted copies of `jira/tasks/` convertors — see the
 [jira_snowflake AGENTS.md](../backend/plugins/jira_snowflake/AGENTS.md) for the diff details.
 

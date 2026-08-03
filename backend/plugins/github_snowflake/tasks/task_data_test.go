@@ -92,9 +92,3 @@ func TestDecodeAndValidateTaskOptions_InvalidNameFormat(t *testing.T) {
 	})
 	assert.NotNil(t, err)
 }
-
-func TestOpenSnowflakeDB_InvalidAuthType(t *testing.T) {
-	_, err := OpenSnowflakeDB("acct", "user", "keypai", "", "db", "schema", "", "")
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "unsupported authType")
-}

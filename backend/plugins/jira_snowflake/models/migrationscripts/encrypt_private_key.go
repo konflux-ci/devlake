@@ -71,6 +71,9 @@ func (*encryptPrivateKey) Up(basicRes context.BasicRes) errors.Error {
 			return err
 		}
 	}
+	if err := cursor.Err(); err != nil {
+		return errors.Default.Wrap(err, "iterating connections cursor")
+	}
 	return nil
 }
 

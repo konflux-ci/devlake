@@ -21,11 +21,13 @@ impl/impl.go              — plugin interfaces, SubTaskMetas, PrepareTaskData
 api/connection_api.go     — connection CRUD (POST/GET/PATCH/DELETE)
 models/connection.go      — SnowflakeJiraConnection (table: _tool_jira_snowflake_connections)
 models/migrationscripts/  — DB migrations
-tasks/task_data.go        — JiraSnowflakeOptions, JiraSnowflakeTaskData, OpenSnowflakeDB
+tasks/task_data.go        — JiraSnowflakeOptions, JiraSnowflakeTaskData
 tasks/shared.go           — getStdStatus, getTypeMappings (adapted from jira/tasks)
 tasks/sync_*.go           — Snowflake SQL queries → _tool_jira_* tool-layer tables
 tasks/convert_*.go        — domain-layer convertors (adapted copies of jira/tasks/*)
 ```
+
+Shared Snowflake connectivity lives in `helpers/snowflakehelper` (`Open`, `ParseRSAPrivateKey`).
 
 ## Subtask pipeline order
 

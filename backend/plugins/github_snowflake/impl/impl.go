@@ -24,6 +24,7 @@ import (
 	coremodels "github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/helpers/snowflakehelper"
 	githubmodels "github.com/apache/incubator-devlake/plugins/github/models"
 	"github.com/apache/incubator-devlake/plugins/github_snowflake/api"
 	"github.com/apache/incubator-devlake/plugins/github_snowflake/models"
@@ -159,7 +160,7 @@ func (p GithubSnowflake) PrepareTaskData(taskCtx plugin.TaskContext, options map
 		op.ScopeConfig = new(githubmodels.GithubScopeConfig)
 	}
 
-	snowDB, openErr := tasks.OpenSnowflakeDB(
+	snowDB, openErr := snowflakehelper.Open(
 		connection.Account,
 		connection.User,
 		connection.AuthType,
