@@ -5,7 +5,9 @@
 - Go 1.21+
 - podman + podman-compose
 - Access to the Snowflake account (`GITHUB_DB.MARTS`)
-- Snowflake role with `SELECT` on that schema (e.g. `GITHUB_GROUP`)
+- Snowflake role `GITHUB_GROUP` **granted to your user** (SSO login alone is not enough —
+  ask a Snowflake admin if `USE ROLE GITHUB_GROUP` fails)
+- Warehouse access (e.g. `DEFAULT`) for that role
 - A konflux-ci repo to pilot (`githubId` + `owner/repo` full name)
 
 ---
@@ -13,6 +15,32 @@
 ## Step 1 — Verify Snowflake access
 
 Before starting DevLake, confirm you can reach Snowflake from your machine.
+
+### 1a — Check role access in the Snowflake console
+
+In a Snowflake worksheet (use your real username from `SELECT CURRENT_USER()`, not the
+literal string `CURRENT_USER`):
+
+```sql
+SELECT CURRENT_USER(), CURRENT_ROLE();
+
+-- Replace with the username returned above (quoted string, not CURRENT_USER as an identifier):
+-- SHOW GRANTS TO USER "your.username";
+
+USE ROLE GITHUB_GROUP;
+USE WAREHOUSE DEFAULT;
+USE DATABASE GITHUB_DB;
+USE SCHEMA MARTS;
+
+SELECT COUNT(*) FROM REPOSITORY;
+SELECT ID, FULL_NAME FROM REPOSITORY ORDER BY FULL_NAME LIMIT 20;
+```
+
+If `USE ROLE GITHUB_GROUP` fails with “not granted to this user”, stop and request the
+role from a Snowflake admin before continuing.
+
+
+### 1b — Check from Go (same auth path as the plugin)
 
 Create a throwaway Go file (outside the repo):
 
@@ -78,8 +106,10 @@ SELECT ID, FULL_NAME FROM REPOSITORY ORDER BY FULL_NAME LIMIT 20;
 | Error | Fix |
 |---|---|
 | `account is empty` | Use the account identifier (e.g. `myorg-myaccount`), not the full `*.snowflakecomputing.com` URL |
+| `Role 'GITHUB_GROUP' ... is not granted to this user` | Ask a Snowflake admin to grant `GITHUB_GROUP` to your user; verify with `USE ROLE GITHUB_GROUP` in a Snowflake worksheet |
 | `Object does not exist or not authorized` | Your role lacks `SELECT` on `GITHUB_DB.MARTS` — ask a Snowflake admin |
 | Browser window never opens | You may be running inside a container or headless SSH session — run locally |
+| `User 'CURRENT_USER' does not exist` | `SHOW GRANTS TO USER` needs a real username string from `SELECT CURRENT_USER()`, not `CURRENT_USER` as an identifier |
 
 ---
 
