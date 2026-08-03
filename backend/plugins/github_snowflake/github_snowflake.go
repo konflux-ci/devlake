@@ -28,15 +28,20 @@ var PluginEntry impl.GithubSnowflake //nolint
 
 func main() {
 	cmd := &cobra.Command{Use: "github_snowflake"}
+	connectionId := cmd.Flags().Uint64P("connectionId", "c", 0, "github_snowflake connection id")
 	githubId := cmd.Flags().IntP("githubId", "g", 0, "GitHub repository numeric ID")
 	fullName := cmd.Flags().StringP("fullName", "n", "", "GitHub repository full name (owner/repo)")
 	timeAfter := cmd.Flags().StringP("timeAfter", "a", "", "only sync records created/updated after this time (RFC3339)")
+	_ = cmd.MarkFlagRequired("connectionId")
+	_ = cmd.MarkFlagRequired("githubId")
+	_ = cmd.MarkFlagRequired("fullName")
 
 	cmd.Run = func(cmd *cobra.Command, args []string) {
 		runner.DirectRun(cmd, args, PluginEntry, map[string]interface{}{
-			"githubId": *githubId,
-			"name":     *fullName,
-			"fullName": *fullName,
+			"connectionId": *connectionId,
+			"githubId":     *githubId,
+			"name":         *fullName,
+			"fullName":     *fullName,
 		}, *timeAfter)
 	}
 	runner.RunCmd(cmd)

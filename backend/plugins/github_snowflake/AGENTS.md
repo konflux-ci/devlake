@@ -19,7 +19,9 @@ Unit tests do **not** need MySQL. A real pipeline run does.
 ### Minimal real-run setup
 
 1. Start MySQL: `podman compose -f docker-compose-dev.yml up -d mysql`
-2. Ensure `.env` has `DB_URL`, `ENCRYPTION_SECRET`, and (for local API) `AUTH_ENABLED=false`
+2. Ensure `.env` has `DB_URL`, `ENCRYPTION_SECRET`, and (for local API) `AUTH_ENABLED=false`.
+   For native `make run`, use `localhost` (or `127.0.0.1`) in `DB_URL` — `env.example`'s
+   `@mysql:3306` host only resolves inside the compose network.
 3. Run the server (native desktop required for `externalbrowser` SSO):
 
 ```bash

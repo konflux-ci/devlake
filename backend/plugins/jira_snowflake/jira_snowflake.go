@@ -28,14 +28,19 @@ var PluginEntry impl.JiraSnowflake //nolint
 
 func main() {
 	cmd := &cobra.Command{Use: "jira_snowflake"}
+	connectionId := cmd.Flags().Uint64P("connectionId", "c", 0, "jira_snowflake connection id")
 	boardId := cmd.Flags().Uint64P("boardId", "b", 0, "Jira board ID to sync")
 	projectKeys := cmd.Flags().StringSliceP("projectKeys", "p", nil, "Jira project keys for this board")
 	timeAfter := cmd.Flags().StringP("timeAfter", "a", "", "only sync records created/updated after this time (RFC3339)")
+	_ = cmd.MarkFlagRequired("connectionId")
+	_ = cmd.MarkFlagRequired("boardId")
+	_ = cmd.MarkFlagRequired("projectKeys")
 
 	cmd.Run = func(cmd *cobra.Command, args []string) {
 		runner.DirectRun(cmd, args, PluginEntry, map[string]interface{}{
-			"boardId":     *boardId,
-			"projectKeys": *projectKeys,
+			"connectionId": *connectionId,
+			"boardId":      *boardId,
+			"projectKeys":  *projectKeys,
 		}, *timeAfter)
 	}
 	runner.RunCmd(cmd)
