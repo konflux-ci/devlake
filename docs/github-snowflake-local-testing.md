@@ -120,36 +120,43 @@ DB_URL=mysql://merico:merico@127.0.0.1:3306/lake?charset=utf8mb4&parseTime=True
 
 ---
 
-## Step 4 — Build and run DevLake (plugin only)
+## Step 4 — Build and run DevLake
 
 Browser-based SSO (`externalbrowser` auth) only works when DevLake runs **natively on your desktop**, not inside a container (the browser pop-up cannot reach a container process).
 
+`github_snowflake` writes into the shared `_tool_github_*` tables owned by the **github** plugin. On a fresh database those tables only exist after github's migrations run, so include `github` in `DEVLAKE_PLUGINS` at least for the first boot:
+
 ```bash
 cd backend
-DEVLAKE_PLUGINS=github_snowflake DISABLED_REMOTE_PLUGINS=true ENV_FILE=../.env make build-plugin run
+DEVLAKE_PLUGINS=github,github_snowflake DISABLED_REMOTE_PLUGINS=true ENV_FILE=../.env make build-plugin run
 ```
 
-- `DEVLAKE_PLUGINS=github_snowflake` — only compile this plugin (much faster than building all plugins)
+- `DEVLAKE_PLUGINS=github,github_snowflake` — load github (for `_tool_github_*` schema) + this plugin
 - `DISABLED_REMOTE_PLUGINS=true` — skip loading remote/dynamic plugins
 - `ENV_FILE=../.env` — point to the `.env` in the repo root
 
-Verify the plugin loaded:
+After the tool tables exist, you can drop back to `DEVLAKE_PLUGINS=github_snowflake` for faster rebuilds if you prefer.
+
+Verify the plugins loaded:
 
 ```bash
-curl -s http://localhost:8080/plugins | jq '.[] | select(.plugin == "github_snowflake")'
+curl -s http://localhost:8080/plugins | jq '.[] | select(.plugin == "github_snowflake" or .plugin == "github")'
 ```
 
-Trigger DB migrations (creates `_tool_github_snowflake_connections` table):
+Trigger DB migrations (creates `_tool_github_snowflake_connections` and, via github, `_tool_github_*`):
 
 ```bash
 curl -s http://localhost:8080/proceed-db-migration | jq .
 ```
 
-Verify the table exists:
+Verify the tables exist:
 
 ```bash
 podman compose -f docker-compose-dev.yml exec mysql \
-  mysql -umerico -pmerico lake -e "SHOW TABLES LIKE '_tool_github_snowflake%';"
+  mysql -umerico -pmerico lake -e "
+    SHOW TABLES LIKE '_tool_github_snowflake%';
+    SHOW TABLES LIKE '_tool_github_repos';
+  "
 ```
 
 ---
@@ -259,5 +266,8 @@ $MYSQL "SELECT number, state, title, author_name, merged
 | `Object 'USER' does not exist` | Unquoted reserved keyword | Queries must use `"USER"` (already done in sync tasks) |
 | Browser pop-up doesn't open | Running inside a container | Run DevLake natively with `make run`, not via `podman compose` |
 | Pipeline ends with `TASK_FAILED` | Check `message` field | `curl -s http://localhost:8080/pipelines/$ID \| jq .message` |
+| `Table 'lake._tool_github_repos' doesn't exist` | github plugin migrations never ran | Restart with `DEVLAKE_PLUGINS=github,github_snowflake` and re-run `/proceed-db-migration` |
+| `failed to decode PEM block from private key` | Connection is on `keypair` with empty/invalid key | Recreate or PATCH connection with `"authType": "externalbrowser"` (local) or a valid PKCS#8 `privateKey` |
+
 | `tool_prs` populated but `domain_prs` = 0 | Convertor subtask failed | Check pipeline subtask logs; ensure convertors are enabled |
 | Same repo also on GitHub API connection | Domain ID duplication risk | Remove the repo from one of the two connections |

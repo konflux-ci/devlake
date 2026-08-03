@@ -26,10 +26,11 @@ Unit tests do **not** need MySQL. A real pipeline run does.
 
 ```bash
 cd backend
-DEVLAKE_PLUGINS=github_snowflake DISABLED_REMOTE_PLUGINS=true ENV_FILE=../.env make build-plugin run
+# Include github so its migrations create shared _tool_github_* tables (needed on a fresh DB).
+DEVLAKE_PLUGINS=github,github_snowflake DISABLED_REMOTE_PLUGINS=true ENV_FILE=../.env make build-plugin run
 ```
 
-4. Create a connection + run a pipeline for one repo (`githubId` + `fullName`)
+4. Create a connection (`authType: externalbrowser` for local desktop) + run a pipeline for one repo (`githubId` + `fullName`)
 
 Full step-by-step (Snowflake check, migrations, curl examples, result queries):
 [docs/github-snowflake-local-testing.md](../../../docs/github-snowflake-local-testing.md)
@@ -84,8 +85,9 @@ Pilot coverage today: **konflux-ci** org only in MARTS.
 ## GitHub plugin models dependency
 
 Imports `plugins/github/models` for tool-layer structs. This is a shared schema
-dependency, not a business-logic cross-import. The github plugin does not need to
-be deployed alongside github_snowflake — `impl.Init` registers a minimal
+dependency, not a business-logic cross-import. Runtime API/business logic does
+not require the github plugin, but a fresh DB still needs github loaded once so
+its migrations create `_tool_github_*`. `impl.Init` registers a minimal
 `githubPluginStub` for didgen.
 
 ## Don'ts
