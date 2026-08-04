@@ -3,8 +3,11 @@
 This file tracks modifications to files originating from [apache/incubator-devlake](https://github.com/apache/incubator-devlake)
 that must be maintained during upstream syncs.
 
-Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`) are additions,
+Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`, `jira_snowflake`) are additions,
 not modifications, and are not tracked here.
+
+`jira_snowflake/tasks/convert_*.go` are adapted copies of `jira/tasks/` convertors — see the
+[jira_snowflake AGENTS.md](../backend/plugins/jira_snowflake/AGENTS.md) for the diff details.
 
 ## gitextractor: ForceFullClone / FORCE_FULL_GIT_HISTORY
 
@@ -25,6 +28,27 @@ directory leak in `doubleClone()`.
 
 **Rebase notes:** Touches clone strategy selection in `clone_gitcli.go`.
 Watch for upstream changes to `CloneRepo()`, `shallowClone()`, or `doubleClone()`.
+
+## archived/base.go: inline Unsigned constraint
+
+**Files:**
+- `backend/core/models/migrationscripts/archived/base.go`
+
+**Reason:** `golang.org/x/exp/constraints` was imported only for `constraints.Unsigned` in
+`GenericModel`. Recent versions of `golang.org/x/exp` require Go 1.23+ (they import the
+standard `cmp` package added in Go 1.21). The CI environment runs an older Go, so the
+transitive dependency chain through `core/runner` → `archived/base.go` caused a `typecheck`
+failure in golangci-lint for any PR that introduces a new plugin main package.
+
+Replaced `constraints.Unsigned` with a locally-defined `unsignedInteger` interface that has
+identical semantics, eliminating the `golang.org/x/exp` import entirely.
+
+**Upstream status:** Pending submission upstream (trivial/safe change)
+**Upstream PR:** none yet
+**Owner:** @fmuntean
+
+**Rebase notes:** If upstream changes `GenericModel`, check whether they still reference
+`golang.org/x/exp/constraints` and reapply the inline if needed.
 
  ## jira: Scope collectParentIssues to current board
   

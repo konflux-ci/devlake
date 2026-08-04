@@ -89,11 +89,18 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	// Build a set of already collected commit+flag combinations
+	// Build a set of already collected commit+flag combinations.
+	// Zero-data rows younger than 7 days are NOT marked as collected — they get
+	// re-fetched in case the coverage upload arrived after the previous collection.
+	retryWindow := time.Now().Add(-7 * 24 * time.Hour)
 	collectedSet := make(map[string]bool)
 	for _, cov := range existingCoverages {
 		key := fmt.Sprintf("%s|%s", cov.CommitSha, cov.FlagName)
-		collectedSet[key] = true
+		if cov.LinesTotal > 0 {
+			collectedSet[key] = true
+		} else if cov.CommitTimestamp != nil && cov.CommitTimestamp.Before(retryWindow) {
+			collectedSet[key] = true
+		}
 	}
 
 	// Build iterator with only NEW commit × flag combinations

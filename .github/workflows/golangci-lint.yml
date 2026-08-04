@@ -50,6 +50,11 @@ jobs:
           go version
           cd backend
           make mock
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache: false
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:

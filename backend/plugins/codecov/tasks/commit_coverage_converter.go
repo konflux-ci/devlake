@@ -42,7 +42,30 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 	db := taskCtx.GetDal()
 
-	// Extract overall coverage from commit totals and join with comparison data
+	// Pre-load all commits for this repo into memory to avoid N+1 queries
+	var commits []models.CodecovCommit
+	err := db.All(&commits, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
+	if err != nil {
+		return errors.Default.Wrap(err, "failed to pre-load commits for commit coverage conversion")
+	}
+	commitMap := make(map[string]*models.CodecovCommit, len(commits))
+	for i := range commits {
+		commitMap[commits[i].CommitSha] = &commits[i]
+	}
+	taskCtx.GetLogger().Info("[ConvertCommitCoverage] pre-loaded %d commits into memory", len(commitMap))
+
+	// Pre-load comparison data with empty flag (overall comparisons) for this repo
+	var comparisons []ComparisonData
+	err = db.All(&comparisons, dal.Where("connection_id = ? AND repo_id = ? AND flag_name = ?", data.Options.ConnectionId, data.Options.FullName, ""))
+	if err != nil {
+		return errors.Default.Wrap(err, "failed to pre-load comparisons for commit coverage conversion")
+	}
+	comparisonMap := make(map[string]*ComparisonData, len(comparisons))
+	for i := range comparisons {
+		comparisonMap[comparisons[i].CommitSha] = &comparisons[i]
+	}
+	taskCtx.GetLogger().Info("[ConvertCommitCoverage] pre-loaded %d comparisons into memory", len(comparisonMap))
+
 	extractor, err := helper.NewApiExtractor(helper.ApiExtractorArgs{
 		RawDataSubTaskArgs: helper.RawDataSubTaskArgs{
 			Ctx: taskCtx,
@@ -53,7 +76,6 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			Table: RAW_COMMIT_TOTALS_TABLE,
 		},
 		Extract: func(resData *helper.RawData) ([]interface{}, errors.Error) {
-			// Read input to get commit SHA (more reliable than API response)
 			var input CommitInput
 			err := errors.Convert(json.Unmarshal(resData.Input, &input))
 			if err != nil {
@@ -81,45 +103,34 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 				return nil, err
 			}
 
-			// Use commit SHA from input (more reliable than API response which may be empty)
 			commitSha := input.CommitSha
 			if commitSha == "" && totals.Commitid != "" {
 				commitSha = totals.Commitid
 			}
 			if commitSha == "" {
-				// No commit SHA available, skip this record
 				return nil, nil
 			}
 
-			// Get commit info
-			var commit models.CodecovCommit
-			err = db.First(&commit, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ?", data.Options.ConnectionId, data.Options.FullName, commitSha))
-			if err != nil {
-				return nil, nil // Skip if commit not found
+			commit, ok := commitMap[commitSha]
+			if !ok {
+				return nil, nil
 			}
 
-			// Get modified coverage from comparison data if available
 			var modifiedCoverage float64
 			var filesChanged int
 			var methodsCovered, methodsTotal int
 
-			// Try to find comparison data for this commit (overall, flag_name = "")
-			var comparison ComparisonData
-			err = db.First(&comparison, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ? AND flag_name = ?", data.Options.ConnectionId, data.Options.FullName, commitSha, ""))
-			if err == nil {
-				// Found comparison data
-				modifiedCoverage = comparison.ModifiedCoverage
-				filesChanged = comparison.FilesChanged
-				methodsCovered = comparison.MethodsCovered
-				methodsTotal = comparison.MethodsTotal
+			if comp, ok := comparisonMap[commitSha]; ok {
+				modifiedCoverage = comp.ModifiedCoverage
+				filesChanged = comp.FilesChanged
+				methodsCovered = comp.MethodsCovered
+				methodsTotal = comp.MethodsTotal
 			} else {
-				// No comparison data, use overall totals for methods
-				// Modified coverage stays 0
 				methodsCovered = totals.Totals.Methods
 				methodsTotal = totals.Totals.Methods
 			}
 
-			codecovCommitCoverage := &models.CodecovCommitCoverage{
+			return []interface{}{&models.CodecovCommitCoverage{
 				NoPKModel:        common.NoPKModel{},
 				ConnectionId:     data.Options.ConnectionId,
 				RepoId:           data.Options.FullName,
@@ -137,9 +148,7 @@ func ConvertCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 				Misses:           totals.Totals.Misses,
 				MethodsCovered:   methodsCovered,
 				MethodsTotal:     methodsTotal,
-			}
-
-			return []interface{}{codecovCommitCoverage}, nil
+			}}, nil
 		},
 	})
 

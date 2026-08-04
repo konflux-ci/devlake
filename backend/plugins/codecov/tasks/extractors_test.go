@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apache/incubator-devlake/core/errors"
 	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
 	mocklog "github.com/apache/incubator-devlake/mocks/core/log"
 	mockplugin "github.com/apache/incubator-devlake/mocks/core/plugin"
@@ -109,6 +108,7 @@ func TestConvertCoverageTrend_NoTable(t *testing.T) {
 
 func TestConvertCoverage_NoTable(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockDal.On("HasTable", "_raw_codecov_api_commit_coverages").Return(false)
 
 	err := ConvertCoverage(mockCtx)
@@ -117,10 +117,24 @@ func TestConvertCoverage_NoTable(t *testing.T) {
 
 func TestConvertCommitCoverage_NoTable(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockDal.On("HasTable", "_raw_codecov_api_commit_totals").Return(false)
 
 	err := ConvertCommitCoverage(mockCtx)
 	assert.Nil(t, err)
+}
+
+// setupConverterPreloadMocks adds All() mock expectations for the pre-loaded
+// commit and comparison maps used by ConvertCoverage and ConvertCommitCoverage.
+func setupConverterPreloadMocks(mockDal *mockdal.Dal, commits []models.CodecovCommit, comparisons []ComparisonData) {
+	mockDal.On("All", mock.AnythingOfType("*[]models.CodecovCommit"), mock.Anything).Run(func(args mock.Arguments) {
+		dst := args.Get(0).(*[]models.CodecovCommit)
+		*dst = commits
+	}).Return(nil)
+	mockDal.On("All", mock.AnythingOfType("*[]tasks.ComparisonData"), mock.Anything).Run(func(args mock.Arguments) {
+		dst := args.Get(0).(*[]ComparisonData)
+		*dst = comparisons
+	}).Return(nil)
 }
 
 func setupEmptyTableMocks(mockDal *mockdal.Dal, tableName string) {
@@ -354,6 +368,7 @@ func TestConvertCoverageTrend_WithOneRow(t *testing.T) {
 
 func TestConvertCoverage_WithOneRow(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -390,9 +405,6 @@ func TestConvertCoverage_WithOneRow(t *testing.T) {
 		}
 	}).Return(nil)
 
-	// db.First for CodecovCommit — return not found so Extract returns nil (skip)
-	mockDal.On("First", mock.Anything, mock.Anything).Return(errors.Default.New("not found"))
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -409,6 +421,7 @@ func TestConvertCoverage_WithOneRow(t *testing.T) {
 
 func TestConvertCommitCoverage_WithOneRow(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_TOTALS_TABLE).Return(true)
@@ -442,9 +455,6 @@ func TestConvertCommitCoverage_WithOneRow(t *testing.T) {
 		}
 	}).Return(nil)
 
-	// db.First for CodecovCommit — return not found so Extract returns nil
-	mockDal.On("First", mock.Anything, mock.Anything).Return(errors.Default.New("not found"))
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -464,6 +474,7 @@ func TestComparisonDataTableName(t *testing.T) {
 
 func TestConvertCoverage_EmptyTable(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	setupEmptyTableMocks(mockDal, RAW_COMMIT_COVERAGES_TABLE)
 	err := ConvertCoverage(mockCtx)
 	assert.Nil(t, err)
@@ -471,6 +482,7 @@ func TestConvertCoverage_EmptyTable(t *testing.T) {
 
 func TestConvertCommitCoverage_EmptyTable(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	setupEmptyTableMocks(mockDal, RAW_COMMIT_TOTALS_TABLE)
 	err := ConvertCommitCoverage(mockCtx)
 	assert.Nil(t, err)
@@ -564,6 +576,10 @@ func TestConvertCoverageTrend_InvalidDate(t *testing.T) {
 
 func TestConvertCoverage_CommitFound(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -595,17 +611,6 @@ func TestConvertCoverage_CommitFound(t *testing.T) {
 		}
 	}).Return(nil)
 
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "main"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil).Once()
-	// Comparison not found
-	mockDal.On("First", mock.Anything, mock.Anything).Return(errors.Default.New("not found")).Once()
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -622,6 +627,10 @@ func TestConvertCoverage_CommitFound(t *testing.T) {
 
 func TestConvertCoverage_EmptyFlagName(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -650,15 +659,6 @@ func TestConvertCoverage_EmptyFlagName(t *testing.T) {
 		}
 	}).Return(nil)
 
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "main"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil)
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -675,6 +675,10 @@ func TestConvertCoverage_EmptyFlagName(t *testing.T) {
 
 func TestConvertCoverage_FlagInMap(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -709,17 +713,6 @@ func TestConvertCoverage_FlagInMap(t *testing.T) {
 		}
 	}).Return(nil)
 
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "main"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil).Once()
-	// Comparison not found
-	mockDal.On("First", mock.Anything, mock.Anything).Return(errors.Default.New("not found")).Once()
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -736,6 +729,12 @@ func TestConvertCoverage_FlagInMap(t *testing.T) {
 
 func TestConvertCoverage_ComparisonFound(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, []ComparisonData{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", FlagName: "unit-tests", ModifiedCoverage: 92.5},
+	})
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -764,21 +763,6 @@ func TestConvertCoverage_ComparisonFound(t *testing.T) {
 		}
 	}).Return(nil)
 
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "main"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil).Once()
-	// Comparison found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if cmp, ok := args.Get(0).(*ComparisonData); ok {
-			cmp.ModifiedCoverage = 92.5
-		}
-	}).Return(nil).Once()
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -795,6 +779,10 @@ func TestConvertCoverage_ComparisonFound(t *testing.T) {
 
 func TestConvertCommitCoverage_CommitFound(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_TOTALS_TABLE).Return(true)
@@ -822,17 +810,6 @@ func TestConvertCommitCoverage_CommitFound(t *testing.T) {
 			Input:  inputJSON,
 		}
 	}).Return(nil)
-
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "main"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil).Once()
-	// Comparison not found
-	mockDal.On("First", mock.Anything, mock.Anything).Return(errors.Default.New("not found")).Once()
 
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
@@ -848,6 +825,12 @@ func TestConvertCommitCoverage_CommitFound(t *testing.T) {
 
 func TestConvertCommitCoverage_CommitAndComparison(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, []ComparisonData{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", FlagName: "", ModifiedCoverage: 75.5, FilesChanged: 3, MethodsCovered: 20, MethodsTotal: 25},
+	})
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_TOTALS_TABLE).Return(true)
@@ -876,24 +859,6 @@ func TestConvertCommitCoverage_CommitAndComparison(t *testing.T) {
 		}
 	}).Return(nil)
 
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "main"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil).Once()
-	// Comparison found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if cmp, ok := args.Get(0).(*ComparisonData); ok {
-			cmp.ModifiedCoverage = 75.5
-			cmp.FilesChanged = 3
-			cmp.MethodsCovered = 20
-			cmp.MethodsTotal = 25
-		}
-	}).Return(nil).Once()
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -908,6 +873,7 @@ func TestConvertCommitCoverage_CommitAndComparison(t *testing.T) {
 
 func TestConvertCommitCoverage_EmptyCommitSha(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_TOTALS_TABLE).Return(true)
@@ -1441,6 +1407,7 @@ func TestConvertCoverageTrend_InvalidDataJSON(t *testing.T) {
 
 func TestConvertCoverage_InvalidInputJSON(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -1472,6 +1439,7 @@ func TestConvertCoverage_InvalidInputJSON(t *testing.T) {
 
 func TestConvertCoverage_InvalidDataJSON(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -1505,6 +1473,10 @@ func TestConvertCoverage_InvalidDataJSON(t *testing.T) {
 
 func TestConvertCoverage_FlagNotInMap(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
@@ -1514,7 +1486,6 @@ func TestConvertCoverage_FlagNotInMap(t *testing.T) {
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
 
-	// Flag name is "unit-tests" but flags map contains "integration-tests" only
 	inputJSON, _ := json.Marshal(CommitFlagInput{CommitSha: "abc123", FlagName: "unit-tests"})
 	dataJSON, _ := json.Marshal(map[string]any{
 		"commitid": "abc123",
@@ -1540,17 +1511,6 @@ func TestConvertCoverage_FlagNotInMap(t *testing.T) {
 		}
 	}).Return(nil)
 
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "main"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil).Once()
-	// Comparison not found
-	mockDal.On("First", mock.Anything, mock.Anything).Return(errors.Default.New("not found")).Once()
-
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
 		{Name: "RepoId", Type: reflect.TypeOf("")},
@@ -1569,6 +1529,7 @@ func TestConvertCoverage_FlagNotInMap(t *testing.T) {
 
 func TestConvertCommitCoverage_InvalidInputJSON(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_TOTALS_TABLE).Return(true)
@@ -1600,6 +1561,7 @@ func TestConvertCommitCoverage_InvalidInputJSON(t *testing.T) {
 
 func TestConvertCommitCoverage_InvalidDataJSON(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_TOTALS_TABLE).Return(true)
@@ -1633,6 +1595,10 @@ func TestConvertCommitCoverage_InvalidDataJSON(t *testing.T) {
 
 func TestConvertCommitCoverage_FallbackToTotalsCommitid(t *testing.T) {
 	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "fallback123", Branch: "develop", CommitTimestamp: &ts},
+	}, nil)
 	mockRows := new(mockdal.Rows)
 
 	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_TOTALS_TABLE).Return(true)
@@ -1642,7 +1608,6 @@ func TestConvertCommitCoverage_FallbackToTotalsCommitid(t *testing.T) {
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
 
-	// Empty CommitSha in input but commitid in data -> uses totals.Commitid
 	inputJSON, _ := json.Marshal(CommitInput{CommitSha: ""})
 	dataJSON, _ := json.Marshal(map[string]any{
 		"commitid": "fallback123",
@@ -1661,17 +1626,6 @@ func TestConvertCommitCoverage_FallbackToTotalsCommitid(t *testing.T) {
 			Input:  inputJSON,
 		}
 	}).Return(nil)
-
-	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
-	// Commit found via fallback SHA
-	mockDal.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		if commit, ok := args.Get(0).(*models.CodecovCommit); ok {
-			commit.Branch = "develop"
-			commit.CommitTimestamp = &ts
-		}
-	}).Return(nil).Once()
-	// Comparison not found
-	mockDal.On("First", mock.Anything, mock.Anything).Return(errors.Default.New("not found")).Once()
 
 	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
 		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
