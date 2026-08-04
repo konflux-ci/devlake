@@ -35,7 +35,8 @@ type SnowflakeGithubConnection struct {
 	AuthType string `json:"authType" gorm:"column:auth_type;default:keypair" mapstructure:"authType"`
 	// PrivateKey is the RSA private key in PKCS#8 PEM format, stored encrypted.
 	// Required when AuthType is "keypair"; ignored for "externalbrowser".
-	// Omitted from JSON responses so GET/list never returns the decrypted PEM.
+	// json:"-" omits the decrypted PEM from GET/list responses. Request binding
+	// still works via mapstructure:"privateKey" (ConnectionApiHelper.Decode).
 	PrivateKey string `json:"-" gorm:"column:private_key;type:text;serializer:encdec" mapstructure:"privateKey"`
 	// Database is the Snowflake database, e.g. "GITHUB_DB"
 	Database string `json:"database" gorm:"column:sf_database;not null" mapstructure:"database" validate:"required"`

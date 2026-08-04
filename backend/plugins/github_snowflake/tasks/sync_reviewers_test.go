@@ -30,7 +30,9 @@ func TestBuildReviewersQuery_FiltersUsersAndLatest(t *testing.T) {
 	assert.Contains(t, q, "LOWER(h.REQUESTED_REVIEWER_TYPE) = 'user'")
 	assert.Contains(t, q, "QUALIFY ROW_NUMBER()")
 	assert.Contains(t, q, "PARTITION BY h.PULL_REQUEST_ID, h.REQUESTED_ID")
-	assert.Contains(t, q, "h.REMOVED IS NULL OR h.REMOVED = FALSE")
+	// REMOVED must be filtered after QUALIFY so a later removal wins.
+	assert.Contains(t, q, "WHERE (latest.removed IS NULL OR latest.removed = FALSE)")
+	assert.NotContains(t, q, "AND (h.REMOVED IS NULL OR h.REMOVED = FALSE)")
 	assert.Equal(t, []interface{}{42}, args)
 }
 

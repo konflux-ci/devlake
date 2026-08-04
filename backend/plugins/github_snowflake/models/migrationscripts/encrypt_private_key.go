@@ -58,6 +58,11 @@ func (*encryptPrivateKey) Up(basicRes context.BasicRes) errors.Error {
 		if row.PrivateKey == "" {
 			continue
 		}
+		// Skip values that are already encrypted so a migration replay cannot
+		// double-encrypt and permanently corrupt the private key.
+		if _, decErr := plugin.Decrypt(encKey, row.PrivateKey); decErr == nil {
+			continue
+		}
 		encrypted, err := plugin.Encrypt(encKey, row.PrivateKey)
 		if err != nil {
 			return err

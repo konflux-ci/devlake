@@ -177,7 +177,9 @@ WHERE i.REPOSITORY_ID = ?
 `
 	args := []interface{}{repoId}
 	if timeAfter != nil {
-		query += "  AND pr.UPDATED_AT > ?\n"
+		// UPDATED_AT can be NULL for older PRs; fall back to created timestamps
+		// so incremental sync does not silently drop them.
+		query += "  AND COALESCE(pr.UPDATED_AT, COALESCE(pr.CREATED_AT, i.CREATED_AT)) > ?\n"
 		args = append(args, *timeAfter)
 	}
 	return query, args

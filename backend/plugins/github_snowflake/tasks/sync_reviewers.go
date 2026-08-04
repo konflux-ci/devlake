@@ -89,34 +89,44 @@ func SyncReviewers(subtaskCtx plugin.SubTaskContext) errors.Error {
 }
 
 func buildReviewersQuery(repoId int, timeAfter *time.Time) (string, []interface{}) {
-	// Latest non-removed user request per (pull_request_id, requested_id).
+	// First pick the latest history row per (pull_request_id, requested_id), then
+	// drop rows whose latest event is a removal. Filtering REMOVED before QUALIFY
+	// incorrectly keeps an older "requested" row when a later removal exists.
 	query := `
 SELECT
-    h.REQUESTED_ID     AS reviewer_id,
-    h.PULL_REQUEST_ID  AS pull_request_id,
-    u.LOGIN            AS username,
-    u.NAME             AS name
-FROM REQUESTED_REVIEWER_HISTORY h
-JOIN PULL_REQUEST pr
-  ON pr.ID = h.PULL_REQUEST_ID
-JOIN ISSUE i
-  ON i.ID = pr.ISSUE_ID
-LEFT JOIN "USER" u
-  ON u.ID = h.REQUESTED_ID
-WHERE i.REPOSITORY_ID = ?
-  AND LOWER(h.REQUESTED_REVIEWER_TYPE) = 'user'
-  AND (h.REMOVED IS NULL OR h.REMOVED = FALSE)
+    latest.reviewer_id,
+    latest.pull_request_id,
+    latest.username,
+    latest.name
+FROM (
+    SELECT
+        h.REQUESTED_ID     AS reviewer_id,
+        h.PULL_REQUEST_ID  AS pull_request_id,
+        u.LOGIN            AS username,
+        u.NAME             AS name,
+        h.REMOVED          AS removed
+    FROM REQUESTED_REVIEWER_HISTORY h
+    JOIN PULL_REQUEST pr
+      ON pr.ID = h.PULL_REQUEST_ID
+    JOIN ISSUE i
+      ON i.ID = pr.ISSUE_ID
+    LEFT JOIN "USER" u
+      ON u.ID = h.REQUESTED_ID
+    WHERE i.REPOSITORY_ID = ?
+      AND LOWER(h.REQUESTED_REVIEWER_TYPE) = 'user'
 `
 	args := []interface{}{repoId}
 	if timeAfter != nil {
-		query += "  AND h.CREATED_AT > ?\n"
+		query += "      AND h.CREATED_AT > ?\n"
 		args = append(args, *timeAfter)
 	}
 	query += `
-QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY h.PULL_REQUEST_ID, h.REQUESTED_ID
-    ORDER BY h.CREATED_AT DESC NULLS LAST
-) = 1
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY h.PULL_REQUEST_ID, h.REQUESTED_ID
+        ORDER BY h.CREATED_AT DESC NULLS LAST
+    ) = 1
+) latest
+WHERE (latest.removed IS NULL OR latest.removed = FALSE)
 `
 	return query, args
 }

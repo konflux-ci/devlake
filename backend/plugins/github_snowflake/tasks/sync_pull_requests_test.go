@@ -38,7 +38,7 @@ func TestBuildPullRequestsQuery_NoTimeFilter(t *testing.T) {
 func TestBuildPullRequestsQuery_WithTimeFilter(t *testing.T) {
 	ts := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
 	q, args := buildPullRequestsQuery(12345, &ts)
-	assert.Contains(t, q, "AND pr.UPDATED_AT > ?")
+	assert.Contains(t, q, "AND COALESCE(pr.UPDATED_AT, COALESCE(pr.CREATED_AT, i.CREATED_AT)) > ?")
 	assert.Equal(t, 2, len(args))
 	assert.Equal(t, 12345, args[0])
 	assert.Equal(t, ts, args[1])
