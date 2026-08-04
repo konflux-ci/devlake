@@ -15,25 +15,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crossdomain
+package tasks
 
 import (
-	"github.com/apache/incubator-devlake/core/models/domainlayer"
-	"time"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-type Account struct {
-	domainlayer.DomainEntity
-	Email        string `gorm:"type:varchar(255)"`
-	FullName     string `gorm:"type:varchar(255)"`
-	UserName     string `gorm:"type:varchar(255)"`
-	AvatarUrl    string `gorm:"type:varchar(255)"`
-	Organization string `gorm:"type:varchar(255)"`
-	CreatedDate  *time.Time
-	Status       int
-	IsBot        bool `gorm:"type:boolean;default:false"`
-}
+func TestHasValidAccountId(t *testing.T) {
+	tests := []struct {
+		name          string
+		toolAccountId int
+		want          bool
+	}{
+		// GitHub's REST API returns author/merged_by = null for many bot
+		// PRs; the tool layer stores that as AuthorId/MergedById = 0. That
+		// zero must not be treated as a real account, or it produces a
+		// phantom domain ID (e.g. "github:GithubAccount:1:0") that matches
+		// no row in accounts.
+		{"zero id is a phantom null-author marker", 0, false},
+		{"positive id is a valid account", 123456, true},
+	}
 
-func (Account) TableName() string {
-	return "accounts"
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, hasValidAccountId(tt.toolAccountId))
+		})
+	}
 }
