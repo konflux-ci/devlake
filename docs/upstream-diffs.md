@@ -43,8 +43,8 @@ failure in golangci-lint for any PR that introduces a new plugin main package.
 Replaced `constraints.Unsigned` with a locally-defined `unsignedInteger` interface that has
 identical semantics, eliminating the `golang.org/x/exp` import entirely.
 
-**Upstream status:** Pending submission upstream (trivial/safe change)
-**Upstream PR:** none yet
+**Upstream status:** Submitted (awaiting merge)
+**Upstream PR:** https://github.com/apache/devlake/pull/9032
 **Owner:** @fmuntean
 
 **Rebase notes:** If upstream changes `GenericModel`, check whether they still reference
