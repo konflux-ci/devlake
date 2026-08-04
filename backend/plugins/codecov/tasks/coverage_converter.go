@@ -40,6 +40,32 @@ var ConvertCoverageMeta = plugin.SubTaskMeta{
 
 func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
+	db := taskCtx.GetDal()
+
+	// Pre-load all commits for this repo into memory to avoid N+1 queries
+	var commits []models.CodecovCommit
+	err := db.All(&commits, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
+	if err != nil {
+		return errors.Default.Wrap(err, "failed to pre-load commits for coverage conversion")
+	}
+	commitMap := make(map[string]*models.CodecovCommit, len(commits))
+	for i := range commits {
+		commitMap[commits[i].CommitSha] = &commits[i]
+	}
+	taskCtx.GetLogger().Info("[ConvertCoverage] pre-loaded %d commits into memory", len(commitMap))
+
+	// Pre-load all comparison data for this repo into memory
+	var comparisons []ComparisonData
+	err = db.All(&comparisons, dal.Where("connection_id = ? AND repo_id = ?", data.Options.ConnectionId, data.Options.FullName))
+	if err != nil {
+		return errors.Default.Wrap(err, "failed to pre-load comparisons for coverage conversion")
+	}
+	comparisonMap := make(map[string]*ComparisonData, len(comparisons))
+	for i := range comparisons {
+		key := comparisons[i].CommitSha + "|" + comparisons[i].FlagName
+		comparisonMap[key] = &comparisons[i]
+	}
+	taskCtx.GetLogger().Info("[ConvertCoverage] pre-loaded %d comparisons into memory", len(comparisonMap))
 
 	extractor, err := helper.NewApiExtractor(helper.ApiExtractorArgs{
 		RawDataSubTaskArgs: helper.RawDataSubTaskArgs{
@@ -51,14 +77,12 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 			Table: RAW_COMMIT_COVERAGES_TABLE,
 		},
 		Extract: func(resData *helper.RawData) ([]interface{}, errors.Error) {
-			// Read input to get flag name and commit SHA
 			var input CommitFlagInput
 			err := errors.Convert(json.Unmarshal(resData.Input, &input))
 			if err != nil {
 				return nil, err
 			}
 
-			// Parse API response - when flag is specified, response contains only totals for that flag
 			var totals struct {
 				Commitid string `json:"commitid"`
 				Totals   struct {
@@ -74,7 +98,6 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 					Sessions   int     `json:"sessions"`
 					Complexity float64 `json:"complexity"`
 				} `json:"totals"`
-				// Flags map may or may not be present depending on API response
 				Flags map[string]struct {
 					Files      int     `json:"files"`
 					Lines      int     `json:"lines"`
@@ -94,40 +117,27 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 				return nil, err
 			}
 
-			// Use commit SHA from input (more reliable)
 			commitSha := input.CommitSha
 			if totals.Commitid != "" {
 				commitSha = totals.Commitid
 			}
 
-			// Get commit info to extract branch and timestamp
-			var commit models.CodecovCommit
-			db := taskCtx.GetDal()
-			err = db.First(&commit, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ?", data.Options.ConnectionId, data.Options.FullName, commitSha))
-			if err != nil {
-				// If commit not found, skip this record
+			commit, ok := commitMap[commitSha]
+			if !ok {
 				return nil, nil
 			}
 
-			var results []interface{}
-
-			// Determine which flag this coverage is for
 			flagName := input.FlagName
-
-			// Skip empty flag names - we only want per-flag coverage
 			if flagName == "" {
 				return nil, nil
 			}
 
-			// Extract coverage data - when flag is specified, API returns flag-specific in totals
-			// When no flag, API returns overall coverage in totals
 			var coveragePercentage float64
 			var linesCovered, linesTotal, linesMissed int
 			var hits, partials, misses int
 			var methodsCovered, methodsTotal int
 
 			if flagName != "" && totals.Flags != nil {
-				// Check if flag-specific data exists in flags map
 				if flagTotals, ok := totals.Flags[flagName]; ok {
 					coveragePercentage = flagTotals.Coverage
 					linesCovered = flagTotals.Hits
@@ -139,7 +149,6 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 					methodsCovered = flagTotals.Methods
 					methodsTotal = flagTotals.Methods
 				} else {
-					// Flag not in map, use totals (API returned flag-specific in totals)
 					coveragePercentage = totals.Totals.Coverage
 					linesCovered = totals.Totals.Hits
 					linesTotal = totals.Totals.Lines
@@ -151,7 +160,6 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 					methodsTotal = totals.Totals.Methods
 				}
 			} else {
-				// No flag specified, use overall totals
 				coveragePercentage = totals.Totals.Coverage
 				linesCovered = totals.Totals.Hits
 				linesTotal = totals.Totals.Lines
@@ -163,16 +171,12 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 				methodsTotal = totals.Totals.Methods
 			}
 
-			// Get modified coverage from comparison data if available (per flag)
 			var modifiedCoverage float64
-			var comparison ComparisonData
-			err = db.First(&comparison, dal.Where("connection_id = ? AND repo_id = ? AND commit_sha = ? AND flag_name = ?", data.Options.ConnectionId, data.Options.FullName, commitSha, flagName))
-			if err == nil {
-				modifiedCoverage = comparison.ModifiedCoverage
+			if comp, ok := comparisonMap[commitSha+"|"+flagName]; ok {
+				modifiedCoverage = comp.ModifiedCoverage
 			}
 
-			// Create one coverage record for this flag/commit combination
-			results = append(results, &models.CodecovCoverage{
+			return []interface{}{&models.CodecovCoverage{
 				NoPKModel:          common.NoPKModel{},
 				ConnectionId:       data.Options.ConnectionId,
 				RepoId:             data.Options.FullName,
@@ -190,9 +194,7 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 				Misses:             misses,
 				MethodsCovered:     methodsCovered,
 				MethodsTotal:       methodsTotal,
-			})
-
-			return results, nil
+			}}, nil
 		},
 	})
 
