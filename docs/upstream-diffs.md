@@ -65,3 +65,19 @@ identical semantics, eliminating the `golang.org/x/exp` import entirely.
   
   **Rebase notes:** `parent_issue_collector.go` is Konflux-only, no upstream conflicts expected.
   `impl.go` has a Konflux addition (`CollectParentIssuesMeta` in `SubTaskMetas()`) — watch for upstream changes to the subtask registration list.
+
+## table_info_test: register owned plugins
+
+**Files:**
+- `backend/plugins/table_info_test.go`
+
+**Reason:** `Test_GetPluginTablesInfo` validates every Go plugin under `backend/plugins/`
+is covered. Owned plugins (`agentready`, `aireview`, `codecov`, `testregistry`) must be
+imported and `FeedIn`'d here so plugin-count and table-coverage checks pass.
+
+**Upstream status:** N/A — owned plugins are Konflux-only additions
+**Upstream PR:** none — not applicable
+**Owner:** @mfrancisc
+
+**Rebase notes:** When upstream adds/removes plugins in this file, keep the owned-plugin
+imports and `FeedIn` calls.

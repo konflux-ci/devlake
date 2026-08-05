@@ -64,6 +64,7 @@ func (p TestRegistry) GetTablesInfo() []dal.Tabler {
 		&models.TestRegistryCIJob{},
 		&models.TestSuite{},
 		&models.TestCase{},
+		&models.TektonTask{},
 	}
 }
 

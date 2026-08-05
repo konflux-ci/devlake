@@ -28,6 +28,7 @@ import (
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/aireview/api"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
+	"github.com/apache/incubator-devlake/plugins/aireview/models/domain"
 	"github.com/apache/incubator-devlake/plugins/aireview/models/migrationscripts"
 	"github.com/apache/incubator-devlake/plugins/aireview/tasks"
 )
@@ -88,6 +89,9 @@ func (p AiReview) GetTablesInfo() []dal.Tabler {
 		&models.AiFailurePrediction{},
 		&models.AiPredictionMetrics{},
 		&models.AiReviewScopeConfig{},
+		&domain.AiReview{},
+		&domain.AiFailurePrediction{},
+		&domain.AiPredictionMetrics{},
 	}
 }
 

@@ -22,6 +22,8 @@ import (
 
 	"github.com/apache/incubator-devlake/helpers/unithelper"
 	ae "github.com/apache/incubator-devlake/plugins/ae/impl"
+	agentready "github.com/apache/incubator-devlake/plugins/agentready/impl"
+	aireview "github.com/apache/incubator-devlake/plugins/aireview/impl"
 	argocd "github.com/apache/incubator-devlake/plugins/argocd/impl"
 	asana "github.com/apache/incubator-devlake/plugins/asana/impl"
 	azuredevops "github.com/apache/incubator-devlake/plugins/azuredevops_go/impl"
@@ -30,6 +32,7 @@ import (
 	bitbucket_server "github.com/apache/incubator-devlake/plugins/bitbucket_server/impl"
 	circleci "github.com/apache/incubator-devlake/plugins/circleci/impl"
 	claudeCode "github.com/apache/incubator-devlake/plugins/claude_code/impl"
+	codecov "github.com/apache/incubator-devlake/plugins/codecov/impl"
 	customize "github.com/apache/incubator-devlake/plugins/customize/impl"
 	dbt "github.com/apache/incubator-devlake/plugins/dbt/impl"
 	dora "github.com/apache/incubator-devlake/plugins/dora/impl"
@@ -59,6 +62,7 @@ import (
 	tapd "github.com/apache/incubator-devlake/plugins/tapd/impl"
 	teambition "github.com/apache/incubator-devlake/plugins/teambition/impl"
 	testmo "github.com/apache/incubator-devlake/plugins/testmo/impl"
+	testregistry "github.com/apache/incubator-devlake/plugins/testregistry/impl"
 	trello "github.com/apache/incubator-devlake/plugins/trello/impl"
 	webhook "github.com/apache/incubator-devlake/plugins/webhook/impl"
 	zentao "github.com/apache/incubator-devlake/plugins/zentao/impl"
@@ -110,6 +114,10 @@ func Test_GetPluginTablesInfo(t *testing.T) {
 	checker.FeedIn("issue_trace/models", issueTrace.IssueTrace{}.GetTablesInfo)
 	checker.FeedIn("q_dev/models", q_dev.QDev{}.GetTablesInfo)
 	checker.FeedIn("gh-copilot/models", copilot.GhCopilot{}.GetTablesInfo)
+	checker.FeedIn("agentready/models", agentready.AgentReady{}.GetTablesInfo)
+	checker.FeedIn("aireview/models", aireview.AiReview{}.GetTablesInfo)
+	checker.FeedIn("testregistry/models", testregistry.TestRegistry{}.GetTablesInfo)
+	checker.FeedIn("codecov/models", codecov.Codecov{}.GetTablesInfo)
 	err := checker.Verify()
 	if err != nil {
 		t.Error(err)
