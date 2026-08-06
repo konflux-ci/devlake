@@ -20,10 +20,10 @@ package tasks
 import (
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
-	domainCode "github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
+	"github.com/apache/incubator-devlake/plugins/aireview/models/domain"
 )
 
 var ConvertPredictionMetricsMeta = plugin.SubTaskMeta{
@@ -49,7 +49,7 @@ func ConvertPredictionMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 		return nil
 	}
 
-	if err := db.Delete(&domainCode.AiPredictionMetrics{}, dal.Where("project_name = ?", projectName)); err != nil {
+	if err := db.Delete(&domain.AiPredictionMetrics{}, dal.Where("project_name = ?", projectName)); err != nil {
 		return errors.Default.Wrap(err, "failed to delete existing ai_prediction_metrics for project")
 	}
 
@@ -64,14 +64,14 @@ func ConvertPredictionMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 	defer cursor.Close()
 
-	batch := make([]*domainCode.AiPredictionMetrics, 0, 100)
+	batch := make([]*domain.AiPredictionMetrics, 0, 100)
 	for cursor.Next() {
 		var src models.AiPredictionMetrics
 		if fetchErr := db.Fetch(cursor, &src); fetchErr != nil {
 			return errors.Default.Wrap(fetchErr, "failed to fetch prediction metrics row")
 		}
 
-		batch = append(batch, &domainCode.AiPredictionMetrics{
+		batch = append(batch, &domain.AiPredictionMetrics{
 			DomainEntity: domainlayer.DomainEntity{
 				Id: generateAiDomainId("apm", projectName, src.Id),
 			},
@@ -119,7 +119,7 @@ func ConvertPredictionMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	return nil
 }
 
-func savePredictionMetricsBatch(db dal.Dal, batch []*domainCode.AiPredictionMetrics) errors.Error {
+func savePredictionMetricsBatch(db dal.Dal, batch []*domain.AiPredictionMetrics) errors.Error {
 	for _, m := range batch {
 		if err := db.CreateOrUpdate(m); err != nil {
 			return errors.Default.Wrap(err, "failed to save domain prediction metrics")

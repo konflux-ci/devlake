@@ -103,9 +103,9 @@ func CreateApiServer() *gin.Engine {
 	// Enable CORS (split comma-separated origins: env vars often come as one string)
 	cfg := basicRes.GetConfigReader()
 	router.Use(cors.New(cors.Config{
-		AllowOrigins: parseCORSAllowOrigins(cfg.GetStringSlice("CORS_ALLOW_ORIGIN")),
-		AllowMethods: []string{"PUT", "PATCH", "POST", "GET", "OPTIONS", "DELETE"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
+		AllowOrigins:     parseCORSAllowOrigins(cfg.GetStringSlice("CORS_ALLOW_ORIGIN")),
+		AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "OPTIONS", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           2 * time.Hour,
