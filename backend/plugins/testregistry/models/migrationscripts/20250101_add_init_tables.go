@@ -21,15 +21,31 @@ import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/testregistry/models"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
+
+// testRegistryConnection20250101 is a frozen snapshot of models.TestRegistryConnection as of 2025-01-01.
+// Do not update this struct — create a new migration instead.
+type testRegistryConnection20250101 struct {
+	helper.BaseConnection `mapstructure:",squash"`
+	CITool                string `gorm:"column:ci_tool;type:varchar(50)"`
+	Project               string `gorm:"column:project;type:varchar(200)"`
+	GitHubOrganization    string `gorm:"column:github_organization;type:varchar(200)"`
+	GitHubToken           string `gorm:"column:github_token;serializer:encdec"`
+	QuayOrganization      string `gorm:"column:quay_organization;type:varchar(200)"`
+	JUnitRegex            string `gorm:"column:junit_regex;type:varchar(500)"`
+}
+
+func (testRegistryConnection20250101) TableName() string {
+	return "_tool_testregistry_connections"
+}
 
 type addInitTables struct{}
 
 func (u *addInitTables) Up(baseRes context.BasicRes) errors.Error {
 	return migrationhelper.AutoMigrateTables(
 		baseRes,
-		&models.TestRegistryConnection{},
+		&testRegistryConnection20250101{},
 	)
 }
 
@@ -40,4 +56,3 @@ func (*addInitTables) Version() uint64 {
 func (*addInitTables) Name() string {
 	return "testregistry init schemas"
 }
-

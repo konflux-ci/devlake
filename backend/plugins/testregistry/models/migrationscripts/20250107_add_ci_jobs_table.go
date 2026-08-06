@@ -18,21 +18,59 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/testregistry/models"
 )
 
 var _ plugin.MigrationScript = (*addCIJobsTable)(nil)
+
+// testRegistryCIJob20250107 is a frozen snapshot of models.TestRegistryCIJob as of 2025-01-07.
+// Do not update this struct — create a new migration instead.
+type testRegistryCIJob20250107 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId uint64 `gorm:"primaryKey;type:BIGINT NOT NULL"`
+	JobId        string `gorm:"primaryKey;type:varchar(255)" json:"job_id"`
+	// fields
+	JobName           string     `gorm:"type:varchar(500);index" json:"job_name"`
+	JobType           string     `gorm:"type:varchar(50);index" json:"job_type"`
+	Organization      string     `gorm:"type:varchar(255);index" json:"organization"`
+	Repository        string     `gorm:"type:varchar(255);index" json:"repository"`
+	CommitSHA         string     `gorm:"type:varchar(40);index" json:"commit_sha"`
+	PullRequestNumber *int       `gorm:"type:int" json:"pull_request_number"`
+	PullRequestAuthor string     `gorm:"type:varchar(255)" json:"pull_request_author"`
+	TriggerType       string     `gorm:"type:varchar(50);index" json:"trigger_type"`
+	Result            string     `gorm:"type:varchar(100)" json:"result"`
+	Namespace         string     `gorm:"type:varchar(255)" json:"namespace"`
+	QueuedAt          *time.Time `gorm:"index" json:"queued_at"`
+	StartedAt         *time.Time `gorm:"index" json:"started_at"`
+	FinishedAt        *time.Time `gorm:"index" json:"finished_at"`
+	DurationSec       *float64   `json:"duration_sec"`
+	QueuedDurationSec *float64   `json:"queued_duration_sec"`
+	ViewURL           string     `gorm:"type:text" json:"view_url"`
+	ScopeId           string     `gorm:"type:varchar(500);index" json:"scope_id"`
+}
+
+func (testRegistryCIJob20250107) TableName() string {
+	return "ci_test_jobs"
+}
 
 type addCIJobsTable struct{}
 
 func (*addCIJobsTable) Up(basicRes context.BasicRes) errors.Error {
 	return migrationhelper.AutoMigrateTables(
 		basicRes,
-		&models.TestRegistryCIJob{},
+		&testRegistryCIJob20250107{},
 	)
 }
 

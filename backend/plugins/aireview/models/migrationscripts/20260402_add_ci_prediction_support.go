@@ -97,16 +97,16 @@ func (scopeConfigCiPrediction20260402) TableName() string {
 }
 
 type failurePredictionCiSupport20260402 struct {
-	PullRequestKey string    `gorm:"type:varchar(255);index"`
-	RepoShortName  string    `gorm:"type:varchar(255)"`
-	CiFailureSource string   `gorm:"type:varchar(20);index"`
-	RepoName       string    `gorm:"type:varchar(255)"`
-	PrTitle        string    `gorm:"type:varchar(500)"`
-	PrUrl          string    `gorm:"type:varchar(1024)"`
-	PrAuthor       string    `gorm:"type:varchar(255)"`
-	PrCreatedAt    time.Time `gorm:"column:pr_created_at"`
-	Additions      int
-	Deletions      int
+	PullRequestKey  string    `gorm:"type:varchar(255);index"`
+	RepoShortName   string    `gorm:"type:varchar(255)"`
+	CiFailureSource string    `gorm:"type:varchar(20);index"`
+	RepoName        string    `gorm:"type:varchar(255)"`
+	PrTitle         string    `gorm:"type:varchar(500)"`
+	PrUrl           string    `gorm:"type:varchar(1024)"`
+	PrAuthor        string    `gorm:"type:varchar(255)"`
+	PrCreatedAt     time.Time `gorm:"column:pr_created_at"`
+	Additions       int
+	Deletions       int
 }
 
 func (failurePredictionCiSupport20260402) TableName() string {

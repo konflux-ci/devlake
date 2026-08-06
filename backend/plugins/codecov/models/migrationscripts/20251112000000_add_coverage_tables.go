@@ -18,28 +18,176 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/codecov/models"
 )
+
+// codecovFlag20251112 is a frozen snapshot of models.CodecovFlag as of 2025-11-12.
+// Do not update this struct — create a new migration instead.
+type codecovFlag20251112 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId uint64 `gorm:"primaryKey;type:bigint"`
+	RepoId       string `gorm:"primaryKey;type:varchar(200)"`
+	FlagName     string `gorm:"primaryKey;type:varchar(100)"`
+	// fields
+	Carryforward bool
+	Deleted      bool
+	Yaml         string `gorm:"type:text"`
+	Coverage     *float64
+}
+
+func (codecovFlag20251112) TableName() string {
+	return "_tool_codecov_flags"
+}
+
+// codecovCommit20251112 is a frozen snapshot of models.CodecovCommit as of 2025-11-12.
+// Do not update this struct — create a new migration instead.
+type codecovCommit20251112 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId uint64 `gorm:"primaryKey;type:bigint"`
+	RepoId       string `gorm:"primaryKey;type:varchar(200);index"`
+	CommitSha    string `gorm:"primaryKey;type:varchar(64);index"`
+	// fields
+	Branch          string     `gorm:"type:varchar(100)"`
+	CommitTimestamp *time.Time `gorm:"index"`
+	Message         string     `gorm:"type:text"`
+	Author          string     `gorm:"type:varchar(255)"`
+	ParentSha       string     `gorm:"type:varchar(64)"`
+}
+
+func (codecovCommit20251112) TableName() string {
+	return "_tool_codecov_commits"
+}
+
+// codecovCoverage20251112 is a frozen snapshot of models.CodecovCoverage as of 2025-11-12.
+// At this time the model used common.Model (with ID) + common.RawDataOrigin.
+// Do not update this struct — create a new migration instead.
+type codecovCoverage20251112 struct {
+	// common.Model fields (as used at time of migration)
+	ID        uint64    `gorm:"primaryKey"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	// common.RawDataOrigin fields
+	RawDataParams string `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64 `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId    uint64     `gorm:"primaryKey;type:bigint"`
+	RepoId          string     `gorm:"primaryKey;type:varchar(200);index"`
+	FlagName        string     `gorm:"primaryKey;type:varchar(100);index"`
+	Branch          string     `gorm:"primaryKey;type:varchar(100)"`
+	CommitSha       string     `gorm:"primaryKey;type:varchar(64)"`
+	CommitTimestamp *time.Time `gorm:"index"`
+	// coverage metrics
+	CoveragePercentage float64
+	ModifiedCoverage   float64
+	LinesCovered       int
+	LinesTotal         int
+	LinesMissed        int
+	Hits               int
+	Partials           int
+	Misses             int
+	MethodsCovered     int
+	MethodsTotal       int
+}
+
+func (codecovCoverage20251112) TableName() string {
+	return "_tool_codecov_coverages"
+}
+
+// codecovCoverageTrend20251112 is a frozen snapshot of models.CodecovCoverageTrend as of 2025-11-12.
+// Do not update this struct — create a new migration instead.
+type codecovCoverageTrend20251112 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId uint64    `gorm:"primaryKey;type:bigint"`
+	RepoId       string    `gorm:"primaryKey;type:varchar(200);index"`
+	FlagName     string    `gorm:"primaryKey;type:varchar(100);index"`
+	Branch       string    `gorm:"primaryKey;type:varchar(100)"`
+	Date         time.Time `gorm:"primaryKey;type:date"`
+	// fields
+	CoveragePercentage float64
+	LinesCovered       int
+	LinesTotal         int
+	MethodsCovered     int
+	MethodsTotal       int
+}
+
+func (codecovCoverageTrend20251112) TableName() string {
+	return "_tool_codecov_coverage_trends"
+}
+
+// codecovCommitCoverage20251112 is a frozen snapshot of models.CodecovCommitCoverage as of 2025-11-12.
+// Do not update this struct — create a new migration instead.
+type codecovCommitCoverage20251112 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId    uint64     `gorm:"primaryKey;type:bigint"`
+	RepoId          string     `gorm:"primaryKey;type:varchar(200);index"`
+	CommitSha       string     `gorm:"primaryKey;type:varchar(64)"`
+	Branch          string     `gorm:"type:varchar(100)"`
+	CommitTimestamp *time.Time `gorm:"index"`
+	// fields
+	OverallCoverage  float64
+	ModifiedCoverage float64
+	FilesChanged     int
+	LinesCovered     int
+	LinesTotal       int
+	LinesMissed      int
+	Hits             int
+	Partials         int
+	Misses           int
+	MethodsCovered   int
+	MethodsTotal     int
+}
+
+func (codecovCommitCoverage20251112) TableName() string {
+	return "_tool_codecov_commit_coverages"
+}
 
 type addCoverageTables struct{}
 
 func (u *addCoverageTables) Up(basicRes context.BasicRes) errors.Error {
 	err := migrationhelper.AutoMigrateTables(
 		basicRes,
-		&models.CodecovFlag{},
-		&models.CodecovCommit{},
-		&models.CodecovCoverage{},
-		&models.CodecovCoverageTrend{},
-		&models.CodecovCommitCoverage{},
+		&codecovFlag20251112{},
+		&codecovCommit20251112{},
+		&codecovCoverage20251112{},
+		&codecovCoverageTrend20251112{},
+		&codecovCommitCoverage20251112{},
 	)
 	return err
 }
-
-// Note: ComparisonData table is created via AutoMigrate in comparison_converter.go
-// It's a temporary helper table, not a model in the models package
 
 func (*addCoverageTables) Version() uint64 {
 	return 20251112000000
