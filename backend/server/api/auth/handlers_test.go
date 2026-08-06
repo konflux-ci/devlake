@@ -36,7 +36,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/apache/incubator-devlake/core/dal"
-	"github.com/apache/incubator-devlake/helpers/oidchelper"
+	"github.com/apache/incubator-devlake/pkg/oidchelper"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
 )

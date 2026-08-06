@@ -23,7 +23,7 @@ import (
 	"regexp"
 
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/helpers/gcshelper"
+	"github.com/apache/incubator-devlake/pkg/gcshelper"
 	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"

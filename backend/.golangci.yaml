@@ -275,7 +275,7 @@ linters:
       - linters:
           - gosec
         text: "G124"
-        path: helpers/oidchelper/
+        path: pkg/oidchelper/
       # G122 (filepath.Walk race) — controlled directory traversal
       - linters:
           - gosec

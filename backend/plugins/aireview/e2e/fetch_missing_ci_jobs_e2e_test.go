@@ -25,7 +25,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
-	"github.com/apache/incubator-devlake/helpers/gcshelper"
+	"github.com/apache/incubator-devlake/pkg/gcshelper"
 	"github.com/apache/incubator-devlake/plugins/aireview/impl"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
 	"github.com/apache/incubator-devlake/plugins/aireview/tasks"

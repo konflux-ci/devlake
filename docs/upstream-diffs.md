@@ -6,6 +6,8 @@ that must be maintained during upstream syncs.
 Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`, `jira_snowflake`) are additions,
 not modifications, and are not tracked here.
 
+Shared internal packages under `backend/pkg/` (`gcshelper`, `oidchelper`) are also additions,
+not modifications, and are not tracked here.
 `jira_snowflake/tasks/convert_*.go` are adapted copies of `jira/tasks/` convertors — see the
 [jira_snowflake AGENTS.md](../backend/plugins/jira_snowflake/AGENTS.md) for the diff details.
 
@@ -29,6 +31,52 @@ directory leak in `doubleClone()`.
 **Rebase notes:** Touches clone strategy selection in `clone_gitcli.go`.
 Watch for upstream changes to `CloneRepo()`, `shallowClone()`, or `doubleClone()`.
 
+## server/api/auth: OIDC authentication
+
+**Files:**
+- `backend/server/api/auth/auth.go`
+- `backend/server/api/auth/middleware.go`
+- `backend/server/api/auth/handlers_test.go`
+- `backend/server/api/auth/store.go`
+- `backend/server/api/auth/cleanup.go`
+- `backend/server/api/auth/revocation_cache.go`
+- `backend/server/api/auth/revocation_cache_test.go`
+- `backend/server/api/auth/auth_test.go`
+- `env.example` (OIDC/auth env var documentation)
+
+**Reason:** Upstream DevLake has no user authentication. This fork adds full OIDC login
+(login/callback/logout, session JWT with server-side revocation, CSRF double-submit cookie)
+for the internal Red Hat / Konflux deployment. Supports multiple OIDC providers (Microsoft
+Entra ID, Google) and Azure Workload Identity federated code exchange. Auth is enabled by
+default; `AUTH_ENABLED=false` is required to opt out (e.g. in local dev or CI).
+
+The supporting library lives in `backend/pkg/oidchelper/` (an owned addition, not tracked here).
+
+**Upstream status:** N/A — upstream Apache DevLake has no auth middleware.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:**
+- `auth.go` / `middleware.go` wire into `backend/server/api/api.go` via `auth.Init()` and three
+  `router.Use()` calls — watch for upstream changes to `api.go`'s middleware chain.
+- `store.go` introduces the `auth_sessions` table; no upstream equivalent.
+- `env.example` additions are at the end of the file and unlikely to conflict.
+
+## jira: Scope collectParentIssues to current board
+
+**Files:**
+- `backend/plugins/jira/tasks/parent_issue_collector.go`
+- `backend/plugins/jira/impl/impl.go`
+
+**Reason:** collectParentIssues queries all issues on the Jira connection for epic keys
+(filtering by connection_id only). Scoped the epic key query to the current board via board_id filter.
+
+**Upstream status:** N/A — collectParentIssues is Konflux-specific (commit f1c634d), not present in upstream Apache DevLake.
+**Upstream PR:** none — not applicable
+**Owner:** @cmulliga
+
+**Rebase notes:** `parent_issue_collector.go` is Konflux-only, no upstream conflicts expected.
+`impl.go` has a Konflux addition (`CollectParentIssuesMeta` in `SubTaskMetas()`) — watch for upstream changes to the subtask registration list.
 ## archived/base.go: inline Unsigned constraint
 
 **Files:**
@@ -49,35 +97,3 @@ identical semantics, eliminating the `golang.org/x/exp` import entirely.
 
 **Rebase notes:** If upstream changes `GenericModel`, check whether they still reference
 `golang.org/x/exp/constraints` and reapply the inline if needed.
-
- ## jira: Scope collectParentIssues to current board
-  
-  **Files:**
-  - `backend/plugins/jira/tasks/parent_issue_collector.go` 
-  - `backend/plugins/jira/impl/impl.go`
-  
-  **Reason:** collectParentIssues queries all issues on the Jira connection for epic keys
-  (filtering by connection_id only). Scoped the epic key query to the current board via board_id filter.
-  
-  **Upstream status:** N/A — collectParentIssues is Konflux-specific (commit f1c634d), not present in upstream Apache DevLake.
-  **Upstream PR:** none — not applicable
-  **Owner:** @cmulliga
-  
-  **Rebase notes:** `parent_issue_collector.go` is Konflux-only, no upstream conflicts expected.
-  `impl.go` has a Konflux addition (`CollectParentIssuesMeta` in `SubTaskMetas()`) — watch for upstream changes to the subtask registration list.
-
-## table_info_test: register owned plugins
-
-**Files:**
-- `backend/plugins/table_info_test.go`
-
-**Reason:** `Test_GetPluginTablesInfo` validates every Go plugin under `backend/plugins/`
-is covered. Owned plugins (`agentready`, `aireview`, `codecov`, `testregistry`) must be
-imported and `FeedIn`'d here so plugin-count and table-coverage checks pass.
-
-**Upstream status:** N/A — owned plugins are Konflux-only additions
-**Upstream PR:** none — not applicable
-**Owner:** @mfrancisc
-
-**Rebase notes:** When upstream adds/removes plugins in this file, keep the owned-plugin
-imports and `FeedIn` calls.
