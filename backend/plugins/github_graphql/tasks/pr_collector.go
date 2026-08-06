@@ -44,7 +44,22 @@ type GraphqlQueryPrWrapper struct {
 			PageInfo   *api.GraphqlQueryPageInfo
 			Prs        []GraphqlQueryPr `graphql:"nodes"`
 			TotalCount graphql.Int
-		} `graphql:"pullRequests(first: $pageSize, after: $skipCursor, orderBy: {field: CREATED_AT, direction: DESC})"`
+		} `graphql:"pullRequests(first: $pageSize, after: $skipCursor, orderBy: {field: UPDATED_AT, direction: DESC})"`
+	} `graphql:"repository(owner: $owner, name: $name)"`
+}
+
+// GraphqlQueryPrReviewsWrapper fetches paginated reviews for a single PR
+type GraphqlQueryPrReviewsWrapper struct {
+	RateLimit struct {
+		Cost int
+	}
+	Repository struct {
+		PullRequest struct {
+			Reviews struct {
+				PageInfo *api.GraphqlQueryPageInfo
+				Nodes    []GraphqlQueryReview `graphql:"nodes"`
+			} `graphql:"reviews(first: 100, after: $cursor)"`
+		} `graphql:"pullRequest(number: $number)"`
 	} `graphql:"repository(owner: $owner, name: $name)"`
 }
 
@@ -95,6 +110,7 @@ type GraphqlQueryPr struct {
 	} `graphql:"commits(first: 100)"`
 	Reviews struct {
 		TotalCount graphql.Int
+		PageInfo   *api.GraphqlQueryPageInfo
 		Nodes      []GraphqlQueryReview `graphql:"nodes"`
 	} `graphql:"reviews(first: 100)"`
 	Additions      int
@@ -173,6 +189,36 @@ type GraphqlQueryCommit struct {
 	Url string
 }
 
+// graphqlQuerier is a subset of api.GraphqlAsyncClient used for testability.
+type graphqlQuerier interface {
+	Query(q interface{}, variables map[string]interface{}) ([]graphql.DataError, error)
+}
+
+// fetchRemainingReviews pages through reviews beyond the first 100 for a PR.
+func fetchRemainingReviews(client graphqlQuerier, owner, repo string, prNumber int, startCursor string) ([]GraphqlQueryReview, errors.Error) {
+	var all []GraphqlQueryReview
+	cursor := startCursor
+	for {
+		var query GraphqlQueryPrReviewsWrapper
+		_, err := client.Query(&query, map[string]interface{}{
+			"owner":  graphql.String(owner),
+			"name":   graphql.String(repo),
+			"number": graphql.Int(prNumber),
+			"cursor": graphql.String(cursor),
+		})
+		if err != nil {
+			return nil, errors.Convert(err)
+		}
+		all = append(all, query.Repository.PullRequest.Reviews.Nodes...)
+		pi := query.Repository.PullRequest.Reviews.PageInfo
+		if pi == nil || !pi.HasNextPage {
+			break
+		}
+		cursor = pi.EndCursor
+	}
+	return all, nil
+}
+
 var CollectPrsMeta = plugin.SubTaskMeta{
 	Name:             "Collect Pull Requests",
 	EntryPoint:       CollectPrs,
@@ -200,6 +246,7 @@ func CollectPrs(taskCtx plugin.SubTaskContext) errors.Error {
 
 	// collect new PRs since the previous run
 	since := apiCollector.GetSince()
+	ownerName := strings.Split(data.Options.Name, "/")
 	err = apiCollector.InitGraphQLCollector(api.GraphqlCollectorArgs{
 		GraphqlClient: data.GraphqlClient,
 		PageSize:      10,
@@ -211,7 +258,6 @@ func CollectPrs(taskCtx plugin.SubTaskContext) errors.Error {
 			if reqData == nil {
 				return query, map[string]interface{}{}, nil
 			}
-			ownerName := strings.Split(data.Options.Name, "/")
 			variables := map[string]interface{}{
 				"pageSize":   graphql.Int(reqData.Pager.Size),
 				"skipCursor": (*graphql.String)(reqData.Pager.SkipCursor),
@@ -231,6 +277,13 @@ func CollectPrs(taskCtx plugin.SubTaskContext) errors.Error {
 			for _, rawL := range prs {
 				if since != nil && since.After(rawL.UpdatedAt) {
 					return messages, api.ErrFinishCollect
+				}
+				if rawL.Reviews.PageInfo != nil && rawL.Reviews.PageInfo.HasNextPage {
+					more, fetchErr := fetchRemainingReviews(data.GraphqlClient, ownerName[0], ownerName[1], rawL.Number, rawL.Reviews.PageInfo.EndCursor)
+					if fetchErr != nil {
+						return nil, fetchErr
+					}
+					rawL.Reviews.Nodes = append(rawL.Reviews.Nodes, more...)
 				}
 				messages = append(messages, errors.Must1(json.Marshal(rawL)))
 			}
@@ -287,6 +340,13 @@ func CollectPrs(taskCtx plugin.SubTaskContext) errors.Error {
 			prs := query.Repository.PullRequests
 			for _, rawL := range prs {
 				if rawL.UpdatedAt.After(prUpdatedAt[rawL.Number]) {
+					if rawL.Reviews.PageInfo != nil && rawL.Reviews.PageInfo.HasNextPage {
+						more, fetchErr := fetchRemainingReviews(data.GraphqlClient, ownerName[0], ownerName[1], rawL.Number, rawL.Reviews.PageInfo.EndCursor)
+						if fetchErr != nil {
+							return nil, fetchErr
+						}
+						rawL.Reviews.Nodes = append(rawL.Reviews.Nodes, more...)
+					}
 					messages = append(messages, errors.Must1(json.Marshal(rawL)))
 				}
 			}
