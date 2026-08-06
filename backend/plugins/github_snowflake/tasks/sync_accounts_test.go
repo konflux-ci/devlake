@@ -15,15 +15,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package tasks
 
-import "github.com/apache/incubator-devlake/core/plugin"
+import (
+	"testing"
 
-// All returns all migration scripts for the jira_snowflake plugin.
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(initSchema),
-		new(addAuthType),
-		new(encryptPrivateKey),
-	}
+	"github.com/stretchr/testify/assert"
+)
+
+func TestBuildAccountsQuery(t *testing.T) {
+	q, args := buildAccountsQuery(55)
+	assert.Contains(t, q, `FROM "USER" u`)
+	assert.Contains(t, q, "LEFT JOIN USER_EMAIL ue")
+	assert.Contains(t, q, "WITH repo_users AS")
+	assert.Contains(t, q, "PULL_REQUEST_REVIEW")
+	assert.Contains(t, q, "REQUESTED_REVIEWER_HISTORY")
+	assert.Equal(t, []interface{}{55, 55, 55, 55}, args)
 }

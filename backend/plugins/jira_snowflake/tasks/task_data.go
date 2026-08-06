@@ -18,16 +18,12 @@ limitations under the License.
 package tasks
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
 	"database/sql"
-	"encoding/pem"
 	"fmt"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	jiramodels "github.com/apache/incubator-devlake/plugins/jira/models"
-	sf "github.com/snowflakedb/gosnowflake"
 )
 
 // JiraSnowflakeOptions contains all per-pipeline task options.
@@ -70,63 +66,4 @@ func DecodeAndValidateTaskOptions(options map[string]interface{}) (*JiraSnowflak
 		return nil, errors.BadInput.New("projectKeys must not be empty")
 	}
 	return &op, nil
-}
-
-// OpenSnowflakeDB opens a database/sql connection to Snowflake.
-//
-// authType controls authentication:
-//   - "keypair" (default): JWT key-pair auth using privateKeyPEM. Works in containers and CI.
-//   - "externalbrowser": SSO via browser pop-up. Only works when DevLake runs on a desktop host
-//     (i.e. via `make run`, not inside a Docker container).
-func OpenSnowflakeDB(account, user, authType, privateKeyPEM, database, schema, warehouse, role string) (*sql.DB, errors.Error) {
-	cfg := &sf.Config{
-		Account:  account,
-		User:     user,
-		Database: database,
-		Schema:   schema,
-	}
-	if warehouse != "" {
-		cfg.Warehouse = warehouse
-	}
-	if role != "" {
-		cfg.Role = role
-	}
-
-	if authType == "externalbrowser" {
-		cfg.Authenticator = sf.AuthTypeExternalBrowser
-	} else {
-		privKey, err := parseRSAPrivateKey(privateKeyPEM)
-		if err != nil {
-			return nil, errors.Default.Wrap(err, "failed to parse Snowflake private key")
-		}
-		cfg.Authenticator = sf.AuthTypeJwt
-		cfg.PrivateKey = privKey
-	}
-
-	dsn, goErr := sf.DSN(cfg)
-	if goErr != nil {
-		return nil, errors.Default.Wrap(goErr, "failed to build Snowflake DSN")
-	}
-	db, goErr := sql.Open("snowflake", dsn)
-	if goErr != nil {
-		return nil, errors.Default.Wrap(goErr, "failed to open Snowflake connection")
-	}
-	return db, nil
-}
-
-// parseRSAPrivateKey parses a PKCS#8 PEM-encoded RSA private key.
-func parseRSAPrivateKey(pemStr string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(pemStr))
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block from private key")
-	}
-	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse PKCS8 private key: %w", err)
-	}
-	rsaKey, ok := key.(*rsa.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("private key is not an RSA key")
-	}
-	return rsaKey, nil
 }

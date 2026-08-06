@@ -21,9 +21,9 @@ import (
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
 
-// SnowflakeJiraConnection holds the credentials and config for a Snowflake-backed Jira connection.
+// SnowflakeGithubConnection holds the credentials and config for a Snowflake-backed GitHub connection.
 // The private key PEM is stored encrypted via GORM's encdec serializer.
-type SnowflakeJiraConnection struct {
+type SnowflakeGithubConnection struct {
 	helper.BaseConnection `mapstructure:",squash"`
 	// Account is the Snowflake account identifier, e.g. "myorg-myaccount"
 	Account string `json:"account" gorm:"column:account;not null" mapstructure:"account" validate:"required"`
@@ -38,9 +38,9 @@ type SnowflakeJiraConnection struct {
 	// json:"-" omits the decrypted PEM from GET/list responses. Request binding
 	// still works via mapstructure:"privateKey" (ConnectionApiHelper.Decode).
 	PrivateKey string `json:"-" gorm:"column:private_key;type:text;serializer:encdec" mapstructure:"privateKey"`
-	// Database is the Snowflake database, e.g. "JIRA_DB"
+	// Database is the Snowflake database, e.g. "GITHUB_DB"
 	Database string `json:"database" gorm:"column:sf_database;not null" mapstructure:"database" validate:"required"`
-	// Schema is the Snowflake schema, e.g. "CLOUDRHAI_MARTS"
+	// Schema is the Snowflake schema, e.g. "MARTS"
 	Schema string `json:"schema" gorm:"column:sf_schema;not null" mapstructure:"schema" validate:"required"`
 	// Warehouse is the virtual warehouse to use; defaults to the account default
 	Warehouse string `json:"warehouse" gorm:"column:warehouse" mapstructure:"warehouse"`
@@ -48,6 +48,6 @@ type SnowflakeJiraConnection struct {
 	Role string `json:"role" gorm:"column:sf_role" mapstructure:"role"`
 }
 
-func (SnowflakeJiraConnection) TableName() string {
-	return "_tool_jira_snowflake_connections"
+func (SnowflakeGithubConnection) TableName() string {
+	return "_tool_github_snowflake_connections"
 }

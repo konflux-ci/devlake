@@ -15,15 +15,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package tasks
 
-import "github.com/apache/incubator-devlake/core/plugin"
+import (
+	"testing"
+	"time"
 
-// All returns all migration scripts for the jira_snowflake plugin.
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(initSchema),
-		new(addAuthType),
-		new(encryptPrivateKey),
-	}
+	"github.com/stretchr/testify/assert"
+)
+
+func TestBuildPrCommitsQuery_InnerJoinsPullRequest(t *testing.T) {
+	q, args := buildPrCommitsQuery(99, nil)
+	assert.Contains(t, q, "JOIN PULL_REQUEST pr")
+	assert.Contains(t, q, "JOIN COMMIT c")
+	assert.Contains(t, q, "FROM COMMIT_PULL_REQUEST cpr")
+	assert.Contains(t, q, "WHERE i.REPOSITORY_ID = ?")
+	assert.NotContains(t, q, "AUTHOR_DATE >")
+	assert.Equal(t, []interface{}{99}, args)
+}
+
+func TestBuildPrCommitsQuery_WithTimeFilter(t *testing.T) {
+	ts := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	q, args := buildPrCommitsQuery(99, &ts)
+	assert.Contains(t, q, "AND c.AUTHOR_DATE > ?")
+	assert.Equal(t, ts, args[1])
 }

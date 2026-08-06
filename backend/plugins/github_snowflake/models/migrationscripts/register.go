@@ -19,11 +19,10 @@ package migrationscripts
 
 import "github.com/apache/incubator-devlake/core/plugin"
 
-// All returns all migration scripts for the jira_snowflake plugin.
+// All returns all migration scripts for the github_snowflake plugin.
 func All() []plugin.MigrationScript {
 	return []plugin.MigrationScript{
 		new(initSchema),
-		new(addAuthType),
 		new(encryptPrivateKey),
 	}
 }

@@ -24,6 +24,7 @@ import (
 	coremodels "github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/helpers/snowflakehelper"
 	jiramodels "github.com/apache/incubator-devlake/plugins/jira/models"
 	"github.com/apache/incubator-devlake/plugins/jira_snowflake/api"
 	"github.com/apache/incubator-devlake/plugins/jira_snowflake/models"
@@ -160,7 +161,7 @@ func (p JiraSnowflake) PrepareTaskData(taskCtx plugin.TaskContext, options map[s
 	}
 
 	// Open the Snowflake SQL connection (closed in Close())
-	snowDB, openErr := tasks.OpenSnowflakeDB(
+	snowDB, openErr := snowflakehelper.Open(
 		connection.Account,
 		connection.User,
 		connection.AuthType,

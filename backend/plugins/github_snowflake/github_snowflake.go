@@ -19,28 +19,29 @@ package main
 
 import (
 	"github.com/apache/incubator-devlake/core/runner"
-	"github.com/apache/incubator-devlake/plugins/jira_snowflake/impl"
+	"github.com/apache/incubator-devlake/plugins/github_snowflake/impl"
 	"github.com/spf13/cobra"
 )
 
 // PluginEntry is exported for the DevLake framework to discover and load this plugin.
-var PluginEntry impl.JiraSnowflake //nolint
+var PluginEntry impl.GithubSnowflake //nolint
 
 func main() {
-	cmd := &cobra.Command{Use: "jira_snowflake"}
-	connectionId := cmd.Flags().Uint64P("connectionId", "c", 0, "jira_snowflake connection id")
-	boardId := cmd.Flags().Uint64P("boardId", "b", 0, "Jira board ID to sync")
-	projectKeys := cmd.Flags().StringSliceP("projectKeys", "p", nil, "Jira project keys for this board")
+	cmd := &cobra.Command{Use: "github_snowflake"}
+	connectionId := cmd.Flags().Uint64P("connectionId", "c", 0, "github_snowflake connection id")
+	githubId := cmd.Flags().IntP("githubId", "g", 0, "GitHub repository numeric ID")
+	fullName := cmd.Flags().StringP("fullName", "n", "", "GitHub repository full name (owner/repo)")
 	timeAfter := cmd.Flags().StringP("timeAfter", "a", "", "only sync records created/updated after this time (RFC3339)")
 	_ = cmd.MarkFlagRequired("connectionId")
-	_ = cmd.MarkFlagRequired("boardId")
-	_ = cmd.MarkFlagRequired("projectKeys")
+	_ = cmd.MarkFlagRequired("githubId")
+	_ = cmd.MarkFlagRequired("fullName")
 
 	cmd.Run = func(cmd *cobra.Command, args []string) {
 		runner.DirectRun(cmd, args, PluginEntry, map[string]interface{}{
 			"connectionId": *connectionId,
-			"boardId":      *boardId,
-			"projectKeys":  *projectKeys,
+			"githubId":     *githubId,
+			"name":         *fullName,
+			"fullName":     *fullName,
 		}, *timeAfter)
 	}
 	runner.RunCmd(cmd)
