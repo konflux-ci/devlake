@@ -52,6 +52,9 @@ func Open(account, user, authType, privateKeyPEM, database, schema, warehouse, r
 
 	switch authType {
 	case "", "keypair":
+		if privateKeyPEM == "" {
+			return nil, errors.BadInput.New("privateKey is required for keypair auth")
+		}
 		privKey, err := ParseRSAPrivateKey(privateKeyPEM)
 		if err != nil {
 			return nil, errors.Default.Wrap(err, "failed to parse Snowflake private key")

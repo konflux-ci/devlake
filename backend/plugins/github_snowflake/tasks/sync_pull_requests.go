@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	githubmodels "github.com/apache/incubator-devlake/plugins/github/models"
 )
@@ -125,7 +124,7 @@ func SyncPullRequests(subtaskCtx plugin.SubTaskContext) errors.Error {
 			MergedById:      nullInt(mergedById),
 			MergedByName:    nullStr(mergedByName),
 			Url:             derivePullRequestURL(fullName, int(number)),
-			NoPKModel:       common.NewNoPKModel(),
+			NoPKModel:       toolLayerNoPKModel(RAW_PULL_REQUEST_TABLE, connectionId, fullName),
 		}
 		if dbErr := db.CreateOrUpdate(pr); dbErr != nil {
 			return dbErr

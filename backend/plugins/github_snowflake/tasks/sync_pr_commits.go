@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	githubmodels "github.com/apache/incubator-devlake/plugins/github/models"
 )
@@ -41,6 +40,7 @@ func SyncPrCommits(subtaskCtx plugin.SubTaskContext) errors.Error {
 
 	connectionId := data.Options.ConnectionId
 	repoId := data.Options.GithubId
+	fullName := data.Options.Name
 
 	var timeAfter *time.Time
 	syncPolicy := subtaskCtx.TaskContext().SyncPolicy()
@@ -75,7 +75,7 @@ func SyncPrCommits(subtaskCtx plugin.SubTaskContext) errors.Error {
 			CommitAuthorName:   nullStr(authorName),
 			CommitAuthorEmail:  nullStr(authorEmail),
 			CommitAuthoredDate: authoredDate,
-			NoPKModel:          common.NewNoPKModel(),
+			NoPKModel:          toolLayerNoPKModel(RAW_PR_COMMIT_TABLE, connectionId, fullName),
 		}
 		if dbErr := db.CreateOrUpdate(prCommit); dbErr != nil {
 			return dbErr

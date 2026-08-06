@@ -51,3 +51,11 @@ func TestRepoShortName(t *testing.T) {
 	assert.Equal(t, "build-service", RepoShortName("konflux-ci/build-service"))
 	assert.Equal(t, "alone", RepoShortName("alone"))
 }
+
+func TestToolLayerNoPKModel(t *testing.T) {
+	m := toolLayerNoPKModel(RAW_PULL_REQUEST_TABLE, 7, "konflux-ci/build-service")
+	assert.Equal(t, "_raw_github_api_pull_requests", m.RawDataTable)
+	assert.Equal(t, `{"ConnectionId":7,"Name":"konflux-ci/build-service"}`, m.RawDataParams)
+	assert.False(t, m.CreatedAt.IsZero())
+	assert.False(t, m.UpdatedAt.IsZero())
+}

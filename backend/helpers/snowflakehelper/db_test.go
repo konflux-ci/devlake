@@ -22,6 +22,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,6 +43,16 @@ func TestOpen_InvalidAuthType(t *testing.T) {
 	_, err := Open("acct", "user", "keypai", "", "db", "schema", "", "")
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "unsupported authType")
+}
+
+func TestOpen_EmptyPrivateKeyForKeypair(t *testing.T) {
+	for _, authType := range []string{"", "keypair"} {
+		t.Run(fmt.Sprintf("authType=%q", authType), func(t *testing.T) {
+			_, err := Open("acct", "user", authType, "", "db", "schema", "", "")
+			assert.NotNil(t, err)
+			assert.Contains(t, err.Error(), "privateKey is required for keypair auth")
+		})
+	}
 }
 
 func TestParseRSAPrivateKey_ValidPKCS8(t *testing.T) {

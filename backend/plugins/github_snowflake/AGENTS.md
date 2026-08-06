@@ -63,8 +63,10 @@ Shared Snowflake connectivity lives in `helpers/snowflakehelper` (`Open`, `Parse
 ## Key conventions
 
 - **Scope unit is `GithubRepo`** (numeric `githubId` + `fullName` owner/repo).
-- **No raw-table layer**: writes directly to `_tool_github_*`. Convertors use
-  `_raw_data_params`-scoped deletion for full sync (same pattern as jira_snowflake).
+- **No raw-table layer**: writes directly to `_tool_github_*`. Sync tasks populate
+  `RawDataOrigin` (`_raw_data_table` / `_raw_data_params`) on tool-layer rows so
+  convertors can delete domain records by `_raw_data_params` on full sync
+  (same pattern as jira_snowflake).
 - **AuthType**: `"keypair"` (default, JWT) or `"externalbrowser"` (SSO, desktop only).
 - **Connection defaults**: Database=`GITHUB_DB`, Schema=`MARTS`, Warehouse=`DEFAULT`.
 - **PR line/comment counts** are unavailable in Snowflake — leave 0.

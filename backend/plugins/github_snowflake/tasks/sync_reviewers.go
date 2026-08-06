@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	githubmodels "github.com/apache/incubator-devlake/plugins/github/models"
 )
@@ -41,6 +40,7 @@ func SyncReviewers(subtaskCtx plugin.SubTaskContext) errors.Error {
 
 	connectionId := data.Options.ConnectionId
 	repoId := data.Options.GithubId
+	fullName := data.Options.Name
 
 	var timeAfter *time.Time
 	syncPolicy := subtaskCtx.TaskContext().SyncPolicy()
@@ -73,7 +73,7 @@ func SyncReviewers(subtaskCtx plugin.SubTaskContext) errors.Error {
 			PullRequestId: int(pullRequestId),
 			Username:      nullStr(username),
 			Name:          nullStr(name),
-			NoPKModel:     common.NewNoPKModel(),
+			NoPKModel:     toolLayerNoPKModel(RAW_PR_REVIEW_TABLE, connectionId, fullName),
 		}
 		if dbErr := db.CreateOrUpdate(reviewer); dbErr != nil {
 			return dbErr

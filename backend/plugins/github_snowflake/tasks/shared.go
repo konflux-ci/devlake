@@ -19,6 +19,9 @@ package tasks
 
 import (
 	"fmt"
+
+	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/core/utils"
 )
 
 // deriveRepoHTMLUrl builds the GitHub HTML URL from FULL_NAME.
@@ -34,6 +37,18 @@ func deriveRepoCloneUrl(fullName string) string {
 // derivePullRequestURL builds the GitHub PR URL.
 func derivePullRequestURL(fullName string, number int) string {
 	return fmt.Sprintf("https://github.com/%s/pull/%d", fullName, number)
+}
+
+// toolLayerNoPKModel builds a NoPKModel with RawDataOrigin fields that match
+// StatefulDataConverter params so full-sync domain deletes by _raw_data_params work.
+func toolLayerNoPKModel(rawTable string, connectionId uint64, name string) common.NoPKModel {
+	m := common.NewNoPKModel()
+	m.RawDataTable = "_raw_" + rawTable
+	m.RawDataParams = utils.ToJsonString(GithubApiParams{
+		ConnectionId: connectionId,
+		Name:         name,
+	})
+	return m
 }
 
 // nullStr returns the string value or empty string when nil.
