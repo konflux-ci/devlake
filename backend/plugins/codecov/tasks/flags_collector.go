@@ -55,7 +55,7 @@ func CollectFlags(taskCtx plugin.SubTaskContext) errors.Error {
 		},
 		Incremental: true, // ALWAYS preserve historical data
 		ApiClient:   data.ApiClient,
-		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/flags", owner, repo),
+		UrlTemplate: fmt.Sprintf("%s/flags", RepoAPIPrefix(data.Service, owner, repo)),
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
 			var response struct {
 				Results []json.RawMessage `json:"results"`

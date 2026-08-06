@@ -101,7 +101,7 @@ func CollectFlagCoverageTrend(taskCtx plugin.SubTaskContext) errors.Error {
 		PageSize:    100, // Max results per page
 		// Use the correct per-flag coverage endpoint: /flags/{flag_name}/coverage (NO trailing slash!)
 		// See: https://docs.codecov.com/reference/repos_flags_coverage_list
-		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/flags/{{ .Input.FlagName }}/coverage", owner, repo),
+		UrlTemplate: fmt.Sprintf("%s/flags/{{ .Input.FlagName }}/coverage", RepoAPIPrefix(data.Service, owner, repo)),
 		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
 			query.Set("interval", "1d") // Daily trend data

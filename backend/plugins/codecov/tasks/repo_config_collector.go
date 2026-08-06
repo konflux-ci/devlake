@@ -80,10 +80,7 @@ func CollectRepoConfig(taskCtx plugin.SubTaskContext) errors.Error {
 		return nil
 	}
 
-	service := data.Repo.Service
-	if service == "" {
-		service = "github"
-	}
+	service := data.Service
 	branch := data.Repo.Branch
 	if branch == "" {
 		logger.Warn(nil, "[Codecov] CollectRepoConfig: No branch configured for %s/%s, skipping", owner, repo)
@@ -156,16 +153,20 @@ func buildRawContentURL(service, owner, repo, branch, filename string) string {
 	case "github":
 		return fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo, branch, filename)
 	case "gitlab":
-		projectPath := url.PathEscape(owner + "/" + repo)
-		encodedFile := url.PathEscape(filename)
-		return fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/repository/files/%s/raw?ref=%s", projectPath, encodedFile, branch)
-	case "gitlab_enterprise":
-		projectPath := url.PathEscape(owner + "/" + repo)
-		encodedFile := url.PathEscape(filename)
-		return fmt.Sprintf("https://gitlab.cee.redhat.com/api/v4/projects/%s/repository/files/%s/raw?ref=%s", projectPath, encodedFile, branch)
+		return gitlabRawURL("https://gitlab.com", owner, repo, branch, filename)
 	default:
+		// Enterprise services (github_enterprise, gitlab_enterprise, bitbucket, bitbucket_server)
+		// require the Git host URL which isn't part of the Codecov connection config.
 		return ""
 	}
+}
+
+func gitlabRawURL(host, owner, repo, branch, filename string) string {
+	host = strings.TrimRight(host, "/")
+	owner = strings.ReplaceAll(owner, ":", "/")
+	projectPath := url.PathEscape(owner + "/" + repo)
+	encodedFile := url.PathEscape(filename)
+	return fmt.Sprintf("%s/api/v4/projects/%s/repository/files/%s/raw?ref=%s", host, projectPath, encodedFile, branch)
 }
 
 const fetchTimeout = 15 * time.Second

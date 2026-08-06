@@ -197,6 +197,11 @@ func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 
 	taskCtx.GetLogger().Info("[Codecov] API client initialized with rate limiter (5000 req/hour)")
 
+	service := connection.ServiceOrDefault()
+	if validErr := connection.ValidateService(); validErr != nil {
+		return nil, validErr
+	}
+
 	// Load the CodecovRepo scope to get branch and other metadata
 	repo := &models.CodecovRepo{}
 	err = db.First(repo, dal.Where("connection_id = ? AND codecov_id = ?", op.ConnectionId, op.FullName))
@@ -210,7 +215,7 @@ func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 	if parseErr != nil {
 		taskCtx.GetLogger().Warn(parseErr, "[Codecov] Failed to parse fullName '%s', branch detection skipped", op.FullName)
 	} else {
-		repoUrl := fmt.Sprintf("/api/v2/github/%s/repos/%s/", owner, repoName)
+		repoUrl := fmt.Sprintf("/%s/", tasks.RepoAPIPrefix(service, owner, repoName))
 		res, apiErr := apiClient.Get(repoUrl, nil, nil)
 		if apiErr != nil {
 			taskCtx.GetLogger().Warn(apiErr, "[Codecov] Failed to fetch repo detail for %s, using stored branch", op.FullName)
@@ -253,6 +258,7 @@ func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 		Options:   op,
 		ApiClient: asyncApiClient,
 		Repo:      repo,
+		Service:   service,
 	}, nil
 }
 

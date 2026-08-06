@@ -90,8 +90,8 @@ func CollectCommits(taskCtx plugin.SubTaskContext) errors.Error {
 
 	for !stopPagination {
 		// Build the request URL
-		reqUrl := fmt.Sprintf("api/v2/github/%s/repos/%s/commits?branch=%s&page=%d&page_size=%d",
-			owner, repo, branch, page, pageSize)
+		reqUrl := fmt.Sprintf("%s/commits?branch=%s&page=%d&page_size=%d",
+			RepoAPIPrefix(data.Service, owner, repo), branch, page, pageSize)
 
 		res, err := apiClient.Get(reqUrl, nil, nil)
 		if err != nil {

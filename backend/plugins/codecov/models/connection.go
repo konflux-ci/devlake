@@ -39,11 +39,37 @@ func (conn *CodecovAccessToken) SetupAuthentication(req *http.Request) errors.Er
 	return nil
 }
 
+// ValidCodecovServices lists the service values accepted by the Codecov API v2.
+var ValidCodecovServices = []string{
+	"github", "gitlab", "bitbucket",
+	"github_enterprise", "gitlab_enterprise", "bitbucket_server",
+}
+
 // CodecovConn holds the essential information to connect to the Codecov API
 type CodecovConn struct {
 	helper.RestConnection `mapstructure:",squash"`
 	CodecovAccessToken    `mapstructure:",squash"`
 	Organization          string `mapstructure:"organization" json:"organization" gorm:"type:varchar(255)" validate:"required"`
+	Service               string `mapstructure:"service" json:"service" gorm:"type:varchar(100);default:github"`
+}
+
+// ServiceOrDefault returns the connection's Service, falling back to "github".
+func (conn *CodecovConn) ServiceOrDefault() string {
+	if conn.Service == "" {
+		return "github"
+	}
+	return conn.Service
+}
+
+// ValidateService checks that Service is one of the accepted values.
+func (conn *CodecovConn) ValidateService() errors.Error {
+	s := conn.ServiceOrDefault()
+	for _, v := range ValidCodecovServices {
+		if v == s {
+			return nil
+		}
+	}
+	return errors.BadInput.New(fmt.Sprintf("invalid service %q, expected one of %v", s, ValidCodecovServices))
 }
 
 // PrepareApiClient configures the HTTP client headers for optimal performance
@@ -83,6 +109,9 @@ func (connection *CodecovConnection) Merge(existed, modified *CodecovConnection,
 	existedTokenStr := existed.Token
 	existed.Name = modified.Name
 	existed.Organization = modified.Organization
+	if _, ok := body["service"]; ok {
+		existed.Service = modified.Service
+	}
 	existed.Proxy = modified.Proxy
 	existed.Endpoint = modified.Endpoint
 	existed.RateLimitPerHour = modified.RateLimitPerHour

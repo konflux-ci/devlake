@@ -52,8 +52,8 @@ export const Organization = ({ type, initialValues, values, setValues, setErrors
       title="Organization Owner"
       description={
         <>
-          Enter the Codecov organization owner name. This should be the GitHub organization or username that exists in
-          Codecov.{' '}
+          Enter the Codecov organization owner name. This is the organization, group, or username on your code hosting
+          service (GitHub org, GitLab group, etc.) as registered in Codecov.{' '}
           <ExternalLink link="https://codecov.io">Learn more about Codecov</ExternalLink>
         </>
       }

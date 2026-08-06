@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -72,10 +73,6 @@ func listCodecovRemoteScopes(
 		page.PerPage = 100
 	}
 
-	// Codecov API endpoint: GET /api/v2/github/{owner}/repos/
-	// According to Codecov API docs: https://docs.codecov.com/reference/overview
-	// Service is "github" for GitHub repositories
-	// If groupId is empty, we're listing repos for the organization
 	owner := connection.Organization
 	if groupId != "" {
 		owner = groupId
@@ -86,8 +83,8 @@ func listCodecovRemoteScopes(
 		"page_size": []string{fmt.Sprintf("%v", page.PerPage)},
 	}
 
-	// Codecov API format: /api/v2/github/{owner}/repos/
-	reposUrl := fmt.Sprintf("/api/v2/github/%s/repos/", owner)
+	service := connection.ServiceOrDefault()
+	reposUrl := fmt.Sprintf("/api/v2/%s/%s/repos/", service, owner)
 	reposBody, err := apiClient.Get(reposUrl, query, nil)
 	if err != nil {
 		return nil, nil, err
@@ -222,14 +219,70 @@ func SearchRemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutp
 		pageSize = v
 	}
 
-	owner := connection.Organization
+	service := connection.ServiceOrDefault()
+	org := connection.Organization
+
+	// For GitLab services, search supports subgroup paths:
+	//   "subgroup"          → list repos under org:subgroup
+	//   "subgroup/repo"     → search "repo" under org:subgroup
+	//   "sub/nested/repo"   → search "repo" under org:sub:nested
+	// If no "/" is present, also try the search as a plain repo name search.
+	var children []dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo]
+	isGitLabService := strings.HasPrefix(service, "gitlab")
+
+	if isGitLabService && strings.Contains(search, "/") {
+		// Split on last "/" — left is subgroup path, right is repo search
+		lastSlash := strings.LastIndex(search, "/")
+		subgroupPath := search[:lastSlash]
+		repoSearch := search[lastSlash+1:]
+		subgroupOwner := org + ":" + strings.ReplaceAll(subgroupPath, "/", ":")
+
+		children, err = searchReposForOwner(apiClient, service, subgroupOwner, repoSearch, page, pageSize)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Standard search: search repos at the org level
+		children, err = searchReposForOwner(apiClient, service, org, search, page, pageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		// For GitLab: if no results, try interpreting search as a subgroup name
+		if isGitLabService && len(children) == 0 {
+			subgroupOwner := org + ":" + strings.ReplaceAll(search, "/", ":")
+			subgroupChildren, subErr := searchReposForOwner(apiClient, service, subgroupOwner, "", page, pageSize)
+			if subErr == nil && len(subgroupChildren) > 0 {
+				children = subgroupChildren
+			}
+		}
+	}
+
+	return &plugin.ApiResourceOutput{
+		Body: map[string]interface{}{
+			"children": children,
+			"page":     page,
+			"pageSize": pageSize,
+		},
+	}, nil
+}
+
+// searchReposForOwner queries the Codecov API for repos belonging to owner,
+// optionally filtered by a search term.
+func searchReposForOwner(
+	apiClient plugin.ApiClient,
+	service, owner, search string,
+	page, pageSize int,
+) ([]dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo], errors.Error) {
 	query := url.Values{
-		"search":    []string{search},
 		"page":      []string{fmt.Sprintf("%v", page)},
 		"page_size": []string{fmt.Sprintf("%v", pageSize)},
 	}
+	if search != "" {
+		query.Set("search", search)
+	}
 
-	reposUrl := fmt.Sprintf("/api/v2/github/%s/repos/", owner)
+	reposUrl := fmt.Sprintf("/api/v2/%s/%s/repos/", service, owner)
 	res, err := apiClient.Get(reposUrl, query, nil)
 	if err != nil {
 		return nil, err
@@ -237,7 +290,7 @@ func SearchRemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutp
 
 	if res.StatusCode == http.StatusNotFound {
 		_ = res.Body.Close()
-		return nil, errors.HttpStatus(http.StatusNotFound).New(fmt.Sprintf("organization '%s' not found", owner))
+		return []dsmodels.DsRemoteApiScopeListEntry[models.CodecovRepo]{}, nil
 	}
 	if res.StatusCode != http.StatusOK {
 		_ = res.Body.Close()
@@ -289,11 +342,5 @@ func SearchRemoteScopes(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutp
 		})
 	}
 
-	return &plugin.ApiResourceOutput{
-		Body: map[string]interface{}{
-			"children": children,
-			"page":     page,
-			"pageSize": pageSize,
-		},
-	}, nil
+	return children, nil
 }
