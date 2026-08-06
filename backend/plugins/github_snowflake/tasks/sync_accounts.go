@@ -19,7 +19,6 @@ package tasks
 
 import (
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	githubmodels "github.com/apache/incubator-devlake/plugins/github/models"
 )
@@ -39,6 +38,7 @@ func SyncAccounts(subtaskCtx plugin.SubTaskContext) errors.Error {
 
 	connectionId := data.Options.ConnectionId
 	repoId := data.Options.GithubId
+	fullName := data.Options.Name
 
 	query, args := buildAccountsQuery(repoId)
 	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
@@ -66,7 +66,7 @@ func SyncAccounts(subtaskCtx plugin.SubTaskContext) errors.Error {
 			Login:        loginStr,
 			Name:         nullStr(name),
 			Email:        nullStr(email),
-			NoPKModel:    common.NewNoPKModel(),
+			NoPKModel:    toolLayerNoPKModel(RAW_ACCOUNT_TABLE, connectionId, fullName),
 		}
 		if loginStr != "" {
 			account.HtmlUrl = "https://github.com/" + loginStr
@@ -81,7 +81,7 @@ func SyncAccounts(subtaskCtx plugin.SubTaskContext) errors.Error {
 			AccountId:    int(id),
 			RepoGithubId: repoId,
 			Login:        loginStr,
-			NoPKModel:    common.NewNoPKModel(),
+			NoPKModel:    toolLayerNoPKModel(RAW_ACCOUNT_TABLE, connectionId, fullName),
 		}
 		if dbErr := db.CreateOrUpdate(repoAccount); dbErr != nil {
 			return dbErr
