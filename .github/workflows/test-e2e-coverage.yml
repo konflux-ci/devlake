@@ -30,7 +30,7 @@ jobs:
       id-token: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
 
     - name: Create .env file
       run: |
@@ -74,7 +74,7 @@ jobs:
         fi
 
     - name: Set up Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
       with:
         node-version: '18'
 
@@ -126,7 +126,7 @@ jobs:
 
     - name: Upload Go e2e coverage to Codecov
       if: always()
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac  # v5
       with:
         use_oidc: true
         flags: e2e-go
@@ -135,7 +135,7 @@ jobs:
 
     - name: Upload Playwright report
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
       with:
         name: playwright-report
         path: e2e/playwright-report/
