@@ -11,6 +11,25 @@ not modifications, and are not tracked here.
 `jira_snowflake/tasks/convert_*.go` are adapted copies of `jira/tasks/` convertors — see the
 [jira_snowflake AGENTS.md](../backend/plugins/jira_snowflake/AGENTS.md) for the diff details.
 
+## build-plugins.sh: exclude metrics plugin
+
+**Files:**
+- `backend/scripts/build-plugins.sh`
+- `backend/Makefile`
+
+**Reason:** `backend/plugins/metrics/` is a standalone HTTP binary (`metrics-api`),
+not a devlake plugin loaded via Go's plugin system. The plugin build script
+(`-buildmode=plugin`) would fail on it. Added `-not -name metrics` to the plugin
+discovery `find` command and a dedicated `build-metrics-api` Makefile target.
+
+**Upstream status:** Not applicable — `metrics` is a wholly new plugin not present upstream.
+**Upstream PR:** N/A
+**Owner:** @rsoaresd
+**Rebase notes:** Re-apply the `-not -name metrics` exclusion after any upstream
+sync that updates `scripts/build-plugins.sh`.
+
+---
+
 ## gitextractor: ForceFullClone / FORCE_FULL_GIT_HISTORY
 
 **Files:**

@@ -46,6 +46,9 @@ dep: go-dep python-dep
 swag: mock
 	scripts/swag.sh
 
+build-metrics-api:
+	go build -o bin/metrics-api ./plugins/metrics/cmd/
+
 build-plugin:
 	@if [ -d "$(HOME)/local/lib/pkgconfig" ] && [ -f "$(HOME)/local/lib/pkgconfig/libgit2.pc" ]; then \
 		export PKG_CONFIG_PATH="$(HOME)/local/lib/pkgconfig:$$PKG_CONFIG_PATH"; \

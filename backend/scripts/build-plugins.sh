@@ -57,7 +57,8 @@ fi
 
 if [ -z "$DEVLAKE_PLUGINS" ]; then
     echo "Building all plugins"
-    PLUGINS=$(find $PLUGIN_SRC_DIR/* -maxdepth 0 -type d -not -name core -not -name helper -not -name logs -not -empty)
+    # metrics is a standalone HTTP binary, not a devlake plugin — excluded from shared-lib build
+    PLUGINS=$(find $PLUGIN_SRC_DIR/* -maxdepth 0 -type d -not -name core -not -name helper -not -name logs -not -name metrics -not -empty)
 else
     echo "Building the following plugins: $PLUGIN"
     PLUGINS=
