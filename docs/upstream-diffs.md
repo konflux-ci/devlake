@@ -50,6 +50,23 @@ directory leak in `doubleClone()`.
 **Rebase notes:** Touches clone strategy selection in `clone_gitcli.go`.
 Watch for upstream changes to `CloneRepo()`, `shallowClone()`, or `doubleClone()`.
 
+## gitlab: Map WorkInProgress to IsDraft in MR converter
+
+**Files:**
+- `backend/plugins/gitlab/tasks/mr_convertor.go`
+
+**Reason:** `WorkInProgress` (from the GitLab API `work_in_progress` field) was extracted and
+stored in `_tool_gitlab_merge_requests` but never forwarded to `code.PullRequest.IsDraft`
+in the converter. This meant draft/WIP MRs were indistinguishable from non-draft MRs at the
+domain layer. One-liner fix: `IsDraft: gitlabMr.WorkInProgress`.
+
+**Upstream status:** Pending — should be contributed upstream as a bug fix.
+**Upstream PR:** none yet
+**Owner:** @fmuntean
+
+**Rebase notes:** Change is isolated to the struct literal in `mr_convertor.go`'s `Convert` func.
+No conflicts expected unless upstream touches the same field mapping block.
+
 ## server/api/auth: OIDC authentication
 
 **Files:**
@@ -110,8 +127,8 @@ failure in golangci-lint for any PR that introduces a new plugin main package.
 Replaced `constraints.Unsigned` with a locally-defined `unsignedInteger` interface that has
 identical semantics, eliminating the `golang.org/x/exp` import entirely.
 
-**Upstream status:** Pending submission upstream (trivial/safe change)
-**Upstream PR:** none yet
+**Upstream status:** Submitted (awaiting merge)
+**Upstream PR:** https://github.com/apache/devlake/pull/9032
 **Owner:** @fmuntean
 
 **Rebase notes:** If upstream changes `GenericModel`, check whether they still reference
