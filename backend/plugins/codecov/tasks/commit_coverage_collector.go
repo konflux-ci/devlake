@@ -146,7 +146,7 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 		Incremental: true, // ALWAYS preserve historical data
 		ApiClient:   data.ApiClient,
 		Input:       iterator,
-		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/totals/", owner, repo),
+		UrlTemplate: fmt.Sprintf("%s/totals/", RepoAPIPrefix(data.Service, owner, repo)),
 		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
 			input := reqData.Input.(*CommitFlagInput)
 			query := url.Values{}

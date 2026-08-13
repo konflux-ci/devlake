@@ -17,5 +17,6 @@
  */
 
 export * from './organization';
+export * from './service';
 export * from './token';
 

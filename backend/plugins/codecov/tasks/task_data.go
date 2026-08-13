@@ -34,6 +34,7 @@ type CodecovTaskData struct {
 	Options   *CodecovOptions
 	ApiClient *helper.ApiAsyncClient
 	Repo      *models.CodecovRepo
+	Service   string // Codecov API service segment (github, gitlab, etc.)
 }
 
 // CodecovApiParams matches the models.CodecovApiParams

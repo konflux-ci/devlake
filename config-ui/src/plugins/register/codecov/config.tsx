@@ -19,7 +19,7 @@
 import { IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
-import { Organization, Token } from './connection-fields';
+import { Organization, Service, Token } from './connection-fields';
 
 export const CodecovConfig: IPluginConfig = {
   plugin: 'codecov',
@@ -30,6 +30,7 @@ export const CodecovConfig: IPluginConfig = {
     docLink: 'https://docs.codecov.com',
     initialValues: {
       endpoint: 'https://api.codecov.io',
+      service: 'github',
     },
     fields: [
       'name',
@@ -38,6 +39,17 @@ export const CodecovConfig: IPluginConfig = {
         subLabel: 'The Codecov API endpoint URL',
         defaultValue: 'https://api.codecov.io',
       },
+      ({ type, initialValues, values, errors, setValues, setErrors }: any) => (
+        <Service
+          key="service"
+          type={type}
+          initialValues={initialValues}
+          values={values}
+          errors={errors}
+          setValues={setValues}
+          setErrors={setErrors}
+        />
+      ),
       ({ type, initialValues, values, errors, setValues, setErrors }: any) => (
         <Organization
           key="organization"

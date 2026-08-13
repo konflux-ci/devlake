@@ -15,27 +15,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tasks
+package migrationscripts
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 )
 
-// ParseFullName splits a "owner/repo" string into its components.
-func ParseFullName(fullName string) (owner, repo string, err errors.Error) {
-	parts := strings.Split(fullName, "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return "", "", errors.BadInput.New("invalid fullName format, expected 'owner/repo'")
-	}
-	return parts[0], parts[1], nil
+type addServiceToConnections struct{}
+
+func (*addServiceToConnections) Up(basicRes context.BasicRes) errors.Error {
+	db := basicRes.GetDal()
+	return db.AutoMigrate(&addServiceToConnections20260804{})
 }
 
-// RepoAPIPrefix builds the Codecov API v2 path prefix for a repo:
-//
-//	api/v2/{service}/{owner}/repos/{repo}
-func RepoAPIPrefix(service, owner, repo string) string {
-	return fmt.Sprintf("api/v2/%s/%s/repos/%s", service, owner, repo)
+func (*addServiceToConnections) Version() uint64 {
+	return 20260804000000
+}
+
+func (*addServiceToConnections) Name() string {
+	return "Codecov add service field to connections for multi-service support"
+}
+
+type addServiceToConnections20260804 struct {
+	Service string `gorm:"column:service;type:varchar(100);default:github"`
+}
+
+func (addServiceToConnections20260804) TableName() string {
+	return "_tool_codecov_connections"
 }

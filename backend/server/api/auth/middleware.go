@@ -25,7 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/apache/incubator-devlake/core/models/common"
-	"github.com/apache/incubator-devlake/helpers/oidchelper"
+	"github.com/apache/incubator-devlake/pkg/oidchelper"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 

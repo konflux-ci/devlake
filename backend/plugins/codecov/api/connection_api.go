@@ -143,15 +143,17 @@ func testConnection(ctx context.Context, conn models.CodecovConn) (*CodecovTestC
 		}
 	}
 
+	if err := conn.ValidateService(); err != nil {
+		return nil, err
+	}
+
 	apiClient, err := api.NewApiClientFromConnection(ctx, basicRes, &conn)
 	if err != nil {
 		return nil, err
 	}
 
-	// Test connection by fetching organization info
-	// Codecov API endpoint: GET /api/v2/github/{owner}/users
-	// According to Codecov API docs: https://docs.codecov.com/reference/overview
-	testUrl := fmt.Sprintf("/api/v2/github/%s/users", conn.Organization)
+	service := conn.ServiceOrDefault()
+	testUrl := fmt.Sprintf("/api/v2/%s/%s/users", service, conn.Organization)
 	res, err := apiClient.Get(testUrl, nil, nil)
 	if err != nil {
 		return nil, errors.BadInput.Wrap(err, "verify token failed")

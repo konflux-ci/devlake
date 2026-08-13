@@ -168,7 +168,7 @@ func CollectComparison(taskCtx plugin.SubTaskContext) errors.Error {
 		Incremental: true, // ALWAYS preserve historical data
 		ApiClient:   data.ApiClient,
 		Input:       iterator,
-		UrlTemplate: fmt.Sprintf("api/v2/github/%s/repos/%s/compare", owner, repo),
+		UrlTemplate: fmt.Sprintf("%s/compare", RepoAPIPrefix(data.Service, owner, repo)),
 		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
 			input := reqData.Input.(*ComparisonInput)
 			query := url.Values{}

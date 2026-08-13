@@ -39,15 +39,18 @@ func TestBuildRawContentURL_GitLab(t *testing.T) {
 	assert.Contains(t, url, "raw?ref=main")
 }
 
-func TestBuildRawContentURL_GitLabEnterprise(t *testing.T) {
-	url := buildRawContentURL("gitlab_enterprise", "myorg", "myrepo", "develop", ".codecov.yml")
-	assert.Contains(t, url, "gitlab.cee.redhat.com/api/v4/projects/")
-	assert.Contains(t, url, "raw?ref=develop")
+func TestBuildRawContentURL_GitLabSubgroup(t *testing.T) {
+	url := buildRawContentURL("gitlab", "org:subgroup", "myrepo", "main", ".codecov.yml")
+	assert.Contains(t, url, "projects/org%2Fsubgroup%2Fmyrepo/")
+	assert.NotContains(t, url, "%3A")
+	assert.Contains(t, url, "raw?ref=main")
 }
 
-func TestBuildRawContentURL_UnsupportedService(t *testing.T) {
-	url := buildRawContentURL("bitbucket", "owner", "repo", "main", "codecov.yml")
-	assert.Equal(t, "", url)
+func TestBuildRawContentURL_EnterpriseServicesSkipped(t *testing.T) {
+	for _, svc := range []string{"github_enterprise", "gitlab_enterprise", "bitbucket", "bitbucket_server"} {
+		url := buildRawContentURL(svc, "owner", "repo", "main", "codecov.yml")
+		assert.Equal(t, "", url, "expected empty URL for service %q", svc)
+	}
 }
 
 // --- fetchFile ---

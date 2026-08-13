@@ -28,7 +28,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/plugin"
-	"github.com/apache/incubator-devlake/helpers/gcshelper"
+	"github.com/apache/incubator-devlake/pkg/gcshelper"
 )
 
 var FetchMissingCiJobsMeta = plugin.SubTaskMeta{
