@@ -18,21 +18,57 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/codecov/models"
 )
+
+// codecovCoverage20251117 is a frozen snapshot of models.CodecovCoverage as of 2025-11-17.
+// At this time the model used common.Model (with ID) + common.RawDataOrigin.
+// Do not update this struct — create a new migration instead.
+type codecovCoverage20251117 struct {
+	// common.Model fields (as used at time of migration)
+	ID        uint64    `gorm:"primaryKey"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	// common.RawDataOrigin fields
+	RawDataParams string `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64 `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId    uint64     `gorm:"primaryKey;type:bigint"`
+	RepoId          string     `gorm:"primaryKey;type:varchar(200);index"`
+	FlagName        string     `gorm:"primaryKey;type:varchar(100);index"`
+	Branch          string     `gorm:"primaryKey;type:varchar(100)"`
+	CommitSha       string     `gorm:"primaryKey;type:varchar(64)"`
+	CommitTimestamp *time.Time `gorm:"index"`
+	// coverage metrics
+	CoveragePercentage float64
+	ModifiedCoverage   float64
+	LinesCovered       int
+	LinesTotal         int
+	LinesMissed        int
+	Hits               int
+	Partials           int
+	Misses             int
+	MethodsCovered     int
+	MethodsTotal       int
+}
+
+func (codecovCoverage20251117) TableName() string {
+	return "_tool_codecov_coverages"
+}
 
 type addModifiedCoverageToCoverages struct{}
 
 func (u *addModifiedCoverageToCoverages) Up(basicRes context.BasicRes) errors.Error {
-	// AutoMigrate will add the missing ModifiedCoverage column to the existing table
-	err := migrationhelper.AutoMigrateTables(
+	return migrationhelper.AutoMigrateTables(
 		basicRes,
-		&models.CodecovCoverage{},
+		&codecovCoverage20251117{},
 	)
-	return err
 }
 
 func (*addModifiedCoverageToCoverages) Version() uint64 {
@@ -42,4 +78,3 @@ func (*addModifiedCoverageToCoverages) Version() uint64 {
 func (*addModifiedCoverageToCoverages) Name() string {
 	return "Codecov add ModifiedCoverage to coverages table"
 }
-

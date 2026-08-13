@@ -18,21 +18,51 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/codecov/tasks"
 )
+
+// comparisonData20251120 is a frozen snapshot of tasks.ComparisonData as of 2025-11-20.
+// Do not update this struct — create a new migration instead.
+type comparisonData20251120 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId uint64 `gorm:"primaryKey;type:bigint"`
+	RepoId       string `gorm:"primaryKey;type:varchar(200);index"`
+	CommitSha    string `gorm:"primaryKey;type:varchar(64);index"`
+	FlagName     string `gorm:"primaryKey;type:varchar(100);index"`
+	// fields
+	ParentSha        string   `gorm:"type:varchar(64)"`
+	ModifiedCoverage float64  `gorm:"type:double"`
+	FilesChanged     int      `gorm:"type:int"`
+	MethodsCovered   int      `gorm:"type:int"`
+	MethodsTotal     int      `gorm:"type:int"`
+	LinesCovered     int      `gorm:"type:int"`
+	LinesTotal       int      `gorm:"type:int"`
+	LinesMissed      int      `gorm:"type:int"`
+	Patch            *float64 `gorm:"type:double"`
+}
+
+func (comparisonData20251120) TableName() string {
+	return "_tool_codecov_comparisons"
+}
 
 type addModifiedLinesToComparisons struct{}
 
 func (u *addModifiedLinesToComparisons) Up(basicRes context.BasicRes) errors.Error {
-	// AutoMigrate will add the missing LinesCovered, LinesTotal, and LinesMissed columns
-	err := migrationhelper.AutoMigrateTables(
+	return migrationhelper.AutoMigrateTables(
 		basicRes,
-		&tasks.ComparisonData{},
+		&comparisonData20251120{},
 	)
-	return err
 }
 
 func (*addModifiedLinesToComparisons) Version() uint64 {
@@ -42,4 +72,3 @@ func (*addModifiedLinesToComparisons) Version() uint64 {
 func (*addModifiedLinesToComparisons) Name() string {
 	return "Codecov add modified lines to comparisons table"
 }
-

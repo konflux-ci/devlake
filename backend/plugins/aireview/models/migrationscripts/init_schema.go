@@ -22,7 +22,6 @@ import (
 
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
 )
@@ -32,15 +31,21 @@ var _ plugin.MigrationScript = (*initSchema)(nil)
 type initSchema struct{}
 
 type aiReview20260127 struct {
-	common.NoPKModel
-	Id               string `gorm:"primaryKey;type:varchar(255)"`
-	PullRequestId    string `gorm:"index;type:varchar(255)"`
-	RepoId           string `gorm:"index;type:varchar(255)"`
-	AiTool           string `gorm:"type:varchar(100)"`
-	AiToolUser       string `gorm:"type:varchar(255)"`
-	ReviewId         string `gorm:"type:varchar(255)"`
-	Body             string `gorm:"type:longtext"`
-	Summary          string `gorm:"type:text"`
+	// common.NoPKModel fields
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+	RawDataParams    string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable     string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId        uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark    string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	Id               string    `gorm:"primaryKey;type:varchar(255)"`
+	PullRequestId    string    `gorm:"index;type:varchar(255)"`
+	RepoId           string    `gorm:"index;type:varchar(255)"`
+	AiTool           string    `gorm:"type:varchar(100)"`
+	AiToolUser       string    `gorm:"type:varchar(255)"`
+	ReviewId         string    `gorm:"type:varchar(255)"`
+	Body             string    `gorm:"type:longtext"`
+	Summary          string    `gorm:"type:text"`
 	CreatedDate      time.Time
 	UpdatedDate      *time.Time
 	RiskLevel        string `gorm:"type:varchar(50)"`
@@ -62,18 +67,24 @@ func (aiReview20260127) TableName() string {
 }
 
 type aiReviewFinding20260127 struct {
-	common.NoPKModel
-	Id                string `gorm:"primaryKey;type:varchar(255)"`
-	AiReviewId        string `gorm:"index;type:varchar(255)"`
-	PullRequestId     string `gorm:"index;type:varchar(255)"`
-	RepoId            string `gorm:"index;type:varchar(255)"`
-	AiTool            string `gorm:"type:varchar(100)"`
-	Category          string `gorm:"type:varchar(100)"`
-	Severity          string `gorm:"type:varchar(50)"`
-	Type              string `gorm:"type:varchar(100)"`
-	Title             string `gorm:"type:varchar(500)"`
-	Description       string `gorm:"type:text"`
-	FilePath          string `gorm:"type:varchar(500)"`
+	// common.NoPKModel fields
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
+	RawDataParams     string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable      string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId         uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark     string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	Id                string    `gorm:"primaryKey;type:varchar(255)"`
+	AiReviewId        string    `gorm:"index;type:varchar(255)"`
+	PullRequestId     string    `gorm:"index;type:varchar(255)"`
+	RepoId            string    `gorm:"index;type:varchar(255)"`
+	AiTool            string    `gorm:"type:varchar(100)"`
+	Category          string    `gorm:"type:varchar(100)"`
+	Severity          string    `gorm:"type:varchar(50)"`
+	Type              string    `gorm:"type:varchar(100)"`
+	Title             string    `gorm:"type:varchar(500)"`
+	Description       string    `gorm:"type:text"`
+	FilePath          string    `gorm:"type:varchar(500)"`
 	LineStart         int
 	LineEnd           int
 	CommitSha         string `gorm:"type:varchar(255)"`
@@ -94,7 +105,13 @@ func (aiReviewFinding20260127) TableName() string {
 }
 
 type aiFailurePrediction20260127 struct {
-	common.NoPKModel
+	// common.RawDataOrigin fields (from NoPKModel).
+	// CreatedAt/UpdatedAt from NoPKModel are omitted here because they are declared
+	// below with UpdatedAt as *time.Time, matching the original shadowing behavior.
+	RawDataParams         string `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable          string `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId             uint64 `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark         string `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
 	Id                    string `gorm:"primaryKey;type:varchar(255)"`
 	PullRequestId         string `gorm:"index;type:varchar(255)"`
 	RepoId                string `gorm:"index;type:varchar(255)"`
@@ -122,10 +139,16 @@ func (aiFailurePrediction20260127) TableName() string {
 }
 
 type aiPredictionMetrics20260127 struct {
-	common.NoPKModel
-	Id                       string `gorm:"primaryKey;type:varchar(255)"`
-	RepoId                   string `gorm:"index;type:varchar(255)"`
-	AiTool                   string `gorm:"type:varchar(100)"`
+	// common.NoPKModel fields
+	CreatedAt                time.Time `json:"createdAt"`
+	UpdatedAt                time.Time `json:"updatedAt"`
+	RawDataParams            string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable             string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId                uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark            string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	Id                       string    `gorm:"primaryKey;type:varchar(255)"`
+	RepoId                   string    `gorm:"index;type:varchar(255)"`
+	AiTool                   string    `gorm:"type:varchar(100)"`
 	PeriodStart              time.Time
 	PeriodEnd                time.Time
 	PeriodType               string `gorm:"type:varchar(20)"`
@@ -150,21 +173,28 @@ func (aiPredictionMetrics20260127) TableName() string {
 }
 
 type aiReviewScopeConfig20260127 struct {
-	common.ScopeConfig
-	CodeRabbitEnabled     bool   `gorm:"type:boolean"`
-	CodeRabbitUsername    string `gorm:"type:varchar(255)"`
-	CodeRabbitPattern     string `gorm:"type:varchar(500)"`
-	CursorBugbotEnabled   bool   `gorm:"type:boolean"`
-	CursorBugbotUsername  string `gorm:"type:varchar(255)"`
-	CursorBugbotPattern   string `gorm:"type:varchar(500)"`
-	QodoEnabled           bool   `gorm:"type:boolean"`
-	QodoUsername          string `gorm:"type:varchar(255)"`
-	QodoPattern           string `gorm:"type:varchar(500)"`
-	AiCommitPatterns      string `gorm:"type:text"`
-	AiPrLabelPattern      string `gorm:"type:varchar(500)"`
-	RiskHighPattern       string `gorm:"type:varchar(500)"`
-	RiskMediumPattern     string `gorm:"type:varchar(500)"`
-	RiskLowPattern        string `gorm:"type:varchar(500)"`
+	// common.Model fields
+	ID        uint64    `gorm:"primaryKey"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	// common.ScopeConfig fields
+	Entities              []string `gorm:"type:json;serializer:json" json:"entities"`
+	ConnectionId          uint64   `json:"connectionId" gorm:"index"`
+	Name                  string   `gorm:"type:varchar(255);uniqueIndex" json:"name"`
+	CodeRabbitEnabled     bool     `gorm:"type:boolean"`
+	CodeRabbitUsername    string   `gorm:"type:varchar(255)"`
+	CodeRabbitPattern     string   `gorm:"type:varchar(500)"`
+	CursorBugbotEnabled   bool     `gorm:"type:boolean"`
+	CursorBugbotUsername  string   `gorm:"type:varchar(255)"`
+	CursorBugbotPattern   string   `gorm:"type:varchar(500)"`
+	QodoEnabled           bool     `gorm:"type:boolean"`
+	QodoUsername          string   `gorm:"type:varchar(255)"`
+	QodoPattern           string   `gorm:"type:varchar(500)"`
+	AiCommitPatterns      string   `gorm:"type:text"`
+	AiPrLabelPattern      string   `gorm:"type:varchar(500)"`
+	RiskHighPattern       string   `gorm:"type:varchar(500)"`
+	RiskMediumPattern     string   `gorm:"type:varchar(500)"`
+	RiskLowPattern        string   `gorm:"type:varchar(500)"`
 	ObservationWindowDays int
 	BugLinkPattern        string `gorm:"type:varchar(500)"`
 }

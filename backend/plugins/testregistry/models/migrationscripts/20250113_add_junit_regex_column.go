@@ -55,5 +55,3 @@ func (*addJUnitRegexColumn) Version() uint64 {
 func (*addJUnitRegexColumn) Name() string {
 	return "add junit_regex column to testregistry connections for configurable JUnit file matching"
 }
-
-
