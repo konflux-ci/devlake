@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     ./plugins/metrics/cmd/
 
 # ---- runtime image ----
-FROM gcr.io/distroless/static:nonroot
+FROM alpine:3.21
 
 COPY --from=builder /metrics-api /metrics-api
 

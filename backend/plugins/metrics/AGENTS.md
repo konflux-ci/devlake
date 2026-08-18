@@ -19,6 +19,19 @@ export METRICS_ADDR=:<METRICS_ADDR>
 export METRICS_ALLOWED_ORIGIN=<METRICS_ALLOWED_ORIGIN>
 ./bin/metrics-api
 
+# podman
+podman build -f plugins/metrics/Dockerfile -t metrics-api .
+
+podman run --rm \
+  -e MYSQL_HOST=<MYSQL_HOST> \
+  -e MYSQL_USER=<MYSQL_USER>\
+  -e MYSQL_PASS=<MYSQL_PASSWORD> \
+  -e MYSQL_DB=<MYSQL_DB> \
+  -e METRICS_ADDR=:8181 \
+  -e METRICS_ALLOWED_ORIGIN='*' \
+  -p 8181:8181 \
+  metrics-api
+
 # Test
 go test ./plugins/metrics/... -v
 golangci-lint run ./plugins/metrics/...
