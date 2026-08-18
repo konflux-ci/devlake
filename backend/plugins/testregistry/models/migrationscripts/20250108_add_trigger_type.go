@@ -63,4 +63,3 @@ func (*addTriggerType) Version() uint64 {
 func (*addTriggerType) Name() string {
 	return "add trigger_type column to ci_test_jobs table"
 }
-

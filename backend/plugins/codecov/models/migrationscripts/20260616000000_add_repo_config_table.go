@@ -18,16 +18,47 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/codecov/models"
 )
+
+// codecovRepoConfig20260616 is a frozen snapshot of models.CodecovRepoConfig as of 2026-06-16.
+// Do not update this struct — create a new migration instead.
+type codecovRepoConfig20260616 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId uint64 `gorm:"primaryKey;type:bigint"`
+	RepoId       string `gorm:"primaryKey;type:varchar(200)"`
+	// fields
+	ConfigSource         string `gorm:"type:varchar(50)"`
+	RawYaml              string `gorm:"type:text"`
+	ProjectTarget        *float64
+	ProjectTargetAuto    bool
+	ProjectThreshold     *float64
+	ProjectInformational bool
+	PatchTarget          *float64
+	PatchTargetAuto      bool
+	PatchThreshold       *float64
+	PatchInformational   bool
+}
+
+func (codecovRepoConfig20260616) TableName() string {
+	return "_tool_codecov_repo_configs"
+}
 
 type addRepoConfigTable struct{}
 
 func (u *addRepoConfigTable) Up(basicRes context.BasicRes) errors.Error {
-	return migrationhelper.AutoMigrateTables(basicRes, &models.CodecovRepoConfig{})
+	return migrationhelper.AutoMigrateTables(basicRes, &codecovRepoConfig20260616{})
 }
 
 func (*addRepoConfigTable) Version() uint64 {

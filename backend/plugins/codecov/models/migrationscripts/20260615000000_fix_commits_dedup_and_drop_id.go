@@ -18,11 +18,38 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/codecov/models"
 )
+
+// codecovCommit20260615 is a frozen snapshot of models.CodecovCommit as of 2026-06-15.
+// Do not update this struct — create a new migration instead.
+type codecovCommit20260615 struct {
+	// common.NoPKModel fields
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	// primary keys
+	ConnectionId uint64 `gorm:"primaryKey;type:bigint"`
+	RepoId       string `gorm:"primaryKey;type:varchar(200);index"`
+	CommitSha    string `gorm:"primaryKey;type:varchar(64);index"`
+	// fields
+	Branch          string     `gorm:"type:varchar(100)"`
+	CommitTimestamp *time.Time `gorm:"index"`
+	Message         string     `gorm:"type:text"`
+	Author          string     `gorm:"type:varchar(255)"`
+	ParentSha       string     `gorm:"type:varchar(64)"`
+}
+
+func (codecovCommit20260615) TableName() string {
+	return "_tool_codecov_commits"
+}
 
 type fixCommitsDedupAndDropId struct{}
 
@@ -75,7 +102,7 @@ func (u *fixCommitsDedupAndDropId) Up(basicRes context.BasicRes) errors.Error {
 
 	// Use AutoMigrate to ensure the table matches the current model definition,
 	// which has PK on (connection_id, repo_id, commit_sha) and no id column.
-	return migrationhelper.AutoMigrateTables(basicRes, &models.CodecovCommit{})
+	return migrationhelper.AutoMigrateTables(basicRes, &codecovCommit20260615{})
 }
 
 func (*fixCommitsDedupAndDropId) Version() uint64 {

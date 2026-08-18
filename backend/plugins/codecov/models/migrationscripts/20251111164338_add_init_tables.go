@@ -18,20 +18,80 @@ limitations under the License.
 package migrationscripts
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
-	"github.com/apache/incubator-devlake/plugins/codecov/models"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
+
+// codecovConnection20251111 is a frozen snapshot of models.CodecovConnection as of 2025-11-11.
+// Do not update this struct — create a new migration instead.
+type codecovConnection20251111 struct {
+	helper.BaseConnection `mapstructure:",squash"`
+	helper.RestConnection `mapstructure:",squash"`
+	helper.AccessToken    `mapstructure:",squash"`
+	Organization          string `gorm:"type:varchar(255)"`
+}
+
+func (codecovConnection20251111) TableName() string {
+	return "_tool_codecov_connections"
+}
+
+// codecovRepo20251111 is a frozen snapshot of models.CodecovRepo as of 2025-11-11.
+// Do not update this struct — create a new migration instead.
+type codecovRepo20251111 struct {
+	// common.Scope fields (inlined)
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
+	RawDataTable  string    `gorm:"column:_raw_data_table;type:varchar(255)" json:"_raw_data_table"`
+	RawDataId     uint64    `gorm:"column:_raw_data_id" json:"_raw_data_id"`
+	RawDataRemark string    `gorm:"column:_raw_data_remark" json:"_raw_data_remark"`
+	ConnectionId  uint64    `json:"connectionId" gorm:"primaryKey"`
+	ScopeConfigId uint64    `json:"scopeConfigId,omitempty"`
+	// CodecovRepo-specific fields
+	CodecovId   string `gorm:"primaryKey;type:varchar(255)"`
+	Name        string `gorm:"type:varchar(255)"`
+	FullName    string `gorm:"type:varchar(255)"`
+	Service     string `gorm:"type:varchar(255)"`
+	Language    string `gorm:"type:varchar(255)"`
+	Active      bool
+	ActivatedAt string `gorm:"type:varchar(255)"`
+	Updatestamp string `gorm:"type:varchar(255)"`
+	Private     bool
+	Branch      string `gorm:"type:varchar(255)"`
+}
+
+func (codecovRepo20251111) TableName() string {
+	return "_tool_codecov_repos"
+}
+
+// codecovScopeConfig20251111 is a frozen snapshot of models.CodecovScopeConfig as of 2025-11-11.
+// Do not update this struct — create a new migration instead.
+type codecovScopeConfig20251111 struct {
+	// common.ScopeConfig fields (inlined)
+	ID           uint64    `gorm:"primaryKey"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	Entities     []string  `gorm:"type:json;serializer:json" json:"entities"`
+	ConnectionId uint64    `json:"connectionId" gorm:"index"`
+	Name         string    `gorm:"type:varchar(255);uniqueIndex" json:"name"`
+}
+
+func (codecovScopeConfig20251111) TableName() string {
+	return "_tool_codecov_scope_configs"
+}
 
 type addInitTables struct{}
 
 func (u *addInitTables) Up(basicRes context.BasicRes) errors.Error {
 	err := migrationhelper.AutoMigrateTables(
 		basicRes,
-		&models.CodecovConnection{},
-		&models.CodecovRepo{},
-		&models.CodecovScopeConfig{},
+		&codecovConnection20251111{},
+		&codecovRepo20251111{},
+		&codecovScopeConfig20251111{},
 	)
 	return err
 }
@@ -43,4 +103,3 @@ func (*addInitTables) Version() uint64 {
 func (*addInitTables) Name() string {
 	return "Codecov init schemas"
 }
-
