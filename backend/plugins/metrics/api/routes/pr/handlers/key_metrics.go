@@ -62,6 +62,8 @@ func KeyMetrics(db *sql.DB) http.HandlerFunc {
 		outliers, err := qpr.KeyMetricsOutliers(r.Context(), db, params)
 		if err != nil {
 			log.Printf("pr/key-metrics: outliers: %v", err)
+			http.Error(w, "query error", http.StatusInternalServerError)
+			return
 		}
 
 		api.WriteJSON(w, tpr.BuildKeyMetrics(stats, compareStats, outliers))

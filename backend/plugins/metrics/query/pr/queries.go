@@ -114,8 +114,9 @@ GROUP BY
 }
 
 // Reviews returns review-comments for all PRs scoped by the same repo/blueprint
-// filter.  Only non-empty author accounts are included (the transform layer
-// applies the bot check on AuthorName).
+// filter.  Self-comments (commenter == PR author) are excluded, matching the
+// n8n Get Reviews node. Only non-empty author accounts are included (the
+// transform layer applies the bot check on AuthorName).
 // Used by: flow.
 func Reviews(ctx context.Context, db *sql.DB, p Params) ([]ReviewRow, error) {
 	args := []interface{}{p.BlueprintID}
@@ -139,6 +140,7 @@ JOIN repos r ON r.id = pr.base_repo_id
 WHERE FIND_IN_SET(bp.id, ?)
   AND r.name IN %s
   AND a.user_name IS NOT NULL AND a.user_name != ''
+  AND a.user_name != pr.author_name
   AND (
     (UNIX_TIMESTAMP(pr.closed_date)  BETWEEN ? AND ?)
     OR (UNIX_TIMESTAMP(pr.created_date) BETWEEN ? AND ?)
