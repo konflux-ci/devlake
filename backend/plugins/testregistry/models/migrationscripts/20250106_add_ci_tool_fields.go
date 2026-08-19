@@ -73,4 +73,3 @@ func (*addCiToolFields) Version() uint64 {
 func (*addCiToolFields) Name() string {
 	return "add CI tool fields to testregistry connections"
 }
-

@@ -108,4 +108,3 @@ func (*renameOciToQuay) Version() uint64 {
 func (*renameOciToQuay) Name() string {
 	return "rename oci_artifact_url to quay_organization and update scope fields"
 }
-
