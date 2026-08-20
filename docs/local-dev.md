@@ -55,6 +55,26 @@ podman compose -f docker-compose-dev.yml up -d --build devlake
 podman compose -f docker-compose-dev.yml logs -f devlake
 ```
 
+## UBI Container images
+
+Local compose builds DevLake from UBI 9 Containerfiles:
+
+- Backend: [`backend/Containerfile`](../backend/Containerfile)
+- Frontend: [`config-ui/Containerfile`](../config-ui/Containerfile)
+
+Compose tags local images as `localhost/devlake-backend:local` and `localhost/devlake-frontend:local`.
+
+```bash
+# Build UBI images via compose
+podman compose -f docker-compose-dev.yml build devlake config-ui
+
+# Or build directly (same tags compose expects)
+podman build -f backend/Containerfile -t localhost/devlake-backend:local backend
+podman build -f config-ui/Containerfile -t localhost/devlake-frontend:local config-ui
+```
+
+Debian-based Dockerfiles (`backend/Dockerfile`, `backend/Dockerfile.local`, `config-ui/Dockerfile`) are **deprecated**; prefer the UBI Containerfiles. Local compose and Konflux Tekton both build from `Containerfile`. `backend/Dockerfile.konflux` was removed after Tekton switched.
+
 ## Building (from backend/)
 
 ```bash
