@@ -32,5 +32,6 @@ func All() []plugin.MigrationScript {
 		&addFlakyInfraFilters{},
 		&addSuggestionsAccepted{},
 		&addDiffMatching{},
+		&claimDomainTables{},
 	}
 }
