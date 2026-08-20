@@ -114,3 +114,54 @@ identical semantics, eliminating the `golang.org/x/exp` import entirely.
 
 **Rebase notes:** If upstream changes `GenericModel`, check whether they still reference
 `golang.org/x/exp/constraints` and reapply the inline if needed.
+
+## docker-compose-dev: local UBI image builds
+
+**Files:**
+- `docker-compose-dev.yml`
+- `Makefile` (root `build-config-ui-image`)
+- `backend/Makefile` (`build-server-image`)
+- `backend/Dockerfile`, `config-ui/Dockerfile` (DEPRECATED comments only)
+
+**Reason:** Points `devlake` and `config-ui` builds at UBI Containerfiles
+(`dockerfile: Containerfile`) and tags images as `localhost/devlake-*:local`
+instead of personal Quay tags / Apache Scarf images. Makefile image targets use
+`Containerfile`. Debian Dockerfiles are marked DEPRECATED pending removal.
+Konflux Tekton builds `backend/Containerfile` and `config-ui/Containerfile`
+(fork-only `backend/Dockerfile.konflux` removed).
+
+**Upstream status:** N/A — Konflux local-dev / image-build customization.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** If upstream regenerates `docker-compose-dev.yml`, re-add under
+`devlake` / `config-ui`: `dockerfile: Containerfile` and
+`image: localhost/devlake-backend:local` / `localhost/devlake-frontend:local`.
+If upstream changes Makefile image targets or Dockerfiles, re-point builds at
+`Containerfile` and keep DEPRECATED headers until the Debian files are deleted.
+
+(`backend/Containerfile` and `config-ui/Containerfile` are fork additions, not
+tracked here.)
+## jira: cleanup stale board associations after tickets leave/change board
+
+**Files:**
+- `backend/plugins/jira/impl/impl.go`
+- `backend/plugins/jira/tasks/stale_board_issue_cleaner.go`
+- `backend/plugins/jira/tasks/stale_board_issue_cleaner_test.go`
+
+**Reason:** Incremental Jira collection only adds board associations; it never removes
+issues that left the board or moved to a different team. Stale rows in
+`_tool_jira_board_issues` / domain `board_issues` keep those tickets on the old
+board in metrics. Adds `cleanupStaleBoardIssues`, which batch-checks membership
+via `agile/1.0/board/:id/issue` JQL (`issue IN (...)`, 100 per request),
+re-fetches current issue state, and deletes the stale associations.
+
+**Upstream status:** N/A — Konflux-specific subtask, not present in upstream Apache DevLake. Also depends on `collectAndExtractSingleIssue` in `parent_issue_collector.go` (Konflux-only).
+**Upstream PR:** none — not applicable
+**Owner:** @rsoaresd
+
+**Rebase notes:** `stale_board_issue_cleaner.go` specific use case; no upstream equivalent.
+`impl.go` registers `CleanupStaleBoardIssuesMeta` in `SubTaskMetas()` after
+`ExtractEpicsMeta` — same conflict hotspot as `CollectParentIssuesMeta`.
+Cleanup reuses `collectAndExtractSingleIssue` from `parent_issue_collector.go`
+(also Konflux-only).

@@ -23,6 +23,9 @@
 #While incubation status is not necessarily a reflection of the completeness or stability of the code,
 #it does indicate that the project has yet to be fully endorsed by the ASF.
 
+# DEPRECATED: Prefer backend/Containerfile (UBI 9) for local compose and Konflux builds.
+# This Debian Dockerfile is retained for upstream compatibility and will be removed later.
+
 # ARM64-only Dockerfile for local development
 
 FROM --platform=linux/arm64 debian:bookworm as debian-arm64

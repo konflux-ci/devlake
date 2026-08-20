@@ -24,7 +24,7 @@ spec:
   - name: output-image
     value: quay.io/konflux-ci/konflux-devprod/devlake-backend:{{revision}}
   - name: dockerfile
-    value: backend/Dockerfile.konflux
+    value: backend/Containerfile
   - name: path-context
     value: backend
   pipelineSpec:

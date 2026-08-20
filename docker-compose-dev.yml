@@ -84,9 +84,10 @@ services:
       - mysql
 
   devlake:
-    image: quay.io/flacatus/konflux-devlake-backend:0.0.1
+    image: localhost/devlake-backend:local
     build:
       context: backend
+      dockerfile: Containerfile
       args:
         HTTPS_PROXY: "${HTTPS_PROXY}"
         GOPROXY: "${GOPROXY}"
@@ -108,9 +109,10 @@ services:
       - mysql
 
   config-ui:
-    image: quay.io/flacatus/konflux-devlake-frontend:0.0.1
+    image: localhost/devlake-frontend:local
     build:
       context: "config-ui"
+      dockerfile: Containerfile
     ports:
       - 4000:4000
     env_file:

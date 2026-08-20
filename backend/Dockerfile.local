@@ -23,6 +23,9 @@
 #While incubation status is not necessarily a reflection of the completeness or stability of the code,
 #it does indicate that the project has yet to be fully endorsed by the ASF.
 
+# DEPRECATED: Prefer backend/Containerfile (UBI 9) for local and Konflux builds.
+# This simplified local Debian Dockerfile is retained temporarily and will be removed later.
+
 FROM golang:1.26-bookworm as builder
 
 ARG GOPROXY=
