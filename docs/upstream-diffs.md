@@ -48,6 +48,27 @@ domain layer. One-liner fix: `IsDraft: gitlabMr.WorkInProgress`.
 **Rebase notes:** Change is isolated to the struct literal in `mr_convertor.go`'s `Convert` func.
 No conflicts expected unless upstream touches the same field mapping block.
 
+## gitlab: Use StatefulApiExtractor for accounts and tags
+
+**Files:**
+- `backend/plugins/gitlab/tasks/account_extractor.go`
+- `backend/plugins/gitlab/tasks/tag_extractor.go`
+
+**Reason:** Extract Users and Extract Tags were the last GitLab extractors still on the
+deprecated `NewApiExtractor`. That helper always deletes tool-layer rows by
+`_raw_data_table` + `_raw_data_params` before insert. A truncated Collect Users run
+(short page treated as end of list) then wiped accounts that project last wrote.
+`NewStatefulApiExtractor` upserts incrementally and only deletes on full sync / config
+change, matching the rest of the GitLab plugin.
+
+**Upstream status:** Pending — should be contributed upstream as a bug fix.
+**Upstream PR:** none yet
+**Owner:** @fmuntean
+
+**Rebase notes:** Upstream still uses `NewApiExtractor` in these two files. Re-apply the
+switch to `CreateSubtaskCommonArgs` + `NewStatefulApiExtractor`. Extract mapping logic
+is unchanged.
+
 ## server/api/auth: OIDC authentication
 
 **Files:**
