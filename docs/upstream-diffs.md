@@ -61,13 +61,13 @@ deprecated `NewApiExtractor`. That helper always deletes tool-layer rows by
 `NewStatefulApiExtractor` upserts incrementally and only deletes on full sync / config
 change, matching the rest of the GitLab plugin.
 
-**Upstream status:** Pending — should be contributed upstream as a bug fix.
-**Upstream PR:** none yet
+**Upstream status:** Submitted (awaiting merge)
+**Upstream PR:** https://github.com/apache/devlake/pull/9070
 **Owner:** @fmuntean
 
-**Rebase notes:** Upstream still uses `NewApiExtractor` in these two files. Re-apply the
-switch to `CreateSubtaskCommonArgs` + `NewStatefulApiExtractor`. Extract mapping logic
-is unchanged.
+**Rebase notes:** Until #9070 merges, upstream still uses `NewApiExtractor` in these two
+files. Re-apply the switch to `CreateSubtaskCommonArgs` + `NewStatefulApiExtractor`.
+Extract mapping logic is unchanged. Drop this entry after #9070 is in upstream.
 
 ## server/api/auth: OIDC authentication
 
