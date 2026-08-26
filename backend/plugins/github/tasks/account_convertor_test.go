@@ -56,6 +56,7 @@ func TestIsBotAccount(t *testing.T) {
 		// Standalone names without a suffix marker.
 		{"standalone copilot login", "copilot", "", true},
 		{"dependabot without brackets", "dependabot", "", true},
+		{"github-actions without brackets", "github-actions", "", true},
 		{"codecov commenter bot, real GitHub API type is User", "codecov-commenter", "User", true},
 
 		// Negative cases: must not false-positive on substrings, only
@@ -64,6 +65,10 @@ func TestIsBotAccount(t *testing.T) {
 		{"organization account is not a bot", "my-org", "Organization", false},
 		{"surname containing bot as a substring", "abbott", "User", false},
 		{"login containing bot mid-string", "robotics-fan", "User", false},
+		{"copilot substring does not mark bot", "copilot-trainer", "User", false},
+		{"dependabot substring does not mark bot", "dependabot-helper", "User", false},
+		{"github-actions substring does not mark bot", "github-actions-user", "User", false},
+		{"codecov-commenter substring does not mark bot", "codecov-commenter-fan", "User", false},
 		{"empty type and no bot marker", "some-human-login", "", false},
 	}
 
@@ -84,7 +89,7 @@ func TestBuildDomainAccount_SetsIsBot(t *testing.T) {
 		{"human user with full profile", &repoAccountForConvert{Login: "octocat", Type: "User", AvatarUrl: "https://avatars.githubusercontent.com/u/1"}, false},
 		{"api type marks bot", &repoAccountForConvert{Login: "some-app", Type: "Bot", AvatarUrl: "https://avatars.githubusercontent.com/u/2"}, true},
 		{"bot suffix login", &repoAccountForConvert{Login: "renovate[bot]", Type: "User", AvatarUrl: "https://avatars.githubusercontent.com/u/3"}, true},
-		{"unrecognized login with no profile data is treated as a bot", &repoAccountForConvert{Login: "totally-unknown-name", Type: "", AvatarUrl: ""}, true},
+		{"unrecognized login with no profile data is not marked as bot", &repoAccountForConvert{Login: "totally-unknown-name", Type: "", AvatarUrl: ""}, false},
 		{"unrecognized login with a real profile is not a bot", &repoAccountForConvert{Login: "totally-unknown-name", Type: "", AvatarUrl: "https://avatars.githubusercontent.com/u/4"}, false},
 	}
 
@@ -111,23 +116,6 @@ func TestBuildDomainAccount_FullNameFallsBackToLogin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := buildDomainAccount("github:GithubAccount:1:1", tt.row, "")
 			assert.Equal(t, tt.wantFullName, got.FullName)
-		})
-	}
-}
-
-func TestHasNoProfileData(t *testing.T) {
-	tests := []struct {
-		name string
-		row  *repoAccountForConvert
-		want bool
-	}{
-		{"no avatar means no profile was ever collected", &repoAccountForConvert{AvatarUrl: ""}, true},
-		{"avatar present means a profile was collected", &repoAccountForConvert{AvatarUrl: "https://avatars.githubusercontent.com/u/1"}, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, hasNoProfileData(tt.row))
 		})
 	}
 }

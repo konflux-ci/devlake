@@ -195,10 +195,8 @@ domain-model addition; upstream has no equivalent field.
 - `backend/plugins/github/tasks/account_convertor.go`
 
 **Reason:** Populate the new `IsBot` field via `isBotAccount()` (API
-`Type == "Bot"` or `[bot]`/`-bot`/`-robot`/copilot/dependabot/github-actions
-login patterns) plus `hasNoProfileData()` (an account with no `avatar_url`
-ever collected — real GitHub users always get a default identicon — is almost
-always a bot the login/type patterns missed).
+`Type == "Bot"`, `[bot]`/`-bot`/`-robot` suffixes, or exact logins
+`copilot`/`dependabot`/`github-actions`/`codecov-commenter`).
 
 **History:** this fork previously carried a much larger divergence here — a
 two-pass design (`ConvertAccounts` + a separate `convertOrphanedRepoAccounts`

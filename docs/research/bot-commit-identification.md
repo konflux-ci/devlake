@@ -303,14 +303,7 @@ Upstream's rewritten `ConvertAccounts` (Step 1.3) projects rows via a local
   to the query's `SELECT`.
 - Set `IsBot` via `isBotAccount(login, type)` based on:
   - `Type == "Bot"`
-  - Login matches `*[bot]`, `-bot`, `-robot`, or contains `copilot`/`dependabot`/`github-actions`
-- Additionally flag accounts with **no enrichment at all**
-  (`AvatarUrl == ""`) as bots: GitHub's REST API returns 404 for most bot
-  profiles, so an account with no avatar ever collected (real users always
-  get a default identicon) is almost always a bot the login/type patterns
-  missed. This replaces the old orphan-pass's blanket "orphans are almost
-  always bots" heuristic with an equivalent signal inside the unified query,
-  without needing a second pass.
+  - Login matches `*[bot]`, `-bot`, `-robot`, or exact logins `copilot`/`dependabot`/`github-actions`/`codecov-commenter`
 
 **Step 4: Populate `IsBot` in GitLab account convertor**
 

@@ -163,8 +163,8 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 
 // isBotAccount reports whether a GitHub account identifies a bot, based on
 // the API-reported account type or well-known login conventions ([bot]
-// suffix for GitHub Apps, -bot/-robot suffixes, copilot/dependabot/
-// github-actions/codecov-commenter logins).
+// suffix for GitHub Apps, -bot/-robot suffixes, or exact logins
+// copilot/dependabot/github-actions/codecov-commenter).
 func isBotAccount(login string, accountType string) bool {
 	if accountType == "Bot" {
 		return true
@@ -175,26 +175,15 @@ func isBotAccount(login string, accountType string) bool {
 		strings.HasSuffix(lowerLogin, "-robot") {
 		return true
 	}
-	return strings.Contains(lowerLogin, "copilot") ||
-		strings.Contains(lowerLogin, "dependabot") ||
-		strings.Contains(lowerLogin, "github-actions") ||
-		strings.Contains(lowerLogin, "codecov-commenter")
-}
-
-// hasNoProfileData reports whether a repo-referenced account was never
-// enriched with a _tool_github_accounts profile row. GitHub's REST API
-// returns 404 for most bot profiles, so an account with no avatar_url ever
-// collected (real GitHub users always have one, even a default identicon)
-// is almost always a bot that login/type pattern matching missed. Best
-// effort: a transient API timeout or rate-limit during collection can leave
-// a real user's profile uncollected too, not just a bot's.
-func hasNoProfileData(row *repoAccountForConvert) bool {
-	return row.AvatarUrl == ""
+	return lowerLogin == "copilot" ||
+		lowerLogin == "dependabot" ||
+		lowerLogin == "github-actions" ||
+		lowerLogin == "codecov-commenter"
 }
 
 // buildDomainAccount converts a repo-referenced account row (enriched with
 // profile detail when available) into a domain Account, flagging bot
-// identities via isBotAccount and hasNoProfileData.
+// identities via isBotAccount.
 func buildDomainAccount(id string, row *repoAccountForConvert, orgStr string) *crossdomain.Account {
 	fullName := row.Name
 	if fullName == "" {
@@ -207,6 +196,6 @@ func buildDomainAccount(id string, row *repoAccountForConvert, orgStr string) *c
 		UserName:     row.Login,
 		AvatarUrl:    row.AvatarUrl,
 		Organization: orgStr,
-		IsBot:        isBotAccount(row.Login, row.Type) || hasNoProfileData(row),
+		IsBot:        isBotAccount(row.Login, row.Type),
 	}
 }
