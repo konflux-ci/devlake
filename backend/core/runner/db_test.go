@@ -22,47 +22,33 @@ import (
 	"testing"
 )
 
-func Test_addLocal(t *testing.T) {
-	values, _ := url.ParseQuery("charset=utf8mb4&parseTime=True")
-	type args struct {
-		query url.Values
+func TestSanitizeQuery_RemovesCaCert(t *testing.T) {
+	q := url.Values{}
+	q.Set("charset", "utf8mb4")
+	q.Set("ca-cert", "/etc/ssl/rds-ca.pem")
+	q.Set("loc", "UTC")
+
+	result := sanitizeQuery(q)
+
+	if q.Get("ca-cert") != "" {
+		t.Error("sanitizeQuery should remove ca-cert from query")
 	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "test add local",
-			args: args{
-				query: values,
-			},
-			want: "charset=utf8mb4&loc=Local&parseTime=True",
-		},
-		{
-			name: "test add local",
-			args: args{
-				query: url.Values{
-					"local": []string{"abc"},
-				},
-			},
-			want: "loc=Local&local=abc",
-		},
-		{
-			name: "test add local",
-			args: args{
-				query: url.Values{
-					"loc": []string{"abc"},
-				},
-			},
-			want: "loc=abc",
-		},
+	if q.Get("loc") != "UTC" {
+		t.Error("sanitizeQuery should preserve existing loc value")
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := sanitizeQuery(tt.args.query); got != tt.want {
-				t.Errorf("sanitizeQuery() = %v, want %v", got, tt.want)
-			}
-		})
+	// ca-cert should not appear in the encoded result
+	if result != "charset=utf8mb4&loc=UTC" {
+		t.Errorf("unexpected query string: %s", result)
+	}
+}
+
+func TestSanitizeQuery_SetsDefaultLoc(t *testing.T) {
+	q := url.Values{}
+	q.Set("charset", "utf8mb4")
+
+	sanitizeQuery(q)
+
+	if q.Get("loc") != "Local" {
+		t.Errorf("expected default loc=Local, got %s", q.Get("loc"))
 	}
 }
