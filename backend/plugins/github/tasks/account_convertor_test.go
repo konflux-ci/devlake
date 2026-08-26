@@ -36,6 +36,7 @@ func TestIsBotAccount(t *testing.T) {
 		// [bot] suffix - GitHub Apps.
 		{"github app bot suffix", "renovate[bot]", "", true},
 		{"github-actions bot suffix", "github-actions[bot]", "", true},
+		{"codecov bot suffix", "codecov-commenter[bot]", "", true},
 		{"coderabbit bot suffix", "coderabbit[bot]", "", true},
 		{"cursor bot suffix", "cursor[bot]", "", true},
 		{"claude bot suffix", "claude[bot]", "", true},
