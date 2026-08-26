@@ -35,6 +35,7 @@ func TestHasValidAccountId(t *testing.T) {
 		// phantom domain ID (e.g. "github:GithubAccount:1:0") that matches
 		// no row in accounts.
 		{"zero id is a phantom null-author marker", 0, false},
+		{"negative id is invalid", -1, false},
 		{"positive id is a valid account", 123456, true},
 	}
 

@@ -38,7 +38,7 @@ func init() {
 // that zero as a real ID generates a phantom domain ID that matches no row
 // in accounts.
 func hasValidAccountId(toolAccountId int) bool {
-	return toolAccountId != 0
+	return toolAccountId > 0
 }
 
 var ConvertPullRequestsMeta = plugin.SubTaskMeta{
