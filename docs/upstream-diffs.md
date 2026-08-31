@@ -266,3 +266,22 @@ only: `project_<id>_bot...`/`group_<id>_bot...` access-token prefixes,
 **Rebase notes:** Upstream's `account_convertor.go` for GitLab is currently
 unchanged from the version this fork started from (single `Convert` closure,
 no orphan handling) — low conflict risk, isolated to the `Convert` closure body.
+
+## ci: automatic upstream-sync PRs
+
+**Files:**
+- `.github/workflows/upstream-sync.yml`
+- `.github/scripts/upstream-sync.sh`
+
+**Reason:** Opens (or updates) a single `chore/upstream-sync` PR when Apache
+DevLake publishes a new major/minor/patch or numbered-beta tag. The PR head is
+the upstream tag so GitHub reports real merge conflicts. The workflow never
+merges. Guarded to `konflux-ci/devlake` so it cannot run on `apache/devlake`.
+
+**Upstream status:** N/A — Konflux-only automation.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** New files; no upstream equivalent. If upstream adds a workflow
+or script with the same path, pick a different name. The job `if:` must keep
+excluding `apache/devlake`.
