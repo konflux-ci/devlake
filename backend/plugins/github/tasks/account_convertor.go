@@ -22,6 +22,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
@@ -29,6 +30,20 @@ import (
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/github/models"
 )
+
+// repoAccountForConvert is the row projected by ConvertAccounts' query: every
+// account referenced by the repo (from _tool_github_repo_accounts), enriched
+// with profile detail from _tool_github_accounts when it was collected. The
+// embedded NoPKModel carries the RawDataOrigin across to the domain row.
+type repoAccountForConvert struct {
+	Id        int
+	Login     string
+	Name      string
+	Email     string
+	AvatarUrl string
+	Type      string
+	common.NoPKModel
+}
 
 func init() {
 	RegisterSubtaskMeta(&ConvertAccountsMeta)
@@ -38,12 +53,12 @@ var ConvertAccountsMeta = plugin.SubTaskMeta{
 	Name:             "Convert Users",
 	EntryPoint:       ConvertAccounts,
 	EnabledByDefault: true,
-	Description:      "Convert tool layer table github_accounts into  domain layer table accounts",
+	Description:      "Convert every account referenced by the repo (tool layer repo_accounts, enriched by github_accounts) into domain layer table accounts",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CROSS},
 	DependencyTables: []string{
-		models.GithubAccount{}.TableName(),     // cursor
-		models.GithubRepoAccount{}.TableName(), // cursor
-		models.GithubAccountOrg{}.TableName()}, // account id gen
+		models.GithubRepoAccount{}.TableName(), // cursor (every user referenced by the repo)
+		models.GithubAccount{}.TableName(),     // left-join enrichment (profile detail, optional)
+		models.GithubAccountOrg{}.TableName()}, // org pluck
 	ProductTables: []string{crossdomain.Account{}.TableName()},
 }
 
@@ -53,7 +68,7 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 
 	accountIdGen := didgen.NewDomainIdGenerator(&models.GithubAccount{})
 
-	converter, err := api.NewStatefulDataConverter(&api.StatefulDataConverterArgs[models.GithubAccount]{
+	converter, err := api.NewStatefulDataConverter(&api.StatefulDataConverterArgs[repoAccountForConvert]{
 		SubtaskCommonArgs: &api.SubtaskCommonArgs{
 			SubTaskContext: taskCtx,
 			Table:          RAW_ACCOUNT_TABLE,
@@ -64,27 +79,56 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 		},
 		Input: func(stateManager *api.SubtaskStateManager) (dal.Rows, errors.Error) {
 			clauses := []dal.Clause{
-				dal.Select("_tool_github_accounts.*"),
-				dal.From(&models.GithubAccount{}),
+				// Enrichment fields (name/email/avatar/type) prefer ga: it's the richer,
+				// individually-fetched profile. Raw-data provenance prefers the opposite —
+				// _tool_github_repo_accounts, not ga — because ga (_tool_github_accounts)
+				// is keyed by (connection_id, id) only, not repo-scoped, so a shared
+				// account's ga row can carry a different repo's raw scope. Full-refresh
+				// deletion matches domain rows by _raw_data_table/_raw_data_params against
+				// the current subtask's own scope; stamping a shared account with the
+				// wrong repo's provenance would make it deletable by that other repo's
+				// full sync. repo_accounts is always present (FROM, not LEFT JOIN) and its
+				// provenance is set by the repo-scoped extractor that created it, so it's
+				// always correctly scoped to this conversion run.
+				dal.Select(`_tool_github_repo_accounts.account_id AS id,
+					_tool_github_repo_accounts.login AS login,
+					COALESCE(ga.name, '') AS name,
+					COALESCE(ga.email, '') AS email,
+					COALESCE(ga.avatar_url, '') AS avatar_url,
+					COALESCE(ga.type, '') AS type,
+					COALESCE(_tool_github_repo_accounts._raw_data_params, ga._raw_data_params, '') AS _raw_data_params,
+					COALESCE(_tool_github_repo_accounts._raw_data_table, ga._raw_data_table, '') AS _raw_data_table,
+					COALESCE(_tool_github_repo_accounts._raw_data_id, ga._raw_data_id, 0) AS _raw_data_id,
+					COALESCE(_tool_github_repo_accounts._raw_data_remark, ga._raw_data_remark, '') AS _raw_data_remark`),
+				dal.From(&models.GithubRepoAccount{}),
+				dal.Join(`left join _tool_github_accounts ga on (
+					ga.connection_id = _tool_github_repo_accounts.connection_id
+					AND ga.id = _tool_github_repo_accounts.account_id
+				)`),
 				dal.Where(
-					"repo_github_id = ? and _tool_github_accounts.connection_id=?",
+					`_tool_github_repo_accounts.repo_github_id = ?
+						AND _tool_github_repo_accounts.connection_id = ?
+						AND _tool_github_repo_accounts.account_id > 0`,
 					data.Options.GithubId,
 					data.Options.ConnectionId,
 				),
-				dal.Join(`left join _tool_github_repo_accounts gra on (
-					_tool_github_accounts.connection_id = gra.connection_id
-					AND _tool_github_accounts.id = gra.account_id
-				)`),
 			}
 			if stateManager.IsIncremental() {
 				since := stateManager.GetSince()
 				if since != nil {
-					clauses = append(clauses, dal.Where("_tool_github_accounts.updated_at >= ?", since))
+					// Either side of the join can be the one that changed: a repo_account
+					// row updates when the repo's membership changes, but the enrichment
+					// profile (name/email/avatar/type — including the signals IsBot reads)
+					// lives on ga and has its own updated_at.
+					clauses = append(clauses, dal.Where(
+						"(_tool_github_repo_accounts.updated_at >= ? OR ga.updated_at >= ?)",
+						since, since,
+					))
 				}
 			}
 			return db.Cursor(clauses...)
 		},
-		Convert: func(githubUser *models.GithubAccount) ([]interface{}, errors.Error) {
+		Convert: func(githubUser *repoAccountForConvert) ([]interface{}, errors.Error) {
 			// query related orgs
 			var orgs []string
 			err := db.Pluck(`org_login`, &orgs,
@@ -104,14 +148,7 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 				}
 			}
 
-			domainUser := &crossdomain.Account{
-				DomainEntity: domainlayer.DomainEntity{Id: accountIdGen.Generate(data.Options.ConnectionId, githubUser.Id)},
-				Email:        githubUser.Email,
-				FullName:     githubUser.Name,
-				UserName:     githubUser.Login,
-				AvatarUrl:    githubUser.AvatarUrl,
-				Organization: orgStr,
-			}
+			domainUser := buildDomainAccount(accountIdGen.Generate(data.Options.ConnectionId, githubUser.Id), githubUser, orgStr)
 			return []interface{}{
 				domainUser,
 			}, nil
@@ -121,66 +158,44 @@ func ConvertAccounts(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	err = converter.Execute()
-	if err != nil {
-		return err
-	}
-
-	// Second pass: create domain Account rows for repo accounts that have no
-	// matching _tool_github_accounts record. This typically happens for GitHub
-	// App bot accounts (e.g. "dependabot[bot]", "renovate[bot]") because the
-	// /users/<login> API returns 404 for bots, so no GithubAccount row is
-	// created during collection.
-	return convertOrphanedRepoAccounts(taskCtx, db, data, accountIdGen)
+	return converter.Execute()
 }
 
-// convertOrphanedRepoAccounts finds GithubRepoAccount entries that have no
-// corresponding GithubAccount row (typically bot accounts) and creates minimal
-// domain Account records for them so that dashboard JOINs on accounts don't
-// lose bot identity.
-func convertOrphanedRepoAccounts(taskCtx plugin.SubTaskContext, db dal.Dal, data *GithubTaskData, accountIdGen *didgen.DomainIdGenerator) errors.Error {
-	cursor, err := db.Cursor(
-		dal.Select("_tool_github_repo_accounts.*"),
-		dal.From(&models.GithubRepoAccount{}),
-		dal.Where(
-			"_tool_github_repo_accounts.repo_github_id = ? AND _tool_github_repo_accounts.connection_id = ?",
-			data.Options.GithubId,
-			data.Options.ConnectionId,
-		),
-		dal.Join(`LEFT JOIN _tool_github_accounts ga ON (
-			_tool_github_repo_accounts.connection_id = ga.connection_id
-			AND _tool_github_repo_accounts.account_id = ga.id
-		)`),
-		dal.Where("ga.id IS NULL"),
-	)
-	if err != nil {
-		return err
+// isBotAccount reports whether a GitHub account identifies a bot, based on
+// the API-reported account type or well-known login conventions ([bot]
+// suffix for GitHub Apps, -bot/-robot suffixes, or exact logins
+// copilot/dependabot/github-actions/codecov-commenter).
+func isBotAccount(login string, accountType string) bool {
+	if accountType == "Bot" {
+		return true
 	}
-	defer cursor.Close()
+	lowerLogin := strings.ToLower(login)
+	if strings.HasSuffix(lowerLogin, "[bot]") ||
+		strings.HasSuffix(lowerLogin, "-bot") ||
+		strings.HasSuffix(lowerLogin, "-robot") {
+		return true
+	}
+	return lowerLogin == "copilot" ||
+		lowerLogin == "dependabot" ||
+		lowerLogin == "github-actions" ||
+		lowerLogin == "codecov-commenter"
+}
 
-	logger := taskCtx.GetLogger()
-	for cursor.Next() {
-		var orphan models.GithubRepoAccount
-		err = db.Fetch(cursor, &orphan)
-		if err != nil {
-			return err
-		}
-		logger.Info("creating domain account for orphaned repo account (likely bot): login=%s, id=%d", orphan.Login, orphan.AccountId)
-		domainUser := &crossdomain.Account{
-			DomainEntity: domainlayer.DomainEntity{
-				Id: accountIdGen.Generate(data.Options.ConnectionId, orphan.AccountId),
-			},
-			UserName: orphan.Login,
-			FullName: orphan.Login,
-		}
-		err = db.CreateOrUpdate(domainUser)
-		if err != nil {
-			return err
-		}
+// buildDomainAccount converts a repo-referenced account row (enriched with
+// profile detail when available) into a domain Account, flagging bot
+// identities via isBotAccount.
+func buildDomainAccount(id string, row *repoAccountForConvert, orgStr string) *crossdomain.Account {
+	fullName := row.Name
+	if fullName == "" {
+		fullName = row.Login
 	}
-	if err := cursor.Err(); err != nil {
-		return errors.Default.Wrap(err, "iterating repo accounts cursor")
+	return &crossdomain.Account{
+		DomainEntity: domainlayer.DomainEntity{Id: id},
+		Email:        row.Email,
+		FullName:     fullName,
+		UserName:     row.Login,
+		AvatarUrl:    row.AvatarUrl,
+		Organization: orgStr,
+		IsBot:        isBotAccount(row.Login, row.Type),
 	}
-
-	return nil
 }

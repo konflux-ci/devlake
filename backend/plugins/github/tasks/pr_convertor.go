@@ -32,6 +32,15 @@ func init() {
 	RegisterSubtaskMeta(&ConvertPullRequestsMeta)
 }
 
+// hasValidAccountId reports whether a tool-layer GitHub account ID refers to
+// a real account. GitHub's REST API returns author/merged_by = null for many
+// bot PRs, which the tool layer stores as AuthorId/MergedById = 0; treating
+// that zero as a real ID generates a phantom domain ID that matches no row
+// in accounts.
+func hasValidAccountId(toolAccountId int) bool {
+	return toolAccountId > 0
+}
+
 var ConvertPullRequestsMeta = plugin.SubTaskMeta{
 	Name:             "Convert Pull Requests",
 	EntryPoint:       ConvertPullRequests,
@@ -87,7 +96,6 @@ func ConvertPullRequests(taskCtx plugin.SubTaskContext) errors.Error {
 				OriginalStatus: pr.State,
 				Title:          pr.Title,
 				Url:            pr.Url,
-				AuthorId:       accountIdGen.Generate(data.Options.ConnectionId, pr.AuthorId),
 				AuthorName:     pr.AuthorName,
 				Description:    pr.Body,
 				CreatedDate:    pr.GithubCreatedAt,
@@ -104,8 +112,16 @@ func ConvertPullRequests(taskCtx plugin.SubTaskContext) errors.Error {
 				Additions:      pr.Additions,
 				Deletions:      pr.Deletions,
 				MergedByName:   pr.MergedByName,
-				MergedById:     accountIdGen.Generate(data.Options.ConnectionId, pr.MergedById),
 				IsDraft:        pr.IsDraft,
+			}
+			// Generate account ids only for real users (#8886): a zero AuthorId (deleted
+			// user) or zero MergedById (unmerged PR) would otherwise produce an id like
+			// github:GithubAccount:1:0 that no accounts row can ever match.
+			if hasValidAccountId(pr.AuthorId) {
+				domainPr.AuthorId = accountIdGen.Generate(data.Options.ConnectionId, pr.AuthorId)
+			}
+			if hasValidAccountId(pr.MergedById) {
+				domainPr.MergedById = accountIdGen.Generate(data.Options.ConnectionId, pr.MergedById)
 			}
 			if pr.State == "open" || pr.State == "OPEN" {
 				domainPr.Status = code.OPEN

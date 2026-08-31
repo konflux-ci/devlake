@@ -15,25 +15,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crossdomain
+package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/models/domainlayer"
-	"time"
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/plugin"
 )
 
-type Account struct {
-	domainlayer.DomainEntity
-	Email        string `gorm:"type:varchar(255)"`
-	FullName     string `gorm:"type:varchar(255)"`
-	UserName     string `gorm:"type:varchar(255)"`
-	AvatarUrl    string `gorm:"type:varchar(255)"`
-	Organization string `gorm:"type:varchar(255)"`
-	CreatedDate  *time.Time
-	Status       int
-	IsBot        bool `gorm:"type:boolean;default:false"`
+var _ plugin.MigrationScript = (*addIsBotToAccounts)(nil)
+
+type account20260715 struct {
+	IsBot bool `gorm:"type:boolean;default:false"`
 }
 
-func (Account) TableName() string {
+func (account20260715) TableName() string {
 	return "accounts"
+}
+
+type addIsBotToAccounts struct{}
+
+func (*addIsBotToAccounts) Up(basicRes context.BasicRes) errors.Error {
+	db := basicRes.GetDal()
+	if err := db.AutoMigrate(&account20260715{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (*addIsBotToAccounts) Version() uint64 {
+	return 20260715000001
+}
+
+func (*addIsBotToAccounts) Name() string {
+	return "add is_bot to accounts"
 }
