@@ -26,7 +26,7 @@
 # DEPRECATED: Prefer backend/Containerfile (UBI 9) for local and Konflux builds.
 # This simplified local Debian Dockerfile is retained temporarily and will be removed later.
 
-FROM golang:1.26-bookworm as builder
+FROM golang:1.27-bookworm as builder
 
 ARG GOPROXY=
 ARG HTTP_PROXY=
