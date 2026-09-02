@@ -31,7 +31,7 @@ require (
 	github.com/tidwall/gjson v1.14.3
 	github.com/viant/afs v1.16.0
 	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
+	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sync v0.16.0
 	gorm.io/datatypes v1.0.1
