@@ -90,7 +90,7 @@ func collectSingleJobApiBuilds(taskCtx plugin.SubTaskContext) errors.Error {
 				Query: func(reqData *helper.RequestData, createdAfter *time.Time) (url.Values, errors.Error) {
 					query := url.Values{}
 					treeValue := fmt.Sprintf(
-						"allBuilds[timestamp,number,duration,building,estimatedDuration,fullDisplayName,result,actions[lastBuiltRevision[SHA1,branch[name]],remoteUrls,mercurialRevisionNumber,causes[*]],changeSet[kind,revisions[revision]]]{%d,%d}",
+						"allBuilds[timestamp,number,duration,building,estimatedDuration,fullDisplayName,result,actions[lastBuiltRevision[SHA1,branch[name]],remoteUrls,mercurialRevisionNumber,causes[*],parameters[name,value]],changeSet[kind,revisions[revision]]]{%d,%d}",
 						reqData.Pager.Skip, reqData.Pager.Skip+reqData.Pager.Size)
 					query.Set("tree", treeValue)
 					return query, nil
@@ -189,7 +189,7 @@ func collectMultiBranchJobApiBuilds(taskCtx plugin.SubTaskContext) errors.Error 
 		UrlTemplate: "{{ .Input.Path }}api/json",
 		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
-			treeValue := "allBuilds[timestamp,number,duration,building,estimatedDuration,fullDisplayName,result,actions[lastBuiltRevision[SHA1,branch[name]],remoteUrls,mercurialRevisionNumber,causes[*]],changeSet[kind,revisions[revision]]]"
+			treeValue := "allBuilds[timestamp,number,duration,building,estimatedDuration,fullDisplayName,result,actions[lastBuiltRevision[SHA1,branch[name]],remoteUrls,mercurialRevisionNumber,causes[*],parameters[name,value]],changeSet[kind,revisions[revision]]]"
 			query.Set("tree", treeValue)
 
 			logger.Debug("Query: %v", query)

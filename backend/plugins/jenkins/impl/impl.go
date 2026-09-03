@@ -72,6 +72,7 @@ func (p Jenkins) GetTablesInfo() []dal.Tabler {
 	return []dal.Tabler{
 		&models.JenkinsBuild{},
 		&models.JenkinsBuildCommit{},
+		&models.JenkinsBuildParameter{},
 		&models.JenkinsConnection{},
 		&models.JenkinsJob{},
 		&models.JenkinsJobDag{},
@@ -145,11 +146,16 @@ func (p Jenkins) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 	if err := regexEnricher.TryAdd(devops.PRODUCTION, op.ScopeConfig.ProductionPattern); err != nil {
 		return nil, errors.BadInput.Wrap(err, "invalid value for `productionPattern`")
 	}
+	fieldExtractor, err := tasks.NewFieldExtractor(op.ScopeConfig, logger)
+	if err != nil {
+		return nil, err
+	}
 	taskData := &tasks.JenkinsTaskData{
-		Options:       op,
-		ApiClient:     apiClient,
-		Connection:    connection,
-		RegexEnricher: regexEnricher,
+		Options:        op,
+		ApiClient:      apiClient,
+		Connection:     connection,
+		RegexEnricher:  regexEnricher,
+		FieldExtractor: fieldExtractor,
 	}
 
 	return taskData, nil
@@ -278,7 +284,7 @@ func EnrichOptions(taskCtx plugin.TaskContext,
 		op.JobPath = fmt.Sprintf("%s/", op.JobPath)
 	}
 	// We only set op.JenkinsScopeConfig when it's nil and we have op.ScopeConfigId != 0
-	if op.ScopeConfig.DeploymentPattern == "" && op.ScopeConfig.ProductionPattern == "" && op.ScopeConfigId != 0 {
+	if op.ScopeConfigId != 0 && (op.ScopeConfig == nil || (op.ScopeConfig.DeploymentPattern == "" && op.ScopeConfig.ProductionPattern == "")) {
 		var scopeConfig models.JenkinsScopeConfig
 		err = taskCtx.GetDal().First(&scopeConfig, dal.Where("id = ?", op.ScopeConfigId))
 		if err != nil {
@@ -287,7 +293,7 @@ func EnrichOptions(taskCtx plugin.TaskContext,
 		op.ScopeConfig = &scopeConfig
 	}
 
-	if op.ScopeConfig.DeploymentPattern == "" && op.ScopeConfig.ProductionPattern == "" && op.ScopeConfigId == 0 {
+	if (op.ScopeConfig == nil || (op.ScopeConfig.DeploymentPattern == "" && op.ScopeConfig.ProductionPattern == "")) && op.ScopeConfigId == 0 {
 		op.ScopeConfig = new(models.JenkinsScopeConfig)
 	}
 
