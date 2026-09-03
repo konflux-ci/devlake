@@ -31,6 +31,7 @@ func GetDomainTablesInfo() []dal.Tabler {
 	return []dal.Tabler{
 		// code
 		&code.AiReview{},
+		&code.AiCommit{},
 		&code.AiFailurePrediction{},
 		&code.AiPredictionMetrics{},
 		&code.Commit{},

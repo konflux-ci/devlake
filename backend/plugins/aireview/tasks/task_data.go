@@ -65,7 +65,7 @@ type AiReviewTaskData struct {
 	QodoPatternRegex          *regexp.Regexp
 	GeminiUsernameRegex       *regexp.Regexp
 	GeminiPatternRegex        *regexp.Regexp
-	AiCommitPatternsRegex     []*regexp.Regexp
+	AiCommitPatternsRegex     *regexp.Regexp
 	AiPrLabelPatternRegex     *regexp.Regexp
 	RiskHighPatternRegex      *regexp.Regexp
 	RiskMediumPatternRegex    *regexp.Regexp
@@ -189,6 +189,14 @@ func CompilePatterns(taskData *AiReviewTaskData) errors.Error {
 		taskData.AiPrLabelPatternRegex, err = regexp.Compile(config.AiPrLabelPattern)
 		if err != nil {
 			return errors.BadInput.Wrap(err, "invalid aiPrLabelPattern")
+		}
+	}
+
+	// Extra catch-all regex for AI-assisted commit messages (single pattern, not comma-split)
+	if config.AiCommitPatterns != "" {
+		taskData.AiCommitPatternsRegex, err = regexp.Compile(config.AiCommitPatterns)
+		if err != nil {
+			return errors.BadInput.Wrap(err, "invalid aiCommitPatterns")
 		}
 	}
 

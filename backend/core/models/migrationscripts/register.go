@@ -148,5 +148,6 @@ func All() []plugin.MigrationScript {
 		new(addAiReviewDomainTables),
 		new(fixAiReviewDomainColumns),
 		new(addIsBotToAccounts),
+		new(addAiCommitsDomain),
 	}
 }

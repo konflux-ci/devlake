@@ -117,6 +117,7 @@ func TestCompilePatterns_AllToolsEnabled(t *testing.T) {
 	assert.NotNil(t, taskData.RiskHighPatternRegex)
 	assert.NotNil(t, taskData.RiskMediumPatternRegex)
 	assert.NotNil(t, taskData.RiskLowPatternRegex)
+	assert.NotNil(t, taskData.AiCommitPatternsRegex)
 }
 
 func TestCompilePatterns_NilConfigUsesDefaults(t *testing.T) {
@@ -253,4 +254,43 @@ func TestCompilePatterns_InvalidAiPrLabelPattern(t *testing.T) {
 	err := CompilePatterns(taskData)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "aiPrLabelPattern")
+}
+
+func TestCompilePatterns_AiCommitPatterns(t *testing.T) {
+	config := models.GetDefaultScopeConfig()
+	taskData := &AiReviewTaskData{
+		Options: &AiReviewOptions{
+			ScopeConfig: config,
+		},
+	}
+	err := CompilePatterns(taskData)
+	assert.Nil(t, err)
+	assert.NotNil(t, taskData.AiCommitPatternsRegex)
+	assert.True(t, taskData.AiCommitPatternsRegex.MatchString("Co-Authored-By: ChatGPT <noreply@openai.com>"))
+}
+
+func TestCompilePatterns_InvalidAiCommitPatterns(t *testing.T) {
+	config := models.GetDefaultScopeConfig()
+	config.AiCommitPatterns = "[invalid"
+	taskData := &AiReviewTaskData{
+		Options: &AiReviewOptions{
+			ScopeConfig: config,
+		},
+	}
+	err := CompilePatterns(taskData)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "aiCommitPatterns")
+}
+
+func TestCompilePatterns_EmptyAiCommitPatternsSkips(t *testing.T) {
+	config := models.GetDefaultScopeConfig()
+	config.AiCommitPatterns = ""
+	taskData := &AiReviewTaskData{
+		Options: &AiReviewOptions{
+			ScopeConfig: config,
+		},
+	}
+	err := CompilePatterns(taskData)
+	assert.Nil(t, err)
+	assert.Nil(t, taskData.AiCommitPatternsRegex)
 }

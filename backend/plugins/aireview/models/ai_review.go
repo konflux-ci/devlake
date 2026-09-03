@@ -69,9 +69,9 @@ type AiReview struct {
 	PreMergeChecksInconclusive int `gorm:"default:0"` // Number of inconclusive checks
 
 	// Suggestion acceptance tracking
-	SuggestionsAccepted     int `gorm:"default:0"` // Number of suggestions accepted/applied by developer (marker-based)
-	SuggestionsDiffAccepted   int     `gorm:"default:0"`    // Count of suggestions with diff-based match
-	SuggestionsDiffAcceptPct  float64 `gorm:"default:0"`    // Average acceptance % across matched suggestions
+	SuggestionsAccepted      int     `gorm:"default:0"` // Number of suggestions accepted/applied by developer (marker-based)
+	SuggestionsDiffAccepted  int     `gorm:"default:0"` // Count of suggestions with diff-based match
+	SuggestionsDiffAcceptPct float64 `gorm:"default:0"` // Average acceptance % across matched suggestions
 
 	// Developer reactions to the AI review comment
 	ReactionsTotalCount int `gorm:"default:0"`
@@ -92,12 +92,17 @@ func (AiReview) TableName() string {
 
 // AI tool type constants
 const (
-	AiToolCodeRabbit   = "coderabbit"
-	AiToolCursorBugbot = "cursor_bugbot"
-	AiToolQodo         = "qodo"
-	AiToolGemini       = "gemini"
-	AiToolSonarQube    = "sonarqube"
-	AiToolCopilot      = "copilot"
+	AiToolCodeRabbit        = "coderabbit"
+	AiToolCursorBugbot      = "cursor_bugbot"
+	AiToolCursor            = "cursor"
+	AiToolClaude            = "claude"
+	AiToolQodo              = "qodo"
+	AiToolGemini            = "gemini"
+	AiToolSonarQube         = "sonarqube"
+	AiToolCopilot           = "copilot"
+	AiToolAssistedByUnknown = "assisted_by_unknown"
+	AiToolMadeWithUnknown   = "made_with_unknown"
+	AiToolOther             = "other"
 )
 
 // Risk level constants

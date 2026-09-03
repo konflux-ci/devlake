@@ -78,12 +78,20 @@ func (p AiReview) RequiredDataEntities() (data []map[string]interface{}, err err
 				"body":            "string",
 			},
 		},
+		{
+			"model": "commits",
+			"requiredFields": map[string]string{
+				"sha":     "string",
+				"message": "string",
+			},
+		},
 	}, nil
 }
 
 func (p AiReview) GetTablesInfo() []dal.Tabler {
 	return []dal.Tabler{
 		&models.AiReview{},
+		&models.AiCommit{},
 		&models.AiReviewFinding{},
 		&models.AiFailurePrediction{},
 		&models.AiPredictionMetrics{},
@@ -97,7 +105,7 @@ func (p AiReview) IsProjectMetric() bool {
 
 func (p AiReview) RunAfter() ([]string, errors.Error) {
 	// Run after GitHub or GitLab plugins have collected PR data
-	return []string{"github", "gitlab"}, nil
+	return []string{"github", "gitlab", "gitextractor"}, nil
 }
 
 func (p AiReview) Settings() interface{} {
@@ -107,10 +115,12 @@ func (p AiReview) Settings() interface{} {
 func (p AiReview) SubTaskMetas() []plugin.SubTaskMeta {
 	return []plugin.SubTaskMeta{
 		tasks.ExtractAiReviewsMeta,
+		tasks.ExtractAiCommitsMeta,
 		tasks.EnrichGithubReviewReactionsMeta,
 		tasks.EnrichGitlabReviewReactionsMeta,
 		tasks.ExtractAiReviewFindingsMeta,
 		tasks.ConvertAiReviewsMeta,
+		tasks.ConvertAiCommitsMeta,
 		tasks.MatchSuggestionDiffsMeta,
 		tasks.FetchMissingCiJobsMeta,
 		tasks.CalculateFailurePredictionsMeta,
@@ -241,10 +251,12 @@ func (p AiReview) MakeMetricPluginPipelinePlanV200(projectName string, options j
 				Options: opts,
 				Subtasks: []string{
 					tasks.ExtractAiReviewsMeta.Name,
+					tasks.ExtractAiCommitsMeta.Name,
 					tasks.EnrichGithubReviewReactionsMeta.Name,
 					tasks.EnrichGitlabReviewReactionsMeta.Name,
 					tasks.ExtractAiReviewFindingsMeta.Name,
 					tasks.ConvertAiReviewsMeta.Name,
+					tasks.ConvertAiCommitsMeta.Name,
 					tasks.MatchSuggestionDiffsMeta.Name,
 					tasks.FetchMissingCiJobsMeta.Name,
 					tasks.CalculateFailurePredictionsMeta.Name,

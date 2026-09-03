@@ -32,6 +32,31 @@ Stores extracted AI-generated code reviews from pull request comments.
 | `source_platform` | string | Source platform: `github`, `gitlab` |
 | `source_url` | string | URL to the pull request |
 
+### `_tool_aireview_commits`
+
+Sparse table of commits classified as AI-assisted. Only AI-positive commits are stored.
+Bot identity is **not** stored here — join `accounts.is_bot`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | string | Unique ID (hash of `repo_id:sha`) |
+| `commit_sha` | string | Commit SHA |
+| `repo_id` | string | Domain layer repository ID |
+| `ai_tool` | string | `cursor`, `claude`, `copilot`, `coderabbit`, `assisted_by_unknown`, `made_with_unknown`, `other` |
+| `author_name` | string | Git author name |
+| `authored_date` | datetime | Commit authored date |
+
+### `ai_commits`
+
+Project-scoped domain copy of `_tool_aireview_commits` (same columns plus `project_name`). Grafana and n8n should join this table, not `_tool_aireview_commits`.
+
+After an aireview **project** pipeline run:
+
+- `aiAssisted` / `aiToolUsed` = `LEFT JOIN ai_commits` (use `ai_tool` as stored; do not remap in SQL)
+- `bot` = `accounts.is_bot` and not in `ai_commits`
+- `human` = neither of the above, excluding merge-commit message prefixes (`Merge pull request #`, `Merge branch `, `Merge remote-tracking branch `)
+- Merge commits are not bots. Join `accounts` on `email` / `user_name` (`commits.author_id` is a git email, not `accounts.id`).
+
 ### `_tool_aireview_findings`
 
 Individual issues, suggestions, or observations extracted from reviews.

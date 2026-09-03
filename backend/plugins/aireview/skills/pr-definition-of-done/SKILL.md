@@ -30,9 +30,11 @@ description: >-
 ## Plugin-Specific
 
 - [ ] New AI tool patterns added to `AiReviewScopeConfig` and `CompilePatterns()`
-- [ ] `detectAiTool()` updated if new tool support added
+- [ ] `detectAiTool()` updated if new review-tool support added
+- [ ] `detectAiCommit()` updated if commit-trailer detection changes
 - [ ] Scope config defaults updated in `GetDefaultScopeConfig()`
 - [ ] E2E CSV fixtures updated if domain output changed (`e2e/raw_tables/`)
+- [ ] New domain tables: model in `backend/core/models/domainlayer/`, migration in `backend/core/models/migrationscripts/`, registered in `domaininfo.go`
 
 ## CI Behavior
 

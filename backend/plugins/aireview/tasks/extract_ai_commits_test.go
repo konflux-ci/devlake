@@ -15,23 +15,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package tasks
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// All returns all migration scripts for the aireview plugin
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		&initSchema{},
-		&addEffortAndChecks{},
-		&addGeminiConfig{},
-		&addReactions{},
-		&addCiPredictionSupport{},
-		&addFlakyInfraFilters{},
-		&addSuggestionsAccepted{},
-		&addDiffMatching{},
-		&addAiCommits{},
-	}
+func TestGenerateAiCommitId(t *testing.T) {
+	id1 := generateAiCommitId("repo-1", "abc123")
+	id2 := generateAiCommitId("repo-1", "abc123")
+	assert.Equal(t, id1, id2)
+	assert.True(t, len(id1) > 0)
+	assert.Contains(t, id1, "aireview-commit:")
+
+	id3 := generateAiCommitId("repo-2", "abc123")
+	assert.NotEqual(t, id1, id3)
+}
+
+func TestFirstNonEmpty(t *testing.T) {
+	assert.Equal(t, "a", firstNonEmpty("", "a", "b"))
+	assert.Equal(t, "", firstNonEmpty("", ""))
+}
+
+func TestFirstNonEmptyBytes(t *testing.T) {
+	assert.Equal(t, "hi", firstNonEmptyBytes(nil, []byte("hi")))
+	assert.Equal(t, "", firstNonEmptyBytes(nil, []byte{}))
 }
