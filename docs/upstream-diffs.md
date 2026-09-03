@@ -288,3 +288,36 @@ has no equivalent table.
 **Rebase notes:** New files plus an append in `domaininfo.go` and
 `register.go:All()`. Low conflict risk unless upstream adds adjacent domain
 tables in the same slice.
+
+## jenkins: build parameters, metadata extractors, UNSTABLE result mapping
+
+**Files:**
+- `backend/plugins/jenkins/models/build_parameter.go`
+- `backend/plugins/jenkins/models/build.go`
+- `backend/plugins/jenkins/models/field_extractor_rule.go`
+- `backend/plugins/jenkins/models/scope_config.go`
+- `backend/plugins/jenkins/models/response.go`
+- `backend/plugins/jenkins/models/migrationscripts/20250902_add_build_parameters_and_metadata.go`
+- `backend/plugins/jenkins/models/migrationscripts/register.go`
+- `backend/plugins/jenkins/tasks/build_collector.go`
+- `backend/plugins/jenkins/tasks/build_extractor.go`
+- `backend/plugins/jenkins/tasks/build_cicd_convertor.go`
+- `backend/plugins/jenkins/tasks/field_extractor.go`
+- `backend/plugins/jenkins/tasks/task_data.go`
+- `backend/plugins/jenkins/impl/impl.go`
+- `backend/plugins/jenkins/e2e/snapshot_tables/cicd_pipelines.csv`
+- `backend/plugins/jenkins/e2e/snapshot_tables/cicd_tasks.csv`
+
+**Reason:** Collect Jenkins build parameters from the API tree query, store them
+in `_tool_jenkins_build_parameters`, and support scope-config `fieldExtractors`
+regex rules that populate `_tool_jenkins_builds.metadata` for team-defined
+dimensions (without hardcoding product-specific fields). Map `UNSTABLE` builds
+to `FAILURE` in `cicd_pipelines.result` while preserving `original_result`.
+
+**Upstream status:** Pending — generic Jenkins enrichment; candidate for upstream PR.
+**Upstream PR:** none yet
+**Owner:** OSSM / DevProd team
+
+**Rebase notes:** Touches build collection tree query, build extractor, and CICD
+converter result mapping. Watch for upstream changes to `build_collector.go` and
+`build_cicd_convertor.go`.

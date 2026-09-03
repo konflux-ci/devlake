@@ -41,6 +41,7 @@ type JenkinsBuild struct {
 	TriggeredBy       string    `gorm:"type:varchar(255)"`
 	Building          bool
 	HasStages         bool
+	Metadata          map[string]string `gorm:"type:json;serializer:json" json:"metadata"`
 }
 
 func (JenkinsBuild) TableName() string {

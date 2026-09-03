@@ -21,18 +21,16 @@ import (
 	"github.com/apache/incubator-devlake/core/models/common"
 )
 
-type JenkinsScopeConfig struct {
-	common.ScopeConfig `mapstructure:",squash" json:",inline" gorm:"embedded"`
-	DeploymentPattern  string `gorm:"type:varchar(255)" mapstructure:"deploymentPattern,omitempty" json:"deploymentPattern"`
-	ProductionPattern  string `gorm:"type:varchar(255)" mapstructure:"productionPattern,omitempty" json:"productionPattern"`
-	FieldExtractors    []FieldExtractorRule `mapstructure:"fieldExtractors" json:"fieldExtractors" gorm:"type:json;serializer:json"`
+// JenkinsBuildParameter stores a Jenkins build parameter name/value pair.
+type JenkinsBuildParameter struct {
+	common.NoPKModel
+
+	ConnectionId uint64 `gorm:"primaryKey"`
+	BuildName    string `gorm:"primaryKey;type:varchar(255);index"`
+	Name         string `gorm:"primaryKey;type:varchar(255);index"`
+	Value        string `gorm:"type:text"`
 }
 
-func (t JenkinsScopeConfig) TableName() string {
-	return "_tool_jenkins_scope_configs"
-}
-
-func (t *JenkinsScopeConfig) SetConnectionId(c *JenkinsScopeConfig, connectionId uint64) {
-	c.ConnectionId = connectionId
-	c.ScopeConfig.ConnectionId = connectionId
+func (JenkinsBuildParameter) TableName() string {
+	return "_tool_jenkins_build_parameters"
 }

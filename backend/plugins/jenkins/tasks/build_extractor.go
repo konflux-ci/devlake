@@ -131,6 +131,25 @@ func ExtractApiBuilds(taskCtx plugin.SubTaskContext) errors.Error {
 				}
 			}
 
+			parameters := ExtractBuildParameters(body)
+			for name, value := range parameters {
+				results = append(results, &models.JenkinsBuildParameter{
+					ConnectionId: data.Options.ConnectionId,
+					BuildName:    build.FullName,
+					Name:         name,
+					Value:        value,
+				})
+			}
+
+			if data.FieldExtractor != nil {
+				data.FieldExtractor.Apply(build, &BuildExtractionContext{
+					FullName:    build.FullName,
+					JobName:     build.JobName,
+					TriggeredBy: build.TriggeredBy,
+					Parameters:  parameters,
+				})
+			}
+
 			results = append(results, build)
 			return results, nil
 		},

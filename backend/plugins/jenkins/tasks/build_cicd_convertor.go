@@ -101,7 +101,7 @@ func ConvertBuildsToCicdTasks(taskCtx plugin.SubTaskContext) (err errors.Error) 
 			if !jenkinsBuild.Building {
 				jenkinsPipelineResult = devops.GetResult(&devops.ResultRule{
 					Success: []string{SUCCESS},
-					Failure: []string{FAILURE, ABORTED},
+					Failure: []string{FAILURE, ABORTED, UNSTABLE},
 					Default: devops.RESULT_DEFAULT,
 				}, jenkinsBuild.Result)
 			}
