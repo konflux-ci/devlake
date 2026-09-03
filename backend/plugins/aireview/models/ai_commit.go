@@ -15,23 +15,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package models
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"time"
+
+	"github.com/apache/incubator-devlake/core/models/common"
 )
 
-// All returns all migration scripts for the aireview plugin
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		&initSchema{},
-		&addEffortAndChecks{},
-		&addGeminiConfig{},
-		&addReactions{},
-		&addCiPredictionSupport{},
-		&addFlakyInfraFilters{},
-		&addSuggestionsAccepted{},
-		&addDiffMatching{},
-		&addAiCommits{},
-	}
+// AiCommit is a tool-layer record for a commit classified as AI-assisted.
+// Only AI-positive commits are stored (sparse).
+type AiCommit struct {
+	common.NoPKModel
+
+	Id           string    `gorm:"primaryKey;type:varchar(255)"`
+	CommitSha    string    `gorm:"index;type:varchar(40)"`
+	RepoId       string    `gorm:"index;type:varchar(255)"`
+	AiTool       string    `gorm:"type:varchar(100)"`
+	AuthorName   string    `gorm:"type:varchar(255)"`
+	AuthoredDate time.Time `gorm:"index"`
+}
+
+func (AiCommit) TableName() string {
+	return "_tool_aireview_commits"
 }

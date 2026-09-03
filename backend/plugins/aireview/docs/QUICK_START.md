@@ -7,6 +7,7 @@ Get started with the AI Review plugin in 5 minutes.
 - DevLake instance running
 - GitHub or GitLab connection configured
 - Pull request data already collected
+- Commit data already collected (gitextractor)
 
 ## Step 1: Verify Plugin is Loaded
 
@@ -20,7 +21,7 @@ Expected output:
   "plugin": "aireview",
   "metric": {
     "requiredDataEntities": [...],
-    "runAfter": ["github", "gitlab"],
+    "runAfter": ["github", "gitlab", "gitextractor"],
     "isProjectMetric": true
   }
 }
@@ -204,7 +205,7 @@ curl -X POST http://localhost:8080/pipelines \
     "plan": [[{
       "plugin": "aireview",
       "options": {"projectName": "my-project", "scopeConfigId": 1},
-      "subtasks": ["extractAiReviews", "extractAiReviewFindings", "calculateFailurePredictions", "calculatePredictionMetrics"]
+      "subtasks": ["extractAiReviews", "extractAiCommits", "extractAiReviewFindings", "convertAiCommits", "calculateFailurePredictions", "calculatePredictionMetrics"]
     }]]
   }'
 ```

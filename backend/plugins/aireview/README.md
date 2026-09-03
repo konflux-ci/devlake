@@ -22,6 +22,7 @@ plugins/aireview/
 │   └── impl.go                    # Plugin implementation (interfaces)
 ├── models/
 │   ├── ai_review.go               # AiReview model
+│   ├── ai_commit.go               # AiCommit model (AI-assisted commits)
 │   ├── ai_review_finding.go       # AiReviewFinding model
 │   ├── ai_failure_prediction.go   # Prediction models
 │   ├── scope_config.go            # Configurable patterns
@@ -30,6 +31,8 @@ plugins/aireview/
 ├── tasks/
 │   ├── task_data.go               # Task options and validation
 │   ├── extract_ai_reviews.go      # Extract AI reviews from comments
+│   ├── extract_ai_commits.go      # Classify AI-assisted commits
+│   ├── convert_ai_commits.go
 │   ├── extract_ai_review_findings.go
 │   ├── calculate_failure_predictions.go
 │   ├── calculate_prediction_metrics.go
@@ -56,6 +59,7 @@ var _ interface {
 
 - **Multi-platform support**: Works with both GitHub PRs and GitLab MRs
 - **Multi-tool support**: Currently supports CodeRabbit, with extensibility for Cursor Bugbot, SonarQube, and other AI review tools
+- **AI-assisted commit classification**: Precomputes which commits were authored with Cursor/Claude/Copilot/CodeRabbit (from git trailers) into `ai_commits`.
 - **Per-team configuration**: Teams can configure which AI tools they use and customize detection patterns
 - **Prediction accuracy tracking**: Tracks AI predictions against actual outcomes (CI failures, bugs, rollbacks)
 - **Metrics calculation**: Computes precision, recall, accuracy, and F1 scores for AI predictions
@@ -185,6 +189,8 @@ go run plugins/aireview/aireview.go \
 - `_tool_aireview_failure_predictions`: Prediction outcome tracking
 - `_tool_aireview_prediction_metrics`: Aggregated metrics
 - `_tool_aireview_scope_configs`: Per-scope configuration
+- `_tool_aireview_commits`: Sparse AI-assisted commit classifications
+- `ai_commits`: Project-scoped domain table for Grafana
 
 ## Extending for New AI Tools
 

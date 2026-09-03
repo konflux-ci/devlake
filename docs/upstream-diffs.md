@@ -285,3 +285,24 @@ merges. Guarded to `konflux-ci/devlake` so it cannot run on `apache/devlake`.
 **Rebase notes:** New files; no upstream equivalent. If upstream adds a workflow
 or script with the same path, pick a different name. The job `if:` must keep
 excluding `apache/devlake`.
+## core: ai_commits domain table
+
+**Files:**
+- `backend/core/models/domainlayer/code/ai_commit.go` (new file)
+- `backend/core/models/domainlayer/domaininfo/domaininfo.go` (append)
+- `backend/core/models/migrationscripts/20260826_add_ai_commits_domain.go` (new file)
+- `backend/core/models/migrationscripts/register.go` (append-only)
+
+**Reason:** Project-scoped domain table for commits classified as AI-assisted by
+the aireview plugin. Grafana LEFT JOINs `ai_commits` instead of evaluating
+Co-Authored-By / Assisted-by / Made-with trailers at query time. Follows the
+same pattern as `ai_reviews` (tool table in aireview, domain table in core).
+
+**Upstream status:** N/A — Konflux aireview addition; upstream Apache DevLake
+has no equivalent table.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** New files plus an append in `domaininfo.go` and
+`register.go:All()`. Low conflict risk unless upstream adds adjacent domain
+tables in the same slice.

@@ -18,7 +18,7 @@ Single-file verification: `go vet ./plugins/aireview/...`
 - `impl/impl.go` — plugin interfaces (PluginMeta, PluginTask, PluginMetric, MetricPluginBlueprintV200)
 - `models/` — tool-layer models + `migrationscripts/register.go` (all migrations listed in `All()`)
 - `models/scope_config.go` — per-team regex patterns for AI tool detection and risk classification
-- `tasks/` — subtask pipeline: extract → enrich reactions → findings → match diffs → fetch CI → predict → metrics
+- `tasks/` — subtask pipeline: extract reviews → extract AI commits → enrich reactions → findings → convert → match diffs → fetch CI → predict → metrics
 - `api/` — REST endpoints (reviews, findings, stats, scope-configs, analyze)
 - `e2e/raw_tables/` — CSV fixtures for e2e tests
 
@@ -29,6 +29,7 @@ Single-file verification: `go vet ./plugins/aireview/...`
 - Subtask order matters: see `SubTaskMetas()` in `impl/impl.go`
 - All regex patterns are compiled once in `tasks.CompilePatterns()` and stored in `AiReviewTaskData`
 - New AI tool support: add fields to `AiReviewScopeConfig`, update `CompilePatterns()`, update `detectAiTool()`
+- AI-assisted **commits** are classified by `detectAiCommit()` (trailer matchers + optional `AiCommitPatterns`) 
 
 ## Don'ts
 
@@ -41,7 +42,7 @@ Single-file verification: `go vet ./plugins/aireview/...`
 
 | Change Type | Example File |
 |---|---|
-| Add new AI tool support | `models/scope_config.go`, `tasks/extract_ai_reviews.go` |
+| Add new AI tool support | `models/scope_config.go`, `tasks/extract_ai_reviews.go`, `tasks/detect_ai_commit.go` |
 | Add migration | `models/migrationscripts/20260415_add_flaky_infra_filters.go` |
 | Add subtask | `tasks/calculate_failure_predictions.go`, then register in `impl/impl.go:SubTaskMetas()` |
 | Add e2e test | `e2e/aireview_test.go` + CSV fixtures in `e2e/raw_tables/` |
