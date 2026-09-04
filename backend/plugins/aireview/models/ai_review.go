@@ -100,6 +100,7 @@ const (
 	AiToolGemini            = "gemini"
 	AiToolSonarQube         = "sonarqube"
 	AiToolCopilot           = "copilot"
+	AiToolYmir              = "ymir"
 	AiToolAssistedByUnknown = "assisted_by_unknown"
 	AiToolMadeWithUnknown   = "made_with_unknown"
 	AiToolOther             = "other"
