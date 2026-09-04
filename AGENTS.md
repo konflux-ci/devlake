@@ -45,6 +45,11 @@ modifications are tracked in [`docs/upstream-diffs.md`](docs/upstream-diffs.md).
    files changed, reason, upstream status, upstream PR link, owner, and rebase notes.
 3. Use `Upstream-Status:` trailer in commit messages for upstream-divergent changes.
 
+A scheduled workflow (`.github/workflows/upstream-sync.yml`) opens a single
+`chore/upstream-sync` PR when Apache publishes a new matching tag (`vX.Y.Z` or
+`vX.Y.Z-betaN`). The bot never merges. Resolve conflicts using
+`docs/upstream-diffs.md` and land with a **merge commit** (do not squash).
+
 ## Quick Reference
 
 ```bash
