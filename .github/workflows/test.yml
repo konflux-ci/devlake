@@ -64,12 +64,20 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
+    - name: Generate mocks
+      run: |
+        cd backend
+        make mock
+    - name: Setup Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
+      with:
+        go-version-file: backend/go.mod
+        cache: false
     - name: Go unit tests
       run: |
         go version
         cp env.example .env
         cd backend
-        make mock
         make unit-test-go || echo "::warning::Go unit tests had failures (coverage still uploaded)"
     - name: Python unit tests
       run: |

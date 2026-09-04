@@ -18,18 +18,17 @@ limitations under the License.
 package tasks
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/codecov/models"
 	"gopkg.in/yaml.v3"
 )
@@ -38,15 +37,36 @@ var CollectRepoConfigMeta = plugin.SubTaskMeta{
 	Name:             "CollectRepoConfig",
 	EntryPoint:       CollectRepoConfig,
 	EnabledByDefault: true,
-	Description:      "Fetch codecov.yml from the repository and parse coverage thresholds",
+	Description:      "Fetch codecov.yml via Codecov GraphQL and parse coverage thresholds",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE},
 }
 
-var configFileNames = []string{
-	".codecov.yml",
-	"codecov.yml",
-	".codecov.yaml",
-	"codecov.yaml",
+const maxConfigSize = 1 << 20 // 1 MiB
+
+// maxGraphQLResponseSize allows JSON wrapper overhead around the yaml payload.
+const maxGraphQLResponseSize = maxConfigSize + (64 << 10)
+
+const repoYamlGraphQLQuery = `query GetRepoSettings($name: String!, $repo: String!) {
+  owner(username: $name) {
+    repository(name: $repo) {
+      ... on Repository {
+        yaml
+      }
+    }
+  }
+}`
+
+type graphqlRepoYamlResponse struct {
+	Data struct {
+		Owner struct {
+			Repository struct {
+				Yaml *string `json:"yaml"`
+			} `json:"repository"`
+		} `json:"owner"`
+	} `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
 }
 
 // codecovYaml represents the relevant parts of a codecov.yml file
@@ -65,6 +85,88 @@ type statusConfig struct {
 	Informational interface{} `yaml:"informational"`
 }
 
+func serviceShortCode(service string) (string, error) {
+	switch service {
+	case "github":
+		return "gh", nil
+	case "github_enterprise":
+		return "ghe", nil
+	case "gitlab":
+		return "gl", nil
+	case "gitlab_enterprise":
+		return "gle", nil
+	case "bitbucket":
+		return "bb", nil
+	case "bitbucket_server":
+		return "bbs", nil
+	default:
+		return "", fmt.Errorf("unsupported service %q", service)
+	}
+}
+
+func fetchRepoYaml(apiClient *helper.ApiAsyncClient, serviceShort, owner, repo string) (string, errors.Error) {
+	path := fmt.Sprintf("/graphql/%s", serviceShort)
+	body := map[string]interface{}{
+		"query": repoYamlGraphQLQuery,
+		"variables": map[string]string{
+			"name": owner,
+			"repo": repo,
+		},
+	}
+
+	res, err := apiClient.Post(path, nil, body, nil)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return "", errors.HttpStatus(res.StatusCode).New(
+			fmt.Sprintf("GraphQL request failed with HTTP %d", res.StatusCode),
+		)
+	}
+
+	limited := io.LimitReader(res.Body, maxGraphQLResponseSize+1)
+	resBody, readErr := io.ReadAll(limited)
+	if readErr != nil {
+		return "", errors.Default.Wrap(readErr, "error reading GraphQL response body")
+	}
+	if len(resBody) == 0 {
+		return "", helper.ErrEmptyResponse
+	}
+	if len(resBody) > maxGraphQLResponseSize {
+		return "", errors.Default.New(fmt.Sprintf("GraphQL response exceeds size limit (%d bytes)", maxGraphQLResponseSize))
+	}
+
+	var result graphqlRepoYamlResponse
+	if err := errors.Convert(json.Unmarshal(resBody, &result)); err != nil {
+		return "", errors.HttpStatus(res.StatusCode).Wrap(err, "error decoding GraphQL response")
+	}
+
+	if len(result.Errors) > 0 {
+		msgs := make([]string, len(result.Errors))
+		for i, gqlErr := range result.Errors {
+			msgs[i] = gqlErr.Message
+		}
+		return "", errors.Default.New(fmt.Sprintf("GraphQL errors: %s", strings.Join(msgs, "; ")))
+	}
+
+	if result.Data.Owner.Repository.Yaml == nil {
+		return "", nil
+	}
+
+	rawYaml := *result.Data.Owner.Repository.Yaml
+	if rawYaml == "" {
+		return "", nil
+	}
+
+	if len(rawYaml) > maxConfigSize {
+		return "", errors.Default.New(fmt.Sprintf("repo yaml exceeds size limit (%d bytes)", maxConfigSize))
+	}
+
+	return rawYaml, nil
+}
+
 func CollectRepoConfig(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*CodecovTaskData)
 	db := taskCtx.GetDal()
@@ -80,46 +182,25 @@ func CollectRepoConfig(taskCtx plugin.SubTaskContext) errors.Error {
 		return nil
 	}
 
-	service := data.Service
-	branch := data.Repo.Branch
-	if branch == "" {
-		logger.Warn(nil, "[Codecov] CollectRepoConfig: No branch configured for %s/%s, skipping", owner, repo)
+	serviceShort, mapErr := serviceShortCode(data.Service)
+	if mapErr != nil {
+		logger.Warn(nil, "[Codecov] CollectRepoConfig: unsupported service %q for %s/%s, skipping", data.Service, owner, repo)
 		return nil
 	}
 
-	if data.Repo.Private {
-		logger.Info("[Codecov] CollectRepoConfig: Skipping private repo %s/%s", owner, repo)
+	logger.Info("[Codecov] CollectRepoConfig: Fetching codecov config for %s/%s (service=%s)", owner, repo, data.Service)
+
+	rawYaml, fetchErr := fetchRepoYaml(data.ApiClient, serviceShort, owner, repo)
+	if fetchErr != nil {
+		return errors.Default.Wrap(fetchErr, fmt.Sprintf("failed to fetch repo yaml via GraphQL for %s/%s", owner, repo))
+	}
+
+	if rawYaml == "" {
+		logger.Info("[Codecov] CollectRepoConfig: No codecov config found for %s/%s", owner, repo)
 		return nil
 	}
 
-	logger.Info("[Codecov] CollectRepoConfig: Fetching codecov config for %s/%s (service=%s, branch=%s)", owner, repo, service, branch)
-
-	var foundFile string
-	var rawYaml string
-
-	for _, filename := range configFileNames {
-		rawURL := buildRawContentURL(service, owner, repo, branch, filename)
-		if rawURL == "" {
-			logger.Warn(nil, "[Codecov] CollectRepoConfig: unsupported service %q, skipping", service)
-			break
-		}
-
-		body, fetchErr := fetchFile(taskCtx.GetContext(), rawURL)
-		if fetchErr != nil {
-			logger.Info("[Codecov] CollectRepoConfig: %s not found at %s", filename, rawURL)
-			continue
-		}
-
-		foundFile = filename
-		rawYaml = body
-		logger.Info("[Codecov] CollectRepoConfig: Found %s for %s/%s (%d bytes)", filename, owner, repo, len(body))
-		break
-	}
-
-	if foundFile == "" {
-		logger.Info("[Codecov] CollectRepoConfig: No codecov config file found for %s/%s", owner, repo)
-		return nil
-	}
+	logger.Info("[Codecov] CollectRepoConfig: Found repo yaml for %s/%s (%d bytes)", owner, repo, len(rawYaml))
 
 	config := parseCodecovYaml(rawYaml)
 
@@ -127,7 +208,7 @@ func CollectRepoConfig(taskCtx plugin.SubTaskContext) errors.Error {
 		NoPKModel:            common.NoPKModel{},
 		ConnectionId:         data.Options.ConnectionId,
 		RepoId:               data.Options.FullName,
-		ConfigSource:         foundFile,
+		ConfigSource:         "codecov-graphql",
 		RawYaml:              rawYaml,
 		ProjectTarget:        config.projectTarget,
 		ProjectTargetAuto:    config.projectTargetAuto,
@@ -146,54 +227,6 @@ func CollectRepoConfig(taskCtx plugin.SubTaskContext) errors.Error {
 	logger.Info("[Codecov] CollectRepoConfig: Saved config for %s/%s (patch_target=%v, project_target=%v)",
 		owner, repo, config.patchTarget, config.projectTarget)
 	return nil
-}
-
-func buildRawContentURL(service, owner, repo, branch, filename string) string {
-	switch service {
-	case "github":
-		return fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo, branch, filename)
-	case "gitlab":
-		return gitlabRawURL("https://gitlab.com", owner, repo, branch, filename)
-	default:
-		// Enterprise services (github_enterprise, gitlab_enterprise, bitbucket, bitbucket_server)
-		// require the Git host URL which isn't part of the Codecov connection config.
-		return ""
-	}
-}
-
-func gitlabRawURL(host, owner, repo, branch, filename string) string {
-	host = strings.TrimRight(host, "/")
-	owner = strings.ReplaceAll(owner, ":", "/")
-	projectPath := url.PathEscape(owner + "/" + repo)
-	encodedFile := url.PathEscape(filename)
-	return fmt.Sprintf("%s/api/v4/projects/%s/repository/files/%s/raw?ref=%s", host, projectPath, encodedFile, branch)
-}
-
-const fetchTimeout = 15 * time.Second
-const maxConfigSize = 1 << 20 // 1 MiB
-
-func fetchFile(ctx context.Context, rawURL string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return "", err
-	}
-
-	client := &http.Client{Timeout: fetchTimeout}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigSize))
-	if err != nil {
-		return "", err
-	}
-	return string(body), nil
 }
 
 type parsedConfig struct {
