@@ -3576,20 +3576,21 @@ __metadata:
   linkType: hard
 
 "ahooks@npm:^3.4.1, ahooks@npm:^3.7.10":
-  version: 3.7.10
-  resolution: "ahooks@npm:3.7.10"
+  version: 3.10.0
+  resolution: "ahooks@npm:3.10.0"
   dependencies:
     "@babel/runtime": ^7.21.0
     dayjs: ^1.9.1
-    intersection-observer: ^0.12.0
-    js-cookie: ^2.x.x
+    js-cookie: ^3.0.5
     lodash: ^4.17.21
+    react-fast-compare: ^3.2.2
     resize-observer-polyfill: ^1.5.1
     screenfull: ^5.0.0
     tslib: ^2.4.1
   peerDependencies:
-    react: ^16.8.0 || ^17.0.0 || ^18.0.0
-  checksum: 8b5a618a5745f39a9d40e689f8d52938276d03dfda9fcf6c57ff3dec13f7313cb70dc1b5a2d8ca8ddaec650e7045ce2b9bcab5e04f4ebeb41c4ff76318959cd8
+    react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 3b4baa9707187ecaedd3db21f29842efd1c530ca8fcc4ae2aaac99f06a1259eee1bac91751180ccdfd00198b1ffb97a7a0879740cd89bf5e0f57beea3c610815
   languageName: node
   linkType: hard
 
@@ -6276,13 +6277,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"intersection-observer@npm:^0.12.0":
-  version: 0.12.2
-  resolution: "intersection-observer@npm:0.12.2"
-  checksum: d1fa9ebbb1e0baafe88ad95545bbb93f92bdcb8789912a2bd11b2463ab177ef185052c9c79c26187833d633f404acb077d4b1249353c5f6e2ca5cd64f50e216b
-  languageName: node
-  linkType: hard
-
 "ip-address@npm:^9.0.5":
   version: 9.0.5
   resolution: "ip-address@npm:9.0.5"
@@ -6685,10 +6679,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"js-cookie@npm:^2.x.x":
-  version: 2.2.1
-  resolution: "js-cookie@npm:2.2.1"
-  checksum: 9b1fb980a1c5e624fd4b28ea4867bb30c71e04c4484bb3a42766344c533faa684de9498e443425479ec68609e96e27b60614bfe354877c449c631529b6d932f2
+"js-cookie@npm:^3.0.5":
+  version: 3.0.8
+  resolution: "js-cookie@npm:3.0.8"
+  checksum: 73ce2e57d352caf01b4ff40406fd474e7e2edd545a6fdcecbe8fb1d764ef761db99b40a2ca990473064f0519a6af0f2cfae30410c93fcb8bf2a4bc4215c5395d
   languageName: node
   linkType: hard
 
@@ -8851,7 +8845,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-fast-compare@npm:^3.1.1":
+"react-fast-compare@npm:^3.1.1, react-fast-compare@npm:^3.2.2":
   version: 3.2.2
   resolution: "react-fast-compare@npm:3.2.2"
   checksum: 2071415b4f76a3e6b55c84611c4d24dcb12ffc85811a2840b5a3f1ff2d1a99be1020d9437ee7c6e024c9f4cbb84ceb35e48cf84f28fcb00265ad2dfdd3947704
