@@ -41,7 +41,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/storage v1.52.0
+	cloud.google.com/go/storage v1.66.0
 	github.com/chainguard-dev/git-urls v1.0.2
 	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/gin-contrib/cors v1.7.2
