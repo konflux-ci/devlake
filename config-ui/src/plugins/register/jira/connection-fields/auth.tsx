@@ -24,8 +24,19 @@ import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
 
 const JIRA_CLOUD_REGEX = /^https:\/\/\w+.atlassian.net\/rest\/$/;
+const JIRA_OAUTH_GATEWAY_REGEX = /^https:\/\/api\.atlassian\.com\/ex\/jira\/[^/]+\/rest\/$/;
 
-type Method = 'BasicAuth' | 'AccessToken';
+type Method = 'BasicAuth' | 'AccessToken' | 'OAuth2';
+type CloudMethod = 'BasicAuth' | 'OAuth2';
+
+const gatewayEndpoint = (cloudId?: string) =>
+  cloudId ? `https://api.atlassian.com/ex/jira/${cloudId.trim()}/rest/` : '';
+
+const isCloudConnection = (values: { authMethod?: string; endpoint?: string }) =>
+  values.authMethod === 'OAuth2' ||
+  !values.endpoint ||
+  JIRA_CLOUD_REGEX.test(values.endpoint) ||
+  JIRA_OAUTH_GATEWAY_REGEX.test(values.endpoint);
 
 interface Props {
   type: 'create' | 'update';
@@ -40,10 +51,12 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
   const [version, setVersion] = useState('cloud');
 
   useEffect(() => {
-    if (initialValues.endpoint && !JIRA_CLOUD_REGEX.test(initialValues.endpoint)) {
+    if (isCloudConnection(initialValues)) {
+      setVersion('cloud');
+    } else if (initialValues.endpoint) {
       setVersion('server');
     }
-  }, [initialValues.endpoint]);
+  }, [initialValues.endpoint, initialValues.authMethod]);
 
   useEffect(() => {
     setValues({
@@ -52,6 +65,9 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       username: initialValues.username,
       password: initialValues.password,
       token: initialValues.token,
+      cloudId: initialValues.cloudId,
+      clientId: initialValues.clientId,
+      clientSecret: initialValues.clientSecret,
     });
   }, [
     initialValues.endpoint,
@@ -59,21 +75,25 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
     initialValues.username,
     initialValues.password,
     initialValues.token,
+    initialValues.cloudId,
+    initialValues.clientId,
+    initialValues.clientSecret,
   ]);
 
   useEffect(() => {
     const required =
       (values.authMethod === 'BasicAuth' && values.username && values.password) ||
       (values.authMethod === 'AccessToken' && values.token) ||
+      (values.authMethod === 'OAuth2' && values.cloudId && values.clientId && values.clientSecret) ||
       type === 'update';
     setErrors({
-      endpoint: !values.endpoint ? 'endpoint is required' : '',
+      endpoint: values.authMethod === 'OAuth2' || values.endpoint ? '' : 'endpoint is required',
       auth: required ? '' : 'auth is required',
     });
   }, [values]);
 
   const handleChangeVersion = (e: RadioChangeEvent) => {
-    const version = e.target.value;
+    const nextVersion = e.target.value;
 
     setValues({
       endpoint: '',
@@ -81,14 +101,31 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       username: undefined,
       password: undefined,
       token: undefined,
+      cloudId: undefined,
+      clientId: undefined,
+      clientSecret: undefined,
     });
 
-    setVersion(version);
+    setVersion(nextVersion);
   };
 
   const handleChangeEndpoint = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues({
       endpoint: e.target.value,
+    });
+  };
+
+  const handleChangeCloudMethod = (e: RadioChangeEvent) => {
+    const authMethod = (e.target as HTMLInputElement).value as CloudMethod;
+    setValues({
+      authMethod,
+      username: undefined,
+      password: undefined,
+      token: undefined,
+      cloudId: undefined,
+      clientId: undefined,
+      clientSecret: undefined,
+      endpoint: '',
     });
   };
 
@@ -119,6 +156,28 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
     });
   };
 
+  const handleChangeCloudId = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cloudId = e.target.value;
+    setValues({
+      cloudId,
+      endpoint: gatewayEndpoint(cloudId),
+    });
+  };
+
+  const handleChangeClientId = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValues({
+      clientId: e.target.value,
+    });
+  };
+
+  const handleChangeClientSecret = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValues({
+      clientSecret: e.target.value,
+    });
+  };
+
+  const cloudAuthMethod: CloudMethod = values.authMethod === 'OAuth2' ? 'OAuth2' : 'BasicAuth';
+
   return (
     <>
       <Block title="Jira Version" required>
@@ -127,54 +186,107 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
           <Radio value="server">Jira Server</Radio>
         </Radio.Group>
 
-        <Block
-          style={{ marginTop: 8, marginBottom: 0 }}
-          title="Endpoint URL"
-          description={
-            <>
-              {version === 'cloud'
-                ? 'Provide the Jira instance API endpoint. For Jira Cloud, e.g. https://your-company.atlassian.net/rest/. Please note that the endpoint URL should end with /.'
-                : ''}
-              {version === 'server'
-                ? 'Provide the Jira instance API endpoint. For Jira Server, e.g. https://jira.your-company.com/rest/. Please note that the endpoint URL should end with /.'
-                : ''}
-            </>
-          }
-          required
-        >
-          <Input
-            style={{ width: 386 }}
-            placeholder="Your Endpoint URL"
-            value={values.endpoint}
-            onChange={handleChangeEndpoint}
-          />
-        </Block>
-      </Block>
-
-      {version === 'cloud' && (
-        <>
-          <Block title="E-Mail" required>
-            <Input
-              style={{ width: 386 }}
-              placeholder="Your E-Mail"
-              value={values.username}
-              onChange={handleChangeUsername}
-            />
-          </Block>
+        {!(version === 'cloud' && cloudAuthMethod === 'OAuth2') && (
           <Block
-            title="API Token"
+            style={{ marginTop: 8, marginBottom: 0 }}
+            title="Endpoint URL"
             description={
-              <ExternalLink link={DOC_URL.PLUGIN.JIRA.API_TOKEN}>Learn about how to create an API Token</ExternalLink>
+              <>
+                {version === 'cloud'
+                  ? 'Provide the Jira instance API endpoint. For Jira Cloud, e.g. https://your-company.atlassian.net/rest/. Please note that the endpoint URL should end with /.'
+                  : ''}
+                {version === 'server'
+                  ? 'Provide the Jira instance API endpoint. For Jira Server, e.g. https://jira.your-company.com/rest/. Please note that the endpoint URL should end with /.'
+                  : ''}
+              </>
             }
             required
           >
             <Input
               style={{ width: 386 }}
-              placeholder={type === 'update' ? '********' : 'Your PAT'}
-              value={values.password}
-              onChange={handleChangePassword}
+              placeholder="Your Endpoint URL"
+              value={values.endpoint}
+              onChange={handleChangeEndpoint}
             />
           </Block>
+        )}
+      </Block>
+
+      {version === 'cloud' && (
+        <>
+          <Block title="Authentication Method" required>
+            <Radio.Group value={cloudAuthMethod} onChange={handleChangeCloudMethod}>
+              <Radio value="BasicAuth">API Token</Radio>
+              <Radio value="OAuth2">OAuth 2.0 (Service Account)</Radio>
+            </Radio.Group>
+          </Block>
+
+          {cloudAuthMethod === 'BasicAuth' && (
+            <>
+              <Block title="E-Mail" required>
+                <Input
+                  style={{ width: 386 }}
+                  placeholder="Your E-Mail"
+                  value={values.username}
+                  onChange={handleChangeUsername}
+                />
+              </Block>
+              <Block
+                title="API Token"
+                description={
+                  <ExternalLink link={DOC_URL.PLUGIN.JIRA.API_TOKEN}>
+                    Learn about how to create an API Token
+                  </ExternalLink>
+                }
+                required
+              >
+                <Input
+                  style={{ width: 386 }}
+                  placeholder={type === 'update' ? '********' : 'Your PAT'}
+                  value={values.password}
+                  onChange={handleChangePassword}
+                />
+              </Block>
+            </>
+          )}
+
+          {cloudAuthMethod === 'OAuth2' && (
+            <>
+              <Block
+                title="Cloud ID"
+                description="The Atlassian Cloud ID for the Jira site. The API endpoint is derived as https://api.atlassian.com/ex/jira/{cloudId}/rest/."
+                required
+              >
+                <Input
+                  style={{ width: 386 }}
+                  placeholder="Your Cloud ID"
+                  value={values.cloudId}
+                  onChange={handleChangeCloudId}
+                />
+              </Block>
+              <Block title="Client ID" required>
+                <Input
+                  style={{ width: 386 }}
+                  placeholder="OAuth 2.0 Client ID"
+                  value={values.clientId}
+                  onChange={handleChangeClientId}
+                />
+              </Block>
+              <Block title="Client Secret" required>
+                <Input.Password
+                  style={{ width: 386 }}
+                  placeholder={type === 'update' ? '********' : 'OAuth 2.0 Client Secret'}
+                  value={values.clientSecret}
+                  onChange={handleChangeClientSecret}
+                />
+              </Block>
+              {values.endpoint && (
+                <Block title="Endpoint URL" description="Derived from Cloud ID for Atlassian OAuth 2.0.">
+                  <Input style={{ width: 386 }} value={values.endpoint} disabled />
+                </Block>
+              )}
+            </>
+          )}
         </>
       )}
 
