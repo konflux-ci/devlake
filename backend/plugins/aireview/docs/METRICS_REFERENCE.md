@@ -13,7 +13,7 @@ Stores extracted AI-generated code reviews from pull request comments.
 | `id` | string | Unique review ID (hash-based) |
 | `pull_request_id` | string | Domain layer PR ID |
 | `repo_id` | string | Domain layer repository ID |
-| `ai_tool` | string | AI tool identifier (e.g., `coderabbit`, `cursor-bugbot`) |
+| `ai_tool` | string | AI tool identifier (e.g., `coderabbit`, `qodo`, `gemini`, `fullsend`, `cursor-bugbot`) |
 | `ai_tool_user` | string | Username/account of the AI bot |
 | `review_id` | string | Original comment ID |
 | `body` | text | Full review comment body |

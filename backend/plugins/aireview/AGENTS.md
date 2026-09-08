@@ -1,6 +1,6 @@
 # aireview Plugin — Agent Context
 
-Metric/transformer plugin that extracts AI-generated code reviews from GitHub/GitLab PR comments, tracks prediction accuracy against CI outcomes, and computes precision/recall/F1 for AI review tools (CodeRabbit, Qodo, Gemini, Cursor Bugbot).
+Metric/transformer plugin that extracts AI-generated code reviews from GitHub/GitLab PR comments, tracks prediction accuracy against CI outcomes, and computes precision/recall/F1 for AI review tools (CodeRabbit, Qodo, Gemini, Fullsend, Cursor Bugbot).
 
 ## Build & Test
 

@@ -658,6 +658,82 @@ func TestDetectAiTool_Gemini(t *testing.T) {
 	}
 }
 
+func TestDetectAiTool_Fullsend(t *testing.T) {
+	tests := []struct {
+		name      string
+		accountId string
+		body      string
+		wantTool  string
+		wantIsAi  bool
+	}{
+		{
+			name:      "Fullsend review bot by username",
+			accountId: "fullsend-ai-review[bot]",
+			body:      "Some review comment",
+			wantTool:  models.AiToolFullsend,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Fullsend coder bot by username",
+			accountId: "fullsend-ai-coder[bot]",
+			body:      "Fix agent iteration",
+			wantTool:  models.AiToolFullsend,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Fullsend retro bot by username",
+			accountId: "fullsend-ai-retro[bot]",
+			body:      "Retro analysis",
+			wantTool:  models.AiToolFullsend,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Fullsend by body pattern - HTML comment",
+			accountId: "somebot",
+			body:      "<!-- fullsend:review-agent -->\n## Review\n### Findings",
+			wantTool:  models.AiToolFullsend,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Fullsend by body pattern - status comment",
+			accountId: "somebot",
+			body:      "<!-- fullsend:agent-status:32466016328 -->\n🤖 Finished Review",
+			wantTool:  models.AiToolFullsend,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Fullsend by body pattern - footer link",
+			accountId: "somebot",
+			body:      "Fixed the issue.\n<sub>Updated by fullsend fix agent</sub>",
+			wantTool:  models.AiToolFullsend,
+			wantIsAi:  true,
+		},
+		{
+			name:      "Not Fullsend - regular comment",
+			accountId: "developer",
+			body:      "LGTM, looks good!",
+			wantTool:  "",
+			wantIsAi:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			taskData := &AiReviewTaskData{
+				Options: &AiReviewOptions{
+					ScopeConfig: models.GetDefaultScopeConfig(),
+				},
+			}
+			err := CompilePatterns(taskData)
+			assert.NoError(t, err)
+
+			gotTool, gotIsAi := detectAiTool(taskData, tt.accountId, tt.body)
+			assert.Equal(t, tt.wantTool, gotTool)
+			assert.Equal(t, tt.wantIsAi, gotIsAi)
+		})
+	}
+}
+
 func TestBuildCommentUrl(t *testing.T) {
 	tests := []struct {
 		name      string

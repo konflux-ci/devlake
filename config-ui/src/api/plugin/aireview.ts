@@ -42,6 +42,11 @@ export interface IAiReviewScopeConfig {
   geminiUsername: string;
   geminiPattern: string;
 
+  // Fullsend detection
+  fullsendEnabled: boolean;
+  fullsendUsername: string;
+  fullsendPattern: string;
+
   // Generic AI detection
   aiCommitPatterns: string;
   aiPrLabelPattern: string;
