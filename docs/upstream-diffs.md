@@ -59,6 +59,7 @@ No conflicts expected unless upstream touches the same field mapping block.
 - `backend/server/api/auth/revocation_cache.go`
 - `backend/server/api/auth/revocation_cache_test.go`
 - `backend/server/api/auth/auth_test.go`
+- `config-ui/src/utils/request.ts` (401 interceptor; skip plugin `/test` so remote credential failures do not redirect to `/login`)
 - `env.example` (OIDC/auth env var documentation)
 
 **Reason:** Upstream DevLake has no user authentication. This fork adds full OIDC login
@@ -299,6 +300,7 @@ tables in the same slice.
 - `backend/plugins/jira/models/migrationscripts/20260907_add_oauth2_credentials.go`
 - `backend/plugins/jira/models/migrationscripts/register.go`
 - `backend/plugins/jira/api/connection_api.go`
+- `backend/plugins/jira/api/connection_api_test.go`
 - `backend/plugins/jira/tasks/api_client.go`
 - `backend/plugins/jira/token/token_provider.go`
 - `backend/plugins/jira/token/round_tripper.go`
