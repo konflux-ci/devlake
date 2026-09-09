@@ -40,6 +40,7 @@ func NewRefreshRoundTripper(base http.RoundTripper, tp *TokenProvider) *RefreshR
 	}
 }
 
+// RoundTrip implements http.RoundTripper and remints the access token once on 401.
 func (rt *RefreshRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return rt.roundTripWithRetry(req, false)
 }
@@ -50,8 +51,10 @@ func (rt *RefreshRoundTripper) roundTripWithRetry(req *http.Request, refreshAtte
 		return nil, err
 	}
 
-	reqClone := req.Clone(req.Context())
-	reqClone.Header.Set("Authorization", "Bearer "+token)
+	reqClone, cloneErr := cloneRequestWithBearer(req, token)
+	if cloneErr != nil {
+		return nil, cloneErr
+	}
 
 	resp, reqErr := rt.base.RoundTrip(reqClone)
 	if reqErr != nil {
@@ -65,15 +68,21 @@ func (rt *RefreshRoundTripper) roundTripWithRetry(req *http.Request, refreshAtte
 			return nil, err
 		}
 
-		newToken, err := rt.tokenProvider.GetToken()
-		if err != nil {
-			return nil, err
-		}
-
-		reqRetry := req.Clone(req.Context())
-		reqRetry.Header.Set("Authorization", "Bearer "+newToken)
-		return rt.roundTripWithRetry(reqRetry, true)
+		return rt.roundTripWithRetry(req, true)
 	}
 
 	return resp, nil
+}
+
+func cloneRequestWithBearer(req *http.Request, token string) (*http.Request, error) {
+	reqClone := req.Clone(req.Context())
+	if req.GetBody != nil {
+		body, err := req.GetBody()
+		if err != nil {
+			return nil, err
+		}
+		reqClone.Body = body
+	}
+	reqClone.Header.Set("Authorization", "Bearer "+token)
+	return reqClone, nil
 }

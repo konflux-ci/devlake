@@ -36,6 +36,7 @@ const (
 	AtlassianOAuthTokenURL = "https://auth.atlassian.com/oauth/token"
 	defaultTokenTimeout    = 10 * time.Second
 	defaultTokenTTL        = 3600 * time.Second
+	maxOAuthResponseBytes  = 4096
 )
 
 // NewOAuthHTTPClient returns an HTTP client for Atlassian token requests.
@@ -89,17 +90,12 @@ func (jc *JiraConn) MintOAuthAccessToken(httpClient *http.Client) errors.Error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxOAuthResponseBytes))
 	if err != nil {
 		return errors.Convert(err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		bodyStr := string(body)
-		const maxBodySnippet = 512
-		if len(bodyStr) > maxBodySnippet {
-			bodyStr = bodyStr[:maxBodySnippet] + "…"
-		}
-		return errors.Default.New(fmt.Sprintf("failed to mint oauth2 access token: %d, body: %s", resp.StatusCode, bodyStr))
+		return errors.Default.New(fmt.Sprintf("failed to mint oauth2 access token: %d: %s", resp.StatusCode, oauthErrorDetail(body)))
 	}
 
 	var result struct {
@@ -136,4 +132,22 @@ func (jc *JiraConn) PrepareApiClient(_ plugin.ApiClient) errors.Error {
 		return err
 	}
 	return jc.MintOAuthAccessToken(httpClient)
+}
+
+func oauthErrorDetail(body []byte) string {
+	var payload struct {
+		Error            string `json:"error"`
+		ErrorDescription string `json:"error_description"`
+	}
+	if json.Unmarshal(body, &payload) == nil {
+		switch {
+		case payload.Error != "" && payload.ErrorDescription != "":
+			return payload.Error + ": " + payload.ErrorDescription
+		case payload.Error != "":
+			return payload.Error
+		case payload.ErrorDescription != "":
+			return payload.ErrorDescription
+		}
+	}
+	return "unexpected token endpoint response"
 }

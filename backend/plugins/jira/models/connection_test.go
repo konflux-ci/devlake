@@ -40,6 +40,15 @@ func TestGatewayEndpoint(t *testing.T) {
 
 	jc.CloudId = ""
 	assert.Equal(t, "", jc.GatewayEndpoint())
+
+	jc.CloudId = "../evil"
+	assert.Equal(t, "", jc.GatewayEndpoint())
+
+	jc.CloudId = "foo/bar"
+	assert.Equal(t, "", jc.GatewayEndpoint())
+
+	jc.CloudId = "foo?x=1"
+	assert.Equal(t, "", jc.GatewayEndpoint())
 }
 
 func TestApplyGatewayEndpoint(t *testing.T) {
@@ -75,6 +84,16 @@ func TestValidateConnectionOAuth2(t *testing.T) {
 	err = missing.ValidateConnection(missing, v)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "clientId, clientSecret and cloudId are required")
+
+	invalid := &JiraConn{
+		ClientId:     "id",
+		ClientSecret: "secret",
+		CloudId:      "../evil",
+	}
+	invalid.AuthMethod = AUTH_METHOD_OAUTH2
+	err = invalid.ValidateConnection(invalid, v)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cloudId must contain only letters, digits, and hyphens")
 }
 
 func TestValidateConnectionOAuth2DoesNotUseMultiAuthOneOf(t *testing.T) {

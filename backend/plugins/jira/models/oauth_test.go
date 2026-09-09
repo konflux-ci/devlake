@@ -89,4 +89,6 @@ func TestMintOAuthAccessTokenHTTPError(t *testing.T) {
 	err := jc.MintOAuthAccessToken(server.Client())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "401")
+	assert.Contains(t, err.Error(), "invalid_client")
+	assert.NotContains(t, err.Error(), `"error"`)
 }

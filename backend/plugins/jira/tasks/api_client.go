@@ -49,6 +49,10 @@ func NewJiraApiClient(taskCtx plugin.TaskContext, connection *models.JiraConnect
 			baseTransport = http.DefaultTransport
 		}
 		apiClient.GetClient().Transport = token.NewRefreshRoundTripper(baseTransport, tp)
+		// RefreshRoundTripper is the sole Authorization setter. Clearing authFunc
+		// avoids unsynchronized oauthToken reads in SetupAuthentication while
+		// TokenProvider remints on other worker goroutines.
+		apiClient.SetAuthFunction(nil)
 		logger.Info("Installed oauth2 token refresh round tripper for Jira connection %d", connection.ID)
 	}
 

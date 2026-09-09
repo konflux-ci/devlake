@@ -20,6 +20,7 @@ package models
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,6 +37,10 @@ const (
 	// It is plugin-specific and is not registered in core MultiAuth.
 	AUTH_METHOD_OAUTH2 = "OAuth2"
 )
+
+// cloudIDPattern allows Atlassian Cloud IDs (UUIDs) and test fixtures such as "cloud-1".
+// It rejects path separators and URL metacharacters so CloudId cannot change the gateway path.
+var cloudIDPattern = regexp.MustCompile(`^[a-zA-Z0-9-]{1,64}$`)
 
 type EpicResponse struct {
 	Id    int
@@ -80,9 +85,17 @@ func (jc *JiraConn) IsOAuth2() bool {
 	return jc.AuthMethod == AUTH_METHOD_OAUTH2
 }
 
+func sanitizedCloudID(cloudId string) string {
+	cloudId = strings.TrimSpace(cloudId)
+	if !cloudIDPattern.MatchString(cloudId) {
+		return ""
+	}
+	return cloudId
+}
+
 // GatewayEndpoint returns the Atlassian API gateway base URL for this cloud ID.
 func (jc *JiraConn) GatewayEndpoint() string {
-	cloudId := strings.TrimSpace(jc.CloudId)
+	cloudId := sanitizedCloudID(jc.CloudId)
 	if cloudId == "" {
 		return ""
 	}
@@ -131,10 +144,13 @@ func (jc *JiraConn) SetupAuthentication(req *http.Request) errors.Error {
 // the shared oneof=BasicAuth AccessToken AppKey constraint.
 func (jc *JiraConn) ValidateConnection(connection interface{}, v *validator.Validate) errors.Error {
 	if jc.IsOAuth2() {
-		jc.ApplyGatewayEndpoint()
 		if strings.TrimSpace(jc.ClientId) == "" || strings.TrimSpace(jc.ClientSecret) == "" || strings.TrimSpace(jc.CloudId) == "" {
 			return errors.BadInput.New("clientId, clientSecret and cloudId are required for OAuth2")
 		}
+		if sanitizedCloudID(jc.CloudId) == "" {
+			return errors.BadInput.New("cloudId must contain only letters, digits, and hyphens")
+		}
+		jc.ApplyGatewayEndpoint()
 		if jc.Endpoint == "" {
 			return errors.BadInput.New("cloudId is required for OAuth2")
 		}

@@ -41,7 +41,11 @@ type JiraTestConnResponse struct {
 }
 
 func testConnection(ctx context.Context, connection models.JiraConn) (*JiraTestConnResponse, errors.Error) {
-	if connection.IsOAuth2() || vld != nil {
+	if connection.IsOAuth2() {
+		if err := connection.ValidateConnection(&connection, vld); err != nil {
+			return nil, err
+		}
+	} else if vld != nil {
 		if err := connection.ValidateConnection(&connection, vld); err != nil {
 			return nil, err
 		}
@@ -243,7 +247,7 @@ func jiraHTTPErrorDetail(res *http.Response) string {
 		return ""
 	}
 	defer res.Body.Close()
-	raw, err := io.ReadAll(res.Body)
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 4096))
 	if err != nil {
 		return ""
 	}
