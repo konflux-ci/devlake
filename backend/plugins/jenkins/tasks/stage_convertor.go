@@ -118,7 +118,7 @@ func ConvertStages(taskCtx plugin.SubTaskContext) (err errors.Error) {
 			durationSec := float64(durationMillis / 1e3)
 			jenkinsTaskResult := devops.GetResult(&devops.ResultRule{
 				Success: []string{SUCCESS},
-				Failure: []string{FAILED, FAILURE, ABORTED},
+				Failure: []string{FAILED, FAILURE, ABORTED, UNSTABLE},
 				Default: devops.RESULT_DEFAULT,
 			}, body.Result)
 

@@ -38,7 +38,8 @@ type JenkinsBuild struct {
 	StartTime         time.Time // converted by timestamp
 	Type              string    `gorm:"index;type:varchar(255)"`
 	Class             string    `gorm:"index;type:varchar(255)" `
-	TriggeredBy       string    `gorm:"type:varchar(255)"`
+	TriggeredBy       string            `gorm:"type:varchar(255)"`
+	Metadata          map[string]string `gorm:"type:json;serializer:json" json:"metadata"`
 	Building          bool
 	HasStages         bool
 }

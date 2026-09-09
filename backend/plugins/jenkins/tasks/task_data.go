@@ -41,10 +41,11 @@ type JenkinsOptions struct {
 }
 
 type JenkinsTaskData struct {
-	Options       *JenkinsOptions
-	ApiClient     *api.ApiAsyncClient
-	Connection    *models.JenkinsConnection
-	RegexEnricher *api.RegexEnricher
+	Options        *JenkinsOptions
+	ApiClient      *api.ApiAsyncClient
+	Connection     *models.JenkinsConnection
+	RegexEnricher  *api.RegexEnricher
+	FieldExtractor *FieldExtractor
 }
 
 func DecodeTaskOptions(options map[string]interface{}) (*JenkinsOptions, errors.Error) {

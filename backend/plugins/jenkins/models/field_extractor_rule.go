@@ -15,27 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package models
 
-import (
-	"github.com/apache/incubator-devlake/core/plugin"
-)
-
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(modifyAllEntities),
-		new(modifyJenkinsBuild),
-		new(addJobFields),
-		new(addJobPathForBuilds),
-		new(changeIndexOfJobPath),
-		new(addTransformationRule20221128),
-		new(addFullNameForBuilds),
-		new(addConnectionIdToTransformationRule),
-		new(renameTr2ScopeConfig),
-		new(addRawParamTableForScope),
-		new(addNumberToJenkinsBuildCommit),
-		new(addBuildParametersAndMetadata),
-	}
+// FieldExtractorRule defines how to extract a named metadata value from Jenkins build fields.
+//
+// Supported sources: full_name, job_name, triggered_by, parameter:<parameter-name>
+type FieldExtractorRule struct {
+	Key         string   `json:"key" mapstructure:"key"`
+	Sources     []string `json:"sources" mapstructure:"sources"`
+	Pattern     string   `json:"pattern" mapstructure:"pattern"`
+	Group       int      `json:"group" mapstructure:"group"`
+	Default     string   `json:"default" mapstructure:"default"`
+	OnlyIfEmpty bool     `json:"onlyIfEmpty" mapstructure:"onlyIfEmpty"`
 }

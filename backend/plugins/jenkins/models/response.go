@@ -18,6 +18,8 @@ limitations under the License.
 package models
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -115,12 +117,57 @@ type LastBuiltRevision struct {
 	Branches []Branch `json:"branch"`
 }
 
+type Parameter struct {
+	Name  string `json:"name"`
+	Value string `json:"-"`
+	Class string `json:"_class,omitempty"`
+}
+
+// UnmarshalJSON accepts Jenkins parameter values of any JSON type (string, bool, number).
+func (p *Parameter) UnmarshalJSON(data []byte) error {
+	type parameterAlias Parameter
+	aux := struct {
+		parameterAlias
+		Value json.RawMessage `json:"value"`
+	}{}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	p.Name = aux.Name
+	p.Class = aux.Class
+	if len(aux.Value) == 0 || string(aux.Value) == "null" {
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(aux.Value, &s); err == nil {
+		p.Value = s
+		return nil
+	}
+
+	var b bool
+	if err := json.Unmarshal(aux.Value, &b); err == nil {
+		p.Value = strconv.FormatBool(b)
+		return nil
+	}
+
+	var n json.Number
+	if err := json.Unmarshal(aux.Value, &n); err == nil {
+		p.Value = n.String()
+		return nil
+	}
+
+	p.Value = strings.Trim(string(aux.Value), `"`)
+	return nil
+}
+
 type Action struct {
 	Class                   string             `json:"_class,omitempty"`
 	LastBuiltRevision       *LastBuiltRevision `json:"lastBuiltRevision,omitempty"`
 	MercurialRevisionNumber string             `json:"mercurialRevisionNumber"`
 	RemoteUrls              []string           `json:"remoteUrls"`
 	Causes                  []Cause            `json:"causes"`
+	Parameters              []Parameter        `json:"parameters,omitempty"`
 }
 type ChangeSet struct {
 	Class     string     `json:"_class"`
