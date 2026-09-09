@@ -44,7 +44,7 @@ require (
 	cloud.google.com/go/storage v1.52.0
 	github.com/chainguard-dev/git-urls v1.0.2
 	github.com/coreos/go-oidc/v3 v3.9.0
-	github.com/gin-contrib/cors v1.7.2
+	github.com/gin-contrib/cors v1.7.8
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/konflux-ci/coverport/instrumentation/go v0.0.0-20260708090559-a0c568e41e08
