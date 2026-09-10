@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	// AtlassianOAuthTokenURL is the token endpoint for Jira Cloud service-account OAuth 2.0.
-	AtlassianOAuthTokenURL = "https://auth.atlassian.com/oauth/token"
+	// atlassianOAuthEndpoint is the public Atlassian OAuth 2.0 client-credentials endpoint.
+	atlassianOAuthEndpoint = "https://auth.atlassian.com/oauth/token"
 	defaultTokenTimeout    = 10 * time.Second
 	defaultTokenTTL        = 3600 * time.Second
 	// Atlassian access tokens are JWTs; with many scopes the JSON easily
@@ -62,7 +62,7 @@ func (jc *JiraConn) tokenURL() string {
 	if jc.OAuthTokenURL != "" {
 		return jc.OAuthTokenURL
 	}
-	return AtlassianOAuthTokenURL
+	return atlassianOAuthEndpoint
 }
 
 // MintOAuthAccessToken exchanges client_id/client_secret for a Bearer access token.
