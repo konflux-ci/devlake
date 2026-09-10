@@ -274,7 +274,7 @@ func (collector *GraphqlCollector) fetchAsync(reqData *GraphqlRequestData, handl
 			collector.checkError(err)
 		} else {
 			msg := formatGraphqlQueryFailure(err, variables)
-			logger.Error(err, "%s", msg)
+			logger.Error(nil, "%s", msg)
 			collector.checkError(errors.Default.New(msg))
 		}
 		return
