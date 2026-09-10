@@ -41,17 +41,10 @@ type JiraTestConnResponse struct {
 }
 
 func testConnection(ctx context.Context, connection models.JiraConn) (*JiraTestConnResponse, errors.Error) {
-	if connection.IsOAuth2() {
+	if connection.IsOAuth2() || vld != nil {
 		if err := connection.ValidateConnection(&connection, vld); err != nil {
 			return nil, err
 		}
-	} else if vld != nil {
-		if err := connection.ValidateConnection(&connection, vld); err != nil {
-			return nil, err
-		}
-	}
-	if connection.IsOAuth2() {
-		connection.ApplyGatewayEndpoint()
 	}
 	// test connection
 	apiClient, err := api.NewApiClientFromConnection(ctx, basicRes, &connection)

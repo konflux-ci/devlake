@@ -18,6 +18,8 @@ limitations under the License.
 package token
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 )
 
@@ -75,6 +77,9 @@ func (rt *RefreshRoundTripper) roundTripWithRetry(req *http.Request, refreshAtte
 }
 
 func cloneRequestWithBearer(req *http.Request, token string) (*http.Request, error) {
+	if err := ensureGetBody(req); err != nil {
+		return nil, err
+	}
 	reqClone := req.Clone(req.Context())
 	if req.GetBody != nil {
 		body, err := req.GetBody()
@@ -85,4 +90,28 @@ func cloneRequestWithBearer(req *http.Request, token string) (*http.Request, err
 	}
 	reqClone.Header.Set("Authorization", "Bearer "+token)
 	return reqClone, nil
+}
+
+// ensureGetBody snapshots the body when GetBody is missing so a 401 retry
+// can re-send it. http.NewRequest already sets GetBody for *bytes.Reader and
+// *strings.Reader; collectors that pass an arbitrary io.Reader would otherwise
+// retry with an empty body.
+func ensureGetBody(req *http.Request) error {
+	if req.GetBody != nil || req.Body == nil || req.Body == http.NoBody {
+		return nil
+	}
+	buf, err := io.ReadAll(req.Body)
+	_ = req.Body.Close()
+	if err != nil {
+		return err
+	}
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(buf)), nil
+	}
+	req.Body, err = req.GetBody()
+	if err != nil {
+		return err
+	}
+	req.ContentLength = int64(len(buf))
+	return nil
 }

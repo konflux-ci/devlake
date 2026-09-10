@@ -242,6 +242,58 @@ func TestRoundTripper401RetryRestoresBody(t *testing.T) {
 	assert.Equal(t, `{"ok":true}`, bodies[1])
 }
 
+// TestRoundTripper401RetryRestoresBodyWithoutGetBody covers collectors that
+// attach an io.Reader without http.NewRequest setting GetBody.
+func TestRoundTripper401RetryRestoresBodyWithoutGetBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]interface{}{
+			"access_token": "new-token",
+			"expires_in":   3600,
+		}))
+	}))
+	defer server.Close()
+
+	conn := oauthConn(server.URL)
+	conn.SetOAuthAccessToken("old-token", time.Now().Add(10*time.Minute))
+	tp, err := NewTokenProvider(conn, nil)
+	require.NoError(t, err)
+
+	var bodies []string
+	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		body, readErr := io.ReadAll(req.Body)
+		require.NoError(t, readErr)
+		bodies = append(bodies, string(body))
+		if req.Header.Get("Authorization") == "Bearer old-token" {
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Body:       io.NopCloser(http.NoBody),
+				Request:    req,
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(http.NoBody),
+			Request:    req,
+		}, nil
+	})
+
+	rt := NewRefreshRoundTripper(base, tp)
+	req, reqErr := http.NewRequest(http.MethodPost, "https://example.com/rest", nil)
+	require.NoError(t, reqErr)
+	payload := `{"ok":true}`
+	req.Body = io.NopCloser(strings.NewReader(payload))
+	req.GetBody = nil
+	req.ContentLength = int64(len(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, tripErr := rt.RoundTrip(req)
+	require.NoError(t, tripErr)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Len(t, bodies, 2)
+	assert.Equal(t, payload, bodies[0])
+	assert.Equal(t, payload, bodies[1])
+}
+
 // TestRoundTripperPersistent401: fake Jira 401s even after remint. The round
 // tripper must retry once, then return that 401 (no infinite loop).
 func TestRoundTripperPersistent401(t *testing.T) {

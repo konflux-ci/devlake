@@ -134,7 +134,7 @@ func (jc *JiraConn) SetupAuthentication(req *http.Request) errors.Error {
 		if token == "" {
 			return errors.Unauthorized.New("oauth2 access token is missing")
 		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		req.Header.Set("Authorization", "Bearer "+token)
 		return nil
 	}
 	return jc.MultiAuth.SetupAuthenticationForConnection(jc, req)
@@ -151,9 +151,6 @@ func (jc *JiraConn) ValidateConnection(connection interface{}, v *validator.Vali
 			return errors.BadInput.New("cloudId must contain only letters, digits, and hyphens")
 		}
 		jc.ApplyGatewayEndpoint()
-		if jc.Endpoint == "" {
-			return errors.BadInput.New("cloudId is required for OAuth2")
-		}
 		if conn, ok := connection.(*JiraConnection); ok && strings.TrimSpace(conn.Name) == "" {
 			return errors.BadInput.New("name is required")
 		}
