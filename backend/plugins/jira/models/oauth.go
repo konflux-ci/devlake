@@ -36,7 +36,9 @@ const (
 	AtlassianOAuthTokenURL = "https://auth.atlassian.com/oauth/token"
 	defaultTokenTimeout    = 10 * time.Second
 	defaultTokenTTL        = 3600 * time.Second
-	maxOAuthResponseBytes  = 4096
+	// Atlassian access tokens are JWTs; with many scopes the JSON easily
+	// exceeds 4KiB. Keep a cap as a DoS guard, not a typical-token size.
+	maxOAuthResponseBytes = 64 * 1024
 )
 
 // NewOAuthHTTPClient returns an HTTP client for Atlassian token requests.
@@ -90,12 +92,18 @@ func (jc *JiraConn) MintOAuthAccessToken(httpClient *http.Client) errors.Error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxOAuthResponseBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxOAuthResponseBytes+1))
 	if err != nil {
 		return errors.Convert(err)
 	}
+	if len(body) > maxOAuthResponseBytes {
+		return errors.Default.New("oauth2 token response exceeded size limit")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return errors.Default.New(fmt.Sprintf("failed to mint oauth2 access token: %d: %s", resp.StatusCode, oauthErrorDetail(body)))
+	}
+	if len(strings.TrimSpace(string(body))) == 0 {
+		return errors.Default.New("oauth2 token endpoint returned an empty body")
 	}
 
 	var result struct {
@@ -104,7 +112,7 @@ func (jc *JiraConn) MintOAuthAccessToken(httpClient *http.Client) errors.Error {
 		TokenType   string `json:"token_type"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return errors.Convert(err)
+		return errors.Default.Wrap(err, fmt.Sprintf("decoding oauth2 token response (%d bytes)", len(body)))
 	}
 	if result.AccessToken == "" {
 		return errors.Default.New("empty oauth2 access token returned")

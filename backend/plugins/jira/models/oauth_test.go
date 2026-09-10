@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,4 +92,34 @@ func TestMintOAuthAccessTokenHTTPError(t *testing.T) {
 	assert.Contains(t, err.Error(), "401")
 	assert.Contains(t, err.Error(), "invalid_client")
 	assert.NotContains(t, err.Error(), `"error"`)
+}
+
+func TestMintOAuthAccessTokenAcceptsLargeJWT(t *testing.T) {
+	token := strings.Repeat("a", 8000)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]interface{}{
+			"access_token": token,
+			"expires_in":   3600,
+			"token_type":   "Bearer",
+			"scope":        strings.Repeat("read:jira-work ", 50),
+		}))
+	}))
+	defer server.Close()
+
+	jc := &JiraConn{OAuthTokenURL: server.URL}
+	err := jc.MintOAuthAccessToken(server.Client())
+	require.NoError(t, err)
+	assert.Equal(t, token, jc.OAuthAccessToken())
+}
+
+func TestMintOAuthAccessTokenEmptyBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	jc := &JiraConn{OAuthTokenURL: server.URL}
+	err := jc.MintOAuthAccessToken(server.Client())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty body")
 }
