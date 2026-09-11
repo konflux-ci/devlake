@@ -120,10 +120,6 @@ jobs:
         echo "Go e2e coverage generated:"
         go tool cover -func=./e2e-coverage/go-coverage.out | tail -1
 
-    - name: Install gpg for Codecov
-      if: always()
-      run: sudo apt-get update -qq && sudo apt-get install -y -qq gpg > /dev/null 2>&1
-
     - name: Upload Go e2e coverage to Codecov
       if: always()
       uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac  # v5
