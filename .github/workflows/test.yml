@@ -43,7 +43,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     container: mericodev/lake-builder:latest
     permissions:
-      id-token: write
+      contents: read
     steps:
     - name: Checkout code
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
@@ -83,16 +83,40 @@ jobs:
       run: |
         cd backend
         COVERAGE_OUTPUT_DIR=python/coverage make unit-test-python || echo "::warning::Python unit tests had failures (coverage still uploaded)"
-    - name: Install gpg for Codecov
-      if: always()
-      run: apt-get update -qq && apt-get install -y -qq gpg > /dev/null 2>&1
     - name: Custom plugins coverage
       if: always()
       run: |
         cd backend
         bash scripts/coverage-custom-plugins.sh
-    - name: Upload Go coverage to Codecov
+    - name: Upload coverage artifacts
       if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+      with:
+        name: unit-coverage
+        if-no-files-found: warn
+        retention-days: 1
+        path: |
+          backend/coverage-custom-plugins.out
+          backend/python/coverage/
+
+  # Fork-only: upload from the Ubuntu runner so codecov-action has gpg
+  upload-coverage:
+    needs: test
+    if: always() && needs.test.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+    - name: Download coverage artifacts
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+      with:
+        name: unit-coverage
+        path: backend
+        if-no-artifact-found: warn
+    - name: Upload Go coverage to Codecov
       uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac  # v5
       with:
         use_oidc: true

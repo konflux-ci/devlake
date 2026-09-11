@@ -311,3 +311,22 @@ fix.
 **Rebase notes:** Touches `fetchAsync` data-error / transport-error handling
 and `Execute` worker-error logging. Watch for upstream changes around
 `IgnoreQueryErrors` / `isIgnorableGraphqlQueryError`.
+
+## ci: unit-test Codecov upload on a separate Ubuntu job
+
+**Files:**
+- `.github/workflows/test.yml`
+
+**Reason:** Fork-only Codecov upload for owned plugins. `codecov-action` needs
+`gpg`, which is not in `mericodev/lake-builder` (Debian 11 / Bullseye). Installing
+it via `apt-get` in that container fails because `bullseye-security` InRelease
+expired after Debian 11 LTS EOL (2026-08-31). Tests stay in `lake-builder`;
+coverage artifacts are uploaded from a follow-on `ubuntu-latest` job with OIDC.
+
+**Upstream status:** N/A — upstream `test.yml` has no Codecov steps.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** Keep the `test` job aligned with upstream (container, unit
+tests). Re-apply the `Custom plugins coverage` / artifact upload steps and the
+`upload-coverage` job after upstream workflow changes.
