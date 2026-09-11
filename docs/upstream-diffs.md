@@ -288,3 +288,26 @@ has no equivalent table.
 **Rebase notes:** New files plus an append in `domaininfo.go` and
 `register.go:All()`. Low conflict risk unless upstream adds adjacent domain
 tables in the same slice.
+
+## graphql collector: include data-error message and variables in logs
+
+**Files:**
+- `backend/helpers/pluginhelper/api/graphql_collector.go`
+- `backend/helpers/pluginhelper/api/graphql_collector_test.go`
+
+**Reason:** `errors.Default.Wrap(dataError, "graphql query got error")` uses
+cockroachdb `WithDetail`. `Error()` then `%+v`s that wrapper, so pipeline
+messages look like `Wraps: (2) graphql query got error Error types: (1)
+*hintdetail.withDetail (2) *errors.errorString` and drop the GraphQL
+`Message`, locations, and request variables. Store/log a flattened string
+instead (`errors.Default.New`) so subtask `message` and worker logs include
+the real GitHub error and variables.
+
+**Upstream status:** Pending — should be contributed upstream as a diagnostics
+fix.
+**Upstream PR:** none yet
+**Owner:** @rsoaresd
+
+**Rebase notes:** Touches `fetchAsync` data-error / transport-error handling
+and `Execute` worker-error logging. Watch for upstream changes around
+`IgnoreQueryErrors` / `isIgnorableGraphqlQueryError`.
