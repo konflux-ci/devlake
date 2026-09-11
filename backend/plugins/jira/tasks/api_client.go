@@ -25,13 +25,33 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/jira/models"
+	"github.com/apache/incubator-devlake/plugins/jira/token"
 )
 
 func NewJiraApiClient(taskCtx plugin.TaskContext, connection *models.JiraConnection) (*api.ApiAsyncClient, errors.Error) {
+	if connection.IsOAuth2() {
+		connection.ApplyGatewayEndpoint()
+	}
 	// create synchronize api client so we can calculate api rate limit dynamically
 	apiClient, err := api.NewApiClientFromConnection(taskCtx.GetContext(), taskCtx, connection)
 	if err != nil {
 		return nil, err
+	}
+
+	if connection.IsOAuth2() {
+		logger := taskCtx.GetLogger()
+		tp, terr := token.NewTokenProvider(&connection.JiraConn, logger)
+		if terr != nil {
+			return nil, terr
+		}
+		baseTransport := apiClient.GetClient().Transport
+		if baseTransport == nil {
+			baseTransport = http.DefaultTransport
+		}
+		apiClient.GetClient().Transport = token.NewRefreshRoundTripper(baseTransport, tp)
+		// RoundTripper sets Authorization; do not also run SetupAuthentication.
+		apiClient.SetAuthFunction(nil)
+		logger.Info("Installed oauth2 token refresh round tripper for Jira connection %d", connection.ID)
 	}
 
 	// create rate limit calculator
