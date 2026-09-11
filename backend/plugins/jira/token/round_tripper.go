@@ -19,9 +19,14 @@ package token
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 )
+
+// maxRetryBodyBytes caps how much of a request body is buffered so a 401
+// retry can re-send it. Collection is almost entirely GET; this is a DoS guard.
+const maxRetryBodyBytes = int64(1 << 20)
 
 // RefreshRoundTripper automatically remints OAuth 2.0 client-credentials tokens.
 // On 401 the round tripper will:
@@ -35,6 +40,7 @@ type RefreshRoundTripper struct {
 	tokenProvider *TokenProvider
 }
 
+// NewRefreshRoundTripper wraps base with a round tripper that automatically remints the OAuth 2.0 token on 401 responses.
 func NewRefreshRoundTripper(base http.RoundTripper, tp *TokenProvider) *RefreshRoundTripper {
 	return &RefreshRoundTripper{
 		base:          base,
@@ -43,17 +49,23 @@ func NewRefreshRoundTripper(base http.RoundTripper, tp *TokenProvider) *RefreshR
 }
 
 // RoundTrip implements http.RoundTripper and remints the access token once on 401.
+// It may consume and close req.Body (per the RoundTripper contract) so a retry can
+// re-send the payload; it does not otherwise mutate req.
 func (rt *RefreshRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	return rt.roundTripWithRetry(req, false)
+	replay, err := snapshotRequestBody(req)
+	if err != nil {
+		return nil, err
+	}
+	return rt.roundTripWithRetry(req, replay, false)
 }
 
-func (rt *RefreshRoundTripper) roundTripWithRetry(req *http.Request, refreshAttempted bool) (*http.Response, error) {
+func (rt *RefreshRoundTripper) roundTripWithRetry(req *http.Request, replay bodyReplay, refreshAttempted bool) (*http.Response, error) {
 	token, err := rt.tokenProvider.GetToken()
 	if err != nil {
 		return nil, err
 	}
 
-	reqClone, cloneErr := cloneRequestWithBearer(req, token)
+	reqClone, cloneErr := cloneRequestWithBearer(req, token, replay)
 	if cloneErr != nil {
 		return nil, cloneErr
 	}
@@ -70,48 +82,55 @@ func (rt *RefreshRoundTripper) roundTripWithRetry(req *http.Request, refreshAtte
 			return nil, err
 		}
 
-		return rt.roundTripWithRetry(req, true)
+		return rt.roundTripWithRetry(req, replay, true)
 	}
 
 	return resp, nil
 }
 
-func cloneRequestWithBearer(req *http.Request, token string) (*http.Request, error) {
-	if err := ensureGetBody(req); err != nil {
-		return nil, err
-	}
+type bodyReplay struct {
+	getBody func() (io.ReadCloser, error)
+	length  int64
+}
+
+func cloneRequestWithBearer(req *http.Request, token string, replay bodyReplay) (*http.Request, error) {
 	reqClone := req.Clone(req.Context())
-	if req.GetBody != nil {
-		body, err := req.GetBody()
+	if replay.getBody != nil {
+		body, err := replay.getBody()
 		if err != nil {
 			return nil, err
 		}
 		reqClone.Body = body
+		reqClone.GetBody = replay.getBody
+		if replay.length >= 0 {
+			reqClone.ContentLength = replay.length
+		}
 	}
 	reqClone.Header.Set("Authorization", "Bearer "+token)
 	return reqClone, nil
 }
 
-// ensureGetBody snapshots the body when GetBody is missing so a 401 retry
-// can re-send it. http.NewRequest already sets GetBody for *bytes.Reader and
-// *strings.Reader; collectors that pass an arbitrary io.Reader would otherwise
-// retry with an empty body.
-func ensureGetBody(req *http.Request) error {
-	if req.GetBody != nil || req.Body == nil || req.Body == http.NoBody {
-		return nil
+// snapshotRequestBody returns a replayable body for clones. When GetBody is
+// already set, the original request is left untouched. Otherwise the original
+// Body is consumed and closed (allowed by http.RoundTripper) and a GetBody is
+// synthesized for clones only.
+func snapshotRequestBody(req *http.Request) (bodyReplay, error) {
+	if req.GetBody != nil {
+		return bodyReplay{getBody: req.GetBody, length: req.ContentLength}, nil
 	}
-	buf, err := io.ReadAll(req.Body)
+	if req.Body == nil || req.Body == http.NoBody {
+		return bodyReplay{}, nil
+	}
+	buf, err := io.ReadAll(io.LimitReader(req.Body, maxRetryBodyBytes+1))
 	_ = req.Body.Close()
 	if err != nil {
-		return err
+		return bodyReplay{}, err
 	}
-	req.GetBody = func() (io.ReadCloser, error) {
+	if int64(len(buf)) > maxRetryBodyBytes {
+		return bodyReplay{}, fmt.Errorf("request body exceeded %d-byte retry snapshot limit", maxRetryBodyBytes)
+	}
+	getBody := func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(buf)), nil
 	}
-	req.Body, err = req.GetBody()
-	if err != nil {
-		return err
-	}
-	req.ContentLength = int64(len(buf))
-	return nil
+	return bodyReplay{getBody: getBody, length: int64(len(buf))}, nil
 }

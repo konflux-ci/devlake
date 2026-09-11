@@ -37,6 +37,8 @@ type TokenProvider struct {
 	httpClient *http.Client
 	logger     log.Logger
 	mu         sync.Mutex
+	token      string
+	expiresAt  *time.Time
 }
 
 // NewTokenProvider creates a TokenProvider that uses a dedicated HTTP client for token requests.
@@ -54,6 +56,7 @@ func NewTokenProvider(conn *models.JiraConn, logger log.Logger) (*TokenProvider,
 	}, nil
 }
 
+// GetToken returns a valid OAuth 2.0 access token, minting a new one if the cached token is absent or near expiry.
 func (tp *TokenProvider) GetToken() (string, errors.Error) {
 	tp.mu.Lock()
 	defer tp.mu.Unlock()
@@ -61,8 +64,8 @@ func (tp *TokenProvider) GetToken() (string, errors.Error) {
 	if tp.needsRefresh() {
 		if tp.logger != nil {
 			expiresStr := "unknown"
-			if exp := tp.conn.OAuthAccessTokenExpiresAt(); exp != nil {
-				expiresStr = exp.Format(time.RFC3339)
+			if tp.expiresAt != nil {
+				expiresStr = tp.expiresAt.Format(time.RFC3339)
 			}
 			tp.logger.Info("Proactive oauth2 token refresh triggered (token expires at %s)", expiresStr)
 		}
@@ -70,25 +73,35 @@ func (tp *TokenProvider) GetToken() (string, errors.Error) {
 			return "", err
 		}
 	}
-	return tp.conn.OAuthAccessToken(), nil
+	return tp.token, nil
 }
 
 func (tp *TokenProvider) needsRefresh() bool {
-	if tp.conn.OAuthAccessToken() == "" {
+	if tp.token == "" {
 		return true
 	}
-	expiresAt := tp.conn.OAuthAccessTokenExpiresAt()
-	if expiresAt == nil {
+	if tp.expiresAt == nil {
 		return false
 	}
-	return time.Now().Add(DefaultRefreshBuffer).After(*expiresAt)
+	return time.Now().Add(DefaultRefreshBuffer).After(*tp.expiresAt)
 }
 
 func (tp *TokenProvider) refreshToken() errors.Error {
 	if tp.logger != nil {
 		tp.logger.Info("Minting Jira oauth2 access token via client_credentials")
 	}
-	return tp.conn.MintOAuthAccessToken(tp.httpClient)
+	token, expiresAt, err := tp.conn.MintOAuthAccessToken(tp.httpClient)
+	if err != nil {
+		return err
+	}
+	tp.cacheToken(token, expiresAt)
+	return nil
+}
+
+func (tp *TokenProvider) cacheToken(token string, expiresAt time.Time) {
+	tp.token = token
+	expiry := expiresAt
+	tp.expiresAt = &expiry
 }
 
 // ForceRefresh remints the access token if the current token is still equal to oldToken.
@@ -96,7 +109,7 @@ func (tp *TokenProvider) ForceRefresh(oldToken string) errors.Error {
 	tp.mu.Lock()
 	defer tp.mu.Unlock()
 
-	if tp.conn.OAuthAccessToken() != oldToken {
+	if tp.token != oldToken {
 		if tp.logger != nil {
 			tp.logger.Info("Skipping reactive oauth2 token refresh — token already changed by another goroutine")
 		}

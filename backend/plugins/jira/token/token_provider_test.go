@@ -44,18 +44,22 @@ func oauthConn(tokenURL string) *models.JiraConn {
 	return jc
 }
 
+func seedToken(tp *TokenProvider, token string, ttl time.Duration) {
+	tp.cacheToken(token, time.Now().Add(ttl))
+}
+
 func TestNeedsRefresh(t *testing.T) {
 	tp := &TokenProvider{conn: oauthConn("")}
 
 	assert.True(t, tp.needsRefresh(), "empty token should refresh")
 
-	tp.conn.SetOAuthAccessToken("tok", time.Now().Add(10*time.Minute))
+	seedToken(tp, "tok", 10*time.Minute)
 	assert.False(t, tp.needsRefresh())
 
-	tp.conn.SetOAuthAccessToken("tok", time.Now().Add(1*time.Minute))
+	seedToken(tp, "tok", 1*time.Minute)
 	assert.True(t, tp.needsRefresh())
 
-	tp.conn.SetOAuthAccessToken("tok", time.Now().Add(-1*time.Minute))
+	seedToken(tp, "tok", -1*time.Minute)
 	assert.True(t, tp.needsRefresh())
 }
 
@@ -72,10 +76,9 @@ func TestGetTokenMintsWhenExpired(t *testing.T) {
 	defer server.Close()
 
 	conn := oauthConn(server.URL)
-	conn.SetOAuthAccessToken("stale", time.Now().Add(-time.Minute))
-
 	tp, err := NewTokenProvider(conn, nil)
 	require.NoError(t, err)
+	seedToken(tp, "stale", -time.Minute)
 
 	token, err := tp.GetToken()
 	require.NoError(t, err)
@@ -94,17 +97,17 @@ func TestForceRefreshSkipsIfTokenChanged(t *testing.T) {
 	defer server.Close()
 
 	conn := oauthConn(server.URL)
-	conn.SetOAuthAccessToken("current", time.Now().Add(time.Hour))
 	tp, err := NewTokenProvider(conn, nil)
 	require.NoError(t, err)
+	seedToken(tp, "current", time.Hour)
 
 	require.NoError(t, tp.ForceRefresh("stale-old-token"))
 	assert.Equal(t, 0, calls)
-	assert.Equal(t, "current", conn.OAuthAccessToken())
+	assert.Equal(t, "current", tp.token)
 
 	require.NoError(t, tp.ForceRefresh("current"))
 	assert.Equal(t, 1, calls)
-	assert.Equal(t, "new-token", conn.OAuthAccessToken())
+	assert.Equal(t, "new-token", tp.token)
 }
 
 func TestGetTokenConcurrency(t *testing.T) {
@@ -154,10 +157,9 @@ func TestRoundTripper401Refresh(t *testing.T) {
 	defer server.Close()
 
 	conn := oauthConn(server.URL)
-	conn.SetOAuthAccessToken("old-token", time.Now().Add(10*time.Minute))
-
 	tp, err := NewTokenProvider(conn, nil)
 	require.NoError(t, err)
+	seedToken(tp, "old-token", 10*time.Minute)
 
 	apiCalls := 0
 	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -188,7 +190,7 @@ func TestRoundTripper401Refresh(t *testing.T) {
 	require.NoError(t, tripErr)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, 2, apiCalls)
-	assert.Equal(t, "new-token", conn.OAuthAccessToken())
+	assert.Equal(t, "new-token", tp.token)
 }
 
 // TestRoundTripper401RetryRestoresBody: fake Jira 401s Bearer old-token, the
@@ -205,9 +207,9 @@ func TestRoundTripper401RetryRestoresBody(t *testing.T) {
 	defer server.Close()
 
 	conn := oauthConn(server.URL)
-	conn.SetOAuthAccessToken("old-token", time.Now().Add(10*time.Minute))
 	tp, err := NewTokenProvider(conn, nil)
 	require.NoError(t, err)
+	seedToken(tp, "old-token", 10*time.Minute)
 
 	var bodies []string
 	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -254,9 +256,9 @@ func TestRoundTripper401RetryRestoresBodyWithoutGetBody(t *testing.T) {
 	defer server.Close()
 
 	conn := oauthConn(server.URL)
-	conn.SetOAuthAccessToken("old-token", time.Now().Add(10*time.Minute))
 	tp, err := NewTokenProvider(conn, nil)
 	require.NoError(t, err)
+	seedToken(tp, "old-token", 10*time.Minute)
 
 	var bodies []string
 	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -292,6 +294,7 @@ func TestRoundTripper401RetryRestoresBodyWithoutGetBody(t *testing.T) {
 	require.Len(t, bodies, 2)
 	assert.Equal(t, payload, bodies[0])
 	assert.Equal(t, payload, bodies[1])
+	assert.Nil(t, req.GetBody, "RoundTrip must not mutate the original request")
 }
 
 // TestRoundTripperPersistent401: fake Jira 401s even after remint. The round
@@ -306,9 +309,9 @@ func TestRoundTripperPersistent401(t *testing.T) {
 	defer server.Close()
 
 	conn := oauthConn(server.URL)
-	conn.SetOAuthAccessToken("old-token", time.Now().Add(10*time.Minute))
 	tp, err := NewTokenProvider(conn, nil)
 	require.NoError(t, err)
+	seedToken(tp, "old-token", 10*time.Minute)
 
 	apiCalls := 0
 	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -328,6 +331,26 @@ func TestRoundTripperPersistent401(t *testing.T) {
 	require.NoError(t, tripErr)
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	assert.Equal(t, 2, apiCalls)
+}
+
+func TestRoundTripperRejectsOversizedBody(t *testing.T) {
+	tp := &TokenProvider{conn: oauthConn("")}
+	seedToken(tp, "tok", time.Hour)
+	rt := NewRefreshRoundTripper(roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		t.Fatal("must not send an oversized body")
+		return nil, nil
+	}), tp)
+
+	payload := strings.Repeat("a", int(maxRetryBodyBytes)+1)
+	req, err := http.NewRequest(http.MethodPost, "https://example.com/rest", nil)
+	require.NoError(t, err)
+	req.Body = io.NopCloser(strings.NewReader(payload))
+	req.GetBody = nil
+	req.ContentLength = int64(len(payload))
+
+	_, tripErr := rt.RoundTrip(req)
+	require.Error(t, tripErr)
+	assert.Contains(t, tripErr.Error(), "retry snapshot limit")
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

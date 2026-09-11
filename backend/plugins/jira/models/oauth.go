@@ -66,9 +66,9 @@ func (jc *JiraConn) tokenURL() string {
 }
 
 // MintOAuthAccessToken exchanges client_id/client_secret for a Bearer access token.
-func (jc *JiraConn) MintOAuthAccessToken(httpClient *http.Client) errors.Error {
+func (jc *JiraConn) MintOAuthAccessToken(httpClient *http.Client) (string, time.Time, errors.Error) {
 	if httpClient == nil {
-		return errors.Default.New("oauth http client is required")
+		return "", time.Time{}, errors.Default.New("oauth http client is required")
 	}
 
 	form := url.Values{}
@@ -81,29 +81,29 @@ func (jc *JiraConn) MintOAuthAccessToken(httpClient *http.Client) errors.Error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, jc.tokenURL(), strings.NewReader(form.Encode()))
 	if err != nil {
-		return errors.Convert(err)
+		return "", time.Time{}, errors.Convert(err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return errors.Default.Wrap(err, "failed to request oauth2 access token")
+		return "", time.Time{}, errors.Default.Wrap(err, "failed to request oauth2 access token")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxOAuthResponseBytes+1))
 	if err != nil {
-		return errors.Convert(err)
+		return "", time.Time{}, errors.Convert(err)
 	}
 	if len(body) > maxOAuthResponseBytes {
-		return errors.Default.New("oauth2 token response exceeded size limit")
+		return "", time.Time{}, errors.Default.New("oauth2 token response exceeded size limit")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Default.New(fmt.Sprintf("failed to mint oauth2 access token: %d: %s", resp.StatusCode, oauthErrorDetail(body)))
+		return "", time.Time{}, errors.Default.New(fmt.Sprintf("failed to mint oauth2 access token: %d: %s", resp.StatusCode, oauthErrorDetail(body)))
 	}
 	if len(strings.TrimSpace(string(body))) == 0 {
-		return errors.Default.New("oauth2 token endpoint returned an empty body")
+		return "", time.Time{}, errors.Default.New("oauth2 token endpoint returned an empty body")
 	}
 
 	var result struct {
@@ -112,18 +112,17 @@ func (jc *JiraConn) MintOAuthAccessToken(httpClient *http.Client) errors.Error {
 		TokenType   string `json:"token_type"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return errors.Default.Wrap(err, fmt.Sprintf("decoding oauth2 token response (%d bytes)", len(body)))
+		return "", time.Time{}, errors.Default.Wrap(err, fmt.Sprintf("decoding oauth2 token response (%d bytes)", len(body)))
 	}
 	if result.AccessToken == "" {
-		return errors.Default.New("empty oauth2 access token returned")
+		return "", time.Time{}, errors.Default.New("empty oauth2 access token returned")
 	}
 
 	ttl := time.Duration(result.ExpiresIn) * time.Second
 	if ttl <= 0 {
 		ttl = defaultTokenTTL
 	}
-	jc.SetOAuthAccessToken(result.AccessToken, time.Now().Add(ttl))
-	return nil
+	return result.AccessToken, time.Now().Add(ttl), nil
 }
 
 // PrepareApiClient mints an OAuth 2.0 access token so subsequent requests can use Bearer auth.
@@ -139,7 +138,12 @@ func (jc *JiraConn) PrepareApiClient(_ plugin.ApiClient) errors.Error {
 	if err != nil {
 		return err
 	}
-	return jc.MintOAuthAccessToken(httpClient)
+	token, expiresAt, err := jc.MintOAuthAccessToken(httpClient)
+	if err != nil {
+		return err
+	}
+	jc.SetOAuthAccessToken(token, expiresAt)
+	return nil
 }
 
 func oauthErrorDetail(body []byte) string {

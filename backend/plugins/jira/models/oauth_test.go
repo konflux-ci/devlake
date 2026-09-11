@@ -56,15 +56,14 @@ func TestMintOAuthAccessToken(t *testing.T) {
 	}
 	jc.AuthMethod = AUTH_METHOD_OAUTH2
 
-	err := jc.MintOAuthAccessToken(server.Client())
+	token, expiresAt, err := jc.MintOAuthAccessToken(server.Client())
 	require.NoError(t, err)
 	assert.Equal(t, "application/x-www-form-urlencoded", gotContentType)
 	assert.Equal(t, "client_credentials", gotGrant)
 	assert.Equal(t, "cid", gotID)
 	assert.Equal(t, "csecret", gotSecret)
-	assert.Equal(t, "minted-token", jc.OAuthAccessToken())
-	require.NotNil(t, jc.OAuthAccessTokenExpiresAt())
-	assert.True(t, jc.OAuthAccessTokenExpiresAt().After(time.Now().Add(50*time.Minute)))
+	assert.Equal(t, "minted-token", token)
+	assert.True(t, expiresAt.After(time.Now().Add(50*time.Minute)))
 }
 
 func TestMintOAuthAccessTokenRejectsEmptyToken(t *testing.T) {
@@ -74,7 +73,7 @@ func TestMintOAuthAccessTokenRejectsEmptyToken(t *testing.T) {
 	defer server.Close()
 
 	jc := &JiraConn{OAuthTokenURL: server.URL}
-	err := jc.MintOAuthAccessToken(server.Client())
+	_, _, err := jc.MintOAuthAccessToken(server.Client())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty oauth2 access token")
 }
@@ -87,7 +86,7 @@ func TestMintOAuthAccessTokenHTTPError(t *testing.T) {
 	defer server.Close()
 
 	jc := &JiraConn{OAuthTokenURL: server.URL}
-	err := jc.MintOAuthAccessToken(server.Client())
+	_, _, err := jc.MintOAuthAccessToken(server.Client())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "401")
 	assert.Contains(t, err.Error(), "invalid_client")
@@ -107,9 +106,9 @@ func TestMintOAuthAccessTokenAcceptsLargeJWT(t *testing.T) {
 	defer server.Close()
 
 	jc := &JiraConn{OAuthTokenURL: server.URL}
-	err := jc.MintOAuthAccessToken(server.Client())
+	got, _, err := jc.MintOAuthAccessToken(server.Client())
 	require.NoError(t, err)
-	assert.Equal(t, token, jc.OAuthAccessToken())
+	assert.Equal(t, token, got)
 }
 
 func TestMintOAuthAccessTokenEmptyBody(t *testing.T) {
@@ -119,7 +118,29 @@ func TestMintOAuthAccessTokenEmptyBody(t *testing.T) {
 	defer server.Close()
 
 	jc := &JiraConn{OAuthTokenURL: server.URL}
-	err := jc.MintOAuthAccessToken(server.Client())
+	_, _, err := jc.MintOAuthAccessToken(server.Client())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty body")
+}
+
+func TestPrepareApiClientStoresTokenOnConn(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]interface{}{
+			"access_token": "test-conn-token",
+			"expires_in":   3600,
+		}))
+	}))
+	defer server.Close()
+
+	jc := &JiraConn{
+		ClientId:      "cid",
+		ClientSecret:  "csecret",
+		CloudId:       "cloud-1",
+		OAuthTokenURL: server.URL,
+	}
+	jc.AuthMethod = AUTH_METHOD_OAUTH2
+
+	require.NoError(t, jc.PrepareApiClient(nil))
+	assert.Equal(t, "test-conn-token", jc.OAuthAccessToken())
+	require.NotNil(t, jc.OAuthAccessTokenExpiresAt())
 }
