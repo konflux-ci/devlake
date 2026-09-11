@@ -289,38 +289,25 @@ has no equivalent table.
 `register.go:All()`. Low conflict risk unless upstream adds adjacent domain
 tables in the same slice.
 
-## jira: OAuth 2.0 client-credentials (service account / 2LO)
+## graphql collector: include data-error message and variables in logs
 
 **Files:**
-- `backend/plugins/jira/models/connection.go`
-- `backend/plugins/jira/models/oauth.go`
-- `backend/plugins/jira/models/connection_test.go`
-- `backend/plugins/jira/models/oauth_test.go`
-- `backend/plugins/jira/models/migrationscripts/20260907_add_oauth2_credentials.go`
-- `backend/plugins/jira/models/migrationscripts/register.go`
-- `backend/plugins/jira/api/connection_api.go`
-- `backend/plugins/jira/tasks/api_client.go`
-- `backend/plugins/jira/token/token_provider.go`
-- `backend/plugins/jira/token/round_tripper.go`
-- `backend/plugins/jira/token/token_provider_test.go`
-- `config-ui/src/plugins/register/jira/connection-fields/auth.tsx`
-- `config-ui/src/plugins/components/connection-form/index.tsx`
-- `config-ui/src/types/connection.ts`
-- `config-ui/src/api/connection/index.ts`
+- `backend/helpers/pluginhelper/api/graphql_collector.go`
+- `backend/helpers/pluginhelper/api/graphql_collector_test.go`
 
-**Reason:** Jira Cloud service accounts authenticate with OAuth 2.0 client
-credentials (`grant_type=client_credentials`), not Basic Auth / PAT. Access
-tokens last 60 minutes and API calls must go through
-`https://api.atlassian.com/ex/jira/{cloudId}/rest/`. Adds `authMethod=OAuth2`
-handling inside the Jira plugin (no core MultiAuth change), in-memory token
-minting, and a refresh round tripper for long collections.
+**Reason:** `errors.Default.Wrap(dataError, "graphql query got error")` uses
+cockroachdb `WithDetail`. `Error()` then `%+v`s that wrapper, so pipeline
+messages look like `Wraps: (2) graphql query got error Error types: (1)
+*hintdetail.withDetail (2) *errors.errorString` and drop the GraphQL
+`Message`, locations, and request variables. Store/log a flattened string
+instead (`errors.Default.New`) so subtask `message` and worker logs include
+the real GitHub error and variables.
 
-**Upstream status:** Pending — could be contributed upstream as a Jira plugin
-enhancement.
+**Upstream status:** Pending — should be contributed upstream as a diagnostics
+fix.
 **Upstream PR:** none yet
-**Owner:** @fmuntean
+**Owner:** @rsoaresd
 
-**Rebase notes:** Watch upstream changes to `JiraConn` / `_tool_jira_connections`,
-`NewJiraApiClient`, `testConnection` validation, and Config UI Cloud auth fields.
-`register.go` append is low risk. Shared Config UI connection form/types/API pick
-lists gained `cloudId` / `clientId` / `clientSecret`.
+**Rebase notes:** Touches `fetchAsync` data-error / transport-error handling
+and `Execute` worker-error logging. Watch for upstream changes around
+`IgnoreQueryErrors` / `isIgnorableGraphqlQueryError`.
