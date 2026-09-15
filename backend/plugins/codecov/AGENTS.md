@@ -12,7 +12,15 @@ golangci-lint run ./plugins/codecov/...         # lint
 
 Single-file verification: `go vet ./plugins/codecov/...`
 
-No e2e tests yet — coverage data is validated via unit tests and manual Grafana dashboard checks.
+Playwright e2e (requires `CODECOV_TOKEN`):
+
+```bash
+cd e2e
+export CODECOV_TOKEN=...   # Codecov API token for konflux-ci org
+npm run test:codecov
+```
+
+Exercises the full plugin lifecycle (connection → scope → blueprint → pipeline with all 13 subtasks). Runs in CI via `.github/workflows/test-e2e-coverage.yml` to drive Go coverage under the `e2e-go` flag.
 
 ## Layout
 
