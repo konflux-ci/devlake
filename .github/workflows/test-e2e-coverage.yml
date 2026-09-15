@@ -96,10 +96,24 @@ jobs:
         npm ci
         npx playwright install chromium --with-deps
 
+    - name: Verify Codecov e2e prerequisites
+      if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+      run: |
+        if [ -z "${{ secrets.CODECOV_TOKEN }}" ]; then
+          echo "::error::CODECOV_TOKEN GitHub Actions secret is required for codecov e2e tests"
+          exit 1
+        fi
+
     - name: Run Playwright e2e tests
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        CODECOV_ORG: konflux-ci
+        CODECOV_SERVICE: github
+        CODECOV_ENDPOINT: https://api.codecov.io
+        CODECOV_REPO: konflux-ci/coverport
       run: |
         cd e2e
-        npx playwright test basic-flow.spec.ts
+        npx playwright test basic-flow.spec.ts codecov-flow.spec.ts --timeout=900000
 
     - name: Collect Go e2e coverage via coverport
       if: always()
