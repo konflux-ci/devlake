@@ -42,7 +42,7 @@ Bot identity is **not** stored here — join `accounts.is_bot`.
 | `id` | string | Unique ID (hash of `repo_id:sha`) |
 | `commit_sha` | string | Commit SHA |
 | `repo_id` | string | Domain layer repository ID |
-| `ai_tool` | string | `cursor`, `claude`, `copilot`, `coderabbit`, `assisted_by_unknown`, `made_with_unknown`, `other` |
+| `ai_tool` | string | `cursor`, `claude`, `copilot`, `coderabbit`, `ymir`, `assisted_by_unknown`, `made_with_unknown`, `other` |
 | `author_name` | string | Git author name |
 | `authored_date` | datetime | Commit authored date |
 
