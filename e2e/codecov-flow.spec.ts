@@ -17,7 +17,7 @@ limitations under the License.
 
 import { test, expect, request } from '@playwright/test';
 
-const API = 'http://127.0.0.1:8080';
+const API = 'http://localhost:8080';
 const TOKEN = process.env.CODECOV_TOKEN;
 const ORG = process.env.CODECOV_ORG ?? 'konflux-ci';
 const SERVICE = process.env.CODECOV_SERVICE ?? 'github';

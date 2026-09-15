@@ -98,8 +98,10 @@ jobs:
 
     - name: Verify Codecov e2e prerequisites
       if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       run: |
-        if [ -z "${{ secrets.CODECOV_TOKEN }}" ]; then
+        if [ -z "$CODECOV_TOKEN" ]; then
           echo "::error::CODECOV_TOKEN GitHub Actions secret is required for codecov e2e tests"
           exit 1
         fi
