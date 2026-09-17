@@ -131,7 +131,7 @@ RUN cd /usr/local/deps/target/lib && \
         fi \
     done
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:57c8151c51445a07e503dab9dc9211dc3cdeac9d45ed81a10954b7d770659b3b AS base
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:7b8e25a1b56ca4d00219198f3b5b51a3e1693a5c4f5369c5e190d7d6cb3f980e AS base
 
 ARG TARGETARCH
 ARG TINI_VERSION=v0.19.0
