@@ -96,10 +96,32 @@ jobs:
         npm ci
         npx playwright install chromium --with-deps
 
-    - name: Run Playwright e2e tests
+    - name: Run basic-flow Playwright e2e tests
       run: |
         cd e2e
         npx playwright test basic-flow.spec.ts
+
+    - name: Verify Codecov e2e prerequisites
+      if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      run: |
+        if [ -z "$CODECOV_TOKEN" ]; then
+          echo "::error::CODECOV_TOKEN GitHub Actions secret is required for codecov e2e tests"
+          exit 1
+        fi
+
+    - name: Run codecov-flow Playwright e2e tests
+      if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        CODECOV_ORG: konflux-ci
+        CODECOV_SERVICE: github
+        CODECOV_ENDPOINT: https://api.codecov.io
+        CODECOV_REPO: konflux-ci/coverport
+      run: |
+        cd e2e
+        npx playwright test codecov-flow.spec.ts
 
     - name: Collect Go e2e coverage via coverport
       if: always()
@@ -119,10 +141,6 @@ jobs:
         go tool covdata textfmt -i=./e2e-coverage/raw -o=./e2e-coverage/go-coverage.out
         echo "Go e2e coverage generated:"
         go tool cover -func=./e2e-coverage/go-coverage.out | tail -1
-
-    - name: Install gpg for Codecov
-      if: always()
-      run: sudo apt-get update -qq && sudo apt-get install -y -qq gpg > /dev/null 2>&1
 
     - name: Upload Go e2e coverage to Codecov
       if: always()

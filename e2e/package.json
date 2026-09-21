@@ -6,7 +6,8 @@
   "scripts": {
     "test": "npx playwright test basic-flow.spec.ts",
     "test:all": "npx playwright test",
-    "test:coverage": "npx playwright test basic-flow.spec.ts"
+    "test:coverage": "npx playwright test basic-flow.spec.ts",
+    "test:codecov": "npx playwright test codecov-flow.spec.ts --timeout=900000"
   },
   "keywords": [],
   "author": "",
