@@ -288,3 +288,45 @@ has no equivalent table.
 **Rebase notes:** New files plus an append in `domaininfo.go` and
 `register.go:All()`. Low conflict risk unless upstream adds adjacent domain
 tables in the same slice.
+
+## graphql collector: include data-error message and variables in logs
+
+**Files:**
+- `backend/helpers/pluginhelper/api/graphql_collector.go`
+- `backend/helpers/pluginhelper/api/graphql_collector_test.go`
+
+**Reason:** `errors.Default.Wrap(dataError, "graphql query got error")` uses
+cockroachdb `WithDetail`. `Error()` then `%+v`s that wrapper, so pipeline
+messages look like `Wraps: (2) graphql query got error Error types: (1)
+*hintdetail.withDetail (2) *errors.errorString` and drop the GraphQL
+`Message`, locations, and request variables. Store/log a flattened string
+instead (`errors.Default.New`) so subtask `message` and worker logs include
+the real GitHub error and variables.
+
+**Upstream status:** Pending — should be contributed upstream as a diagnostics
+fix.
+**Upstream PR:** none yet
+**Owner:** @rsoaresd
+
+**Rebase notes:** Touches `fetchAsync` data-error / transport-error handling
+and `Execute` worker-error logging. Watch for upstream changes around
+`IgnoreQueryErrors` / `isIgnorableGraphqlQueryError`.
+
+## ci: unit-test Codecov upload on a separate Ubuntu job
+
+**Files:**
+- `.github/workflows/test.yml`
+
+**Reason:** Fork-only Codecov upload for owned plugins. `codecov-action` needs
+`gpg`, which is not in `mericodev/lake-builder` (Debian 11 / Bullseye). Installing
+it via `apt-get` in that container fails because `bullseye-security` InRelease
+expired after Debian 11 LTS EOL (2026-08-31). Tests stay in `lake-builder`;
+coverage artifacts are uploaded from a follow-on `ubuntu-latest` job with OIDC.
+
+**Upstream status:** N/A — upstream `test.yml` has no Codecov steps.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** Keep the `test` job aligned with upstream (container, unit
+tests). Re-apply the `Custom plugins coverage` / artifact upload steps and the
+`upload-coverage` job after upstream workflow changes.
