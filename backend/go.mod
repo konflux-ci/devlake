@@ -15,7 +15,7 @@ require (
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
 	github.com/lib/pq v1.10.2
 	github.com/libgit2/git2go/v33 v33.0.6
-	github.com/magiconair/properties v1.8.5
+	github.com/magiconair/properties v1.18.12
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/panjf2000/ants/v2 v2.4.6
 	github.com/robfig/cron/v3 v3.0.0
