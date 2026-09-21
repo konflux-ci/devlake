@@ -36,6 +36,6 @@ description: >-
 ## CI Behavior
 
 - **Unit tests**: Run on PRs via `make unit-test-go` (excludes `e2e/` and `models/` packages)
-- **E2E tests**: No e2e tests exist yet; adding `codecov/e2e/` would be auto-discovered by CI
+- **E2E tests**: Playwright spec at `e2e/codecov-flow.spec.ts` runs in `test-e2e-coverage` workflow (requires `CODECOV_TOKEN` secret)
 - **Lint**: Runs only on push to main/tags, not on PRs
 - Upstream CI also runs `plugins/table_info_test.go` — fails if `GetTablesInfo()` is incomplete
