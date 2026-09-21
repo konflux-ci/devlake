@@ -41,7 +41,7 @@ jobs:
           fetch-depth: 0
       - name: Cache golangci-lint
         id: cache-golangci-lint
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6
         with:
           path: golangci-lint
           key: ${{ runner.os }}-backend-golangci-lint
