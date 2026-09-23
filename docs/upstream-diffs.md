@@ -330,3 +330,25 @@ coverage artifacts are uploaded from a follow-on `ubuntu-latest` job with OIDC.
 **Rebase notes:** Keep the `test` job aligned with upstream (container, unit
 tests). Re-apply the `Custom plugins coverage` / artifact upload steps and the
 `upload-coverage` job after upstream workflow changes.
+
+## config-ui: connection fields for owned plugins
+
+**Files:**
+- `config-ui/src/plugins/components/connection-form/index.tsx`
+- `config-ui/src/api/connection/index.ts`
+- `config-ui/src/types/connection.ts`
+
+**Reason:** The shared connection form whitelists which values reach the backend,
+so each owned-plugin field must be listed in `IConnectionAPI`, the `test` /
+`testOld` payload `Pick<>`s, and both test-payload builders. Fields added so far:
+`service` (codecov); `ciTool`, `quayOrganization`, `githubOrganization`,
+`githubToken`, `project`, `junitRegex` (testregistry). Missing a builder is
+silent — Save Connection still works while Test Connection drops the field and
+the backend falls back to its default (COVERPORT-351).
+
+**Upstream status:** N/A — these fields belong to fork-only plugins.
+**Upstream PR:** none — not applicable
+**Owner:** @lipka28
+
+**Rebase notes:** The lists are additive; on conflict keep both upstream's fields
+and the fork's.
