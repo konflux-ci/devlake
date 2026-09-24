@@ -31,8 +31,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:57c8151c51445a07e503dab9
 
 USER 0
 
-RUN microdnf -y update && \
-    microdnf -y install \
+RUN microdnf -y install \
         nginx \
         httpd-tools \
         iproute \

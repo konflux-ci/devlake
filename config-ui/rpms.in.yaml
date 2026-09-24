@@ -1,0 +1,14 @@
+packages:
+  - nginx
+  - httpd-tools
+  - iproute
+  - gettext
+  - shadow-utils
+  - findutils
+  - tar
+  - coreutils-single
+contentOrigin:
+  repofiles:
+    - ./ubi.repo
+arches:
+  - x86_64
