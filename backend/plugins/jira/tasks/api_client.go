@@ -29,20 +29,26 @@ import (
 )
 
 func NewJiraApiClient(taskCtx plugin.TaskContext, connection *models.JiraConnection) (*api.ApiAsyncClient, errors.Error) {
+	var apiClient *api.ApiClient
+	var err errors.Error
 	if connection.IsOAuth2() {
 		connection.ApplyGatewayEndpoint()
-	}
-	// create synchronize api client so we can calculate api rate limit dynamically
-	apiClient, err := api.NewApiClientFromConnection(taskCtx.GetContext(), taskCtx, connection)
-	if err != nil {
-		return nil, err
-	}
-
-	if connection.IsOAuth2() {
+		apiClient, err = api.NewApiClient(
+			taskCtx.GetContext(),
+			connection.GetEndpoint(),
+			nil,
+			0,
+			connection.GetProxy(),
+			taskCtx,
+		)
+		if err != nil {
+			return nil, err
+		}
 		logger := taskCtx.GetLogger()
-		tp, terr := token.NewTokenProvider(&connection.JiraConn, logger)
-		if terr != nil {
-			return nil, terr
+		var tp *token.TokenProvider
+		tp, err = token.NewTokenProvider(&connection.JiraConn, logger)
+		if err != nil {
+			return nil, err
 		}
 		baseTransport := apiClient.GetClient().Transport
 		if baseTransport == nil {
@@ -50,6 +56,11 @@ func NewJiraApiClient(taskCtx plugin.TaskContext, connection *models.JiraConnect
 		}
 		apiClient.GetClient().Transport = token.NewRefreshRoundTripper(baseTransport, tp)
 		logger.Info("Installed oauth2 token refresh round tripper for Jira connection %d", connection.ID)
+	} else {
+		apiClient, err = api.NewApiClientFromConnection(taskCtx.GetContext(), taskCtx, connection)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// create rate limit calculator

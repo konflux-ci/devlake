@@ -41,6 +41,7 @@ export interface IConnectionAPI {
   rateLimitPerHour?: number;
   organization?: string;
   organizationId?: string;
+  service?: string;
   customHeaders?: ICustomHeader[];
   ciTool?: string;
   quayOrganization?: string;

@@ -59,6 +59,7 @@ No conflicts expected unless upstream touches the same field mapping block.
 - `backend/server/api/auth/revocation_cache.go`
 - `backend/server/api/auth/revocation_cache_test.go`
 - `backend/server/api/auth/auth_test.go`
+- `config-ui/src/utils/request.ts` (401 interceptor; skip plugin `/test` so remote credential failures do not redirect to `/login`)
 - `env.example` (OIDC/auth env var documentation)
 
 **Reason:** Upstream DevLake has no user authentication. This fork adds full OIDC login
@@ -289,6 +290,42 @@ has no equivalent table.
 `register.go:All()`. Low conflict risk unless upstream adds adjacent domain
 tables in the same slice.
 
+## jira: OAuth 2.0 client-credentials (service account / 2LO)
+
+**Files:**
+- `backend/plugins/jira/models/connection.go`
+- `backend/plugins/jira/models/oauth.go`
+- `backend/plugins/jira/models/connection_test.go`
+- `backend/plugins/jira/models/oauth_test.go`
+- `backend/plugins/jira/models/migrationscripts/20260907_add_oauth2_credentials.go`
+- `backend/plugins/jira/models/migrationscripts/register.go`
+- `backend/plugins/jira/api/connection_api.go`
+- `backend/plugins/jira/api/connection_api_test.go`
+- `backend/plugins/jira/tasks/api_client.go`
+- `backend/plugins/jira/token/token_provider.go`
+- `backend/plugins/jira/token/round_tripper.go`
+- `backend/plugins/jira/token/token_provider_test.go`
+- `config-ui/src/plugins/register/jira/connection-fields/auth.tsx`
+- `config-ui/src/plugins/components/connection-form/index.tsx`
+- `config-ui/src/types/connection.ts`
+- `config-ui/src/api/connection/index.ts`
+
+**Reason:** Jira Cloud service accounts authenticate with OAuth 2.0 client
+credentials (`grant_type=client_credentials`), not Basic Auth / PAT. Access
+tokens last 60 minutes and API calls must go through
+`https://api.atlassian.com/ex/jira/{cloudId}/rest/`. Adds `authMethod=OAuth2`
+handling inside the Jira plugin (no core MultiAuth change), in-memory token
+minting, and a refresh round tripper for long collections.
+
+**Upstream status:** Pending — could be contributed upstream as a Jira plugin
+enhancement.
+**Upstream PR:** none yet
+**Owner:** @fmuntean
+
+**Rebase notes:** Watch upstream changes to `JiraConn` / `_tool_jira_connections`,
+`NewJiraApiClient`, `testConnection` validation, and Config UI Cloud auth fields.
+`register.go` append is low risk. Shared Config UI connection form/types/API pick
+lists gained `cloudId` / `clientId` / `clientSecret`.
 ## graphql collector: include data-error message and variables in logs
 
 **Files:**
@@ -330,3 +367,25 @@ coverage artifacts are uploaded from a follow-on `ubuntu-latest` job with OIDC.
 **Rebase notes:** Keep the `test` job aligned with upstream (container, unit
 tests). Re-apply the `Custom plugins coverage` / artifact upload steps and the
 `upload-coverage` job after upstream workflow changes.
+
+## config-ui: connection fields for owned plugins
+
+**Files:**
+- `config-ui/src/plugins/components/connection-form/index.tsx`
+- `config-ui/src/api/connection/index.ts`
+- `config-ui/src/types/connection.ts`
+
+**Reason:** The shared connection form whitelists which values reach the backend,
+so each owned-plugin field must be listed in `IConnectionAPI`, the `test` /
+`testOld` payload `Pick<>`s, and both test-payload builders. Fields added so far:
+`service` (codecov); `ciTool`, `quayOrganization`, `githubOrganization`,
+`githubToken`, `project`, `junitRegex` (testregistry). Missing a builder is
+silent — Save Connection still works while Test Connection drops the field and
+the backend falls back to its default (COVERPORT-351).
+
+**Upstream status:** N/A — these fields belong to fork-only plugins.
+**Upstream PR:** none — not applicable
+**Owner:** @lipka28
+
+**Rebase notes:** The lists are additive; on conflict keep both upstream's fields
+and the fork's.
