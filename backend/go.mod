@@ -50,7 +50,7 @@ require (
 	github.com/konflux-ci/coverport/instrumentation/go v0.0.0-20260708090559-a0c568e41e08
 	github.com/merico-ai/graphql v0.0.0-20260206020408-b7fd267bcfac
 	github.com/rogpeppe/go-internal v1.13.1
-	github.com/snowflakedb/gosnowflake v1.19.1
+	github.com/snowflakedb/gosnowflake/v2 v2.2.0
 	golang.org/x/mod v0.27.0
 	google.golang.org/api v0.230.0
 	gopkg.in/yaml.v3 v3.0.1
