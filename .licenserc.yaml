@@ -51,6 +51,8 @@ header:
     - "**/poetry.lock"
     - "config-ui/.yarn/**/*"
     - "config-ui/yarn.lock"
+    # skywalking-eyes v0.7.0 has no comment style for yum .repo files.
+    - "**/*.repo"
     - ".github/ISSUE_TEMPLATE/*.md"
     - ".cursor/**"
     - ".cursorrules"
