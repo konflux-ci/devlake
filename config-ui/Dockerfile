@@ -26,7 +26,7 @@
 # DEPRECATED: Prefer config-ui/Containerfile (UBI 9) for local compose and Konflux builds.
 # This Debian Dockerfile is retained for upstream compatibility and will be removed later.
 
-FROM node:18-bookworm-slim as builder
+FROM node:24-bookworm-slim as builder
 
 WORKDIR /home/node/code
 COPY . .
