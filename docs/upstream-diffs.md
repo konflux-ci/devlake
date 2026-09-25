@@ -389,3 +389,20 @@ the backend falls back to its default (COVERPORT-351).
 
 **Rebase notes:** The lists are additive; on conflict keep both upstream's fields
 and the fork's.
+
+## ci: ignore yum repo files in the Apache header check
+
+**Files:**
+- `.licenserc.yaml`
+
+**Reason:** skywalking-eyes v0.7.0 cannot pick a comment style for `*.repo`.
+`config-ui/ubi.repo` is a yum repo file for the frontend RPM lockfile, so the
+header check ignored that extension. The YAML lockfile inputs keep a normal
+Apache header.
+
+**Upstream status:** N/A — the `.repo` file is fork-only Konflux input.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** Re-add the `**/*.repo` entry under `header.paths-ignore` if
+upstream replaces `.licenserc.yaml`.
