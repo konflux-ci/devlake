@@ -57,6 +57,8 @@ header:
     - ".pr_agent.toml"
     - ".gitleaks.toml"
     - ".github/workflows/fullsend.yaml"
+    - ".github/workflows/prioritize.yml"
+    - ".fullsend/**"
     - "CLAUDE.md"
     - "CODEOWNERS"
     - ".tekton/**"
