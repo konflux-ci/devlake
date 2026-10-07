@@ -31,7 +31,7 @@ type fixCommitsPrimaryKey struct{}
 // AutoMigrateTables, but MySQL's AutoMigrate does not reliably add a
 // composite PK to an existing table. The result: no PK, so
 // CreateOrUpdate always inserts, causing ~32x row duplication.
-func (u *fixCommitsPrimaryKey) Up(basicRes context.BasicRes) errors.Error {
+func (_ *fixCommitsPrimaryKey) Up(basicRes context.BasicRes) errors.Error {
 	db := basicRes.GetDal()
 	logger := basicRes.GetLogger()
 
@@ -53,54 +53,72 @@ func (u *fixCommitsPrimaryKey) Up(basicRes context.BasicRes) errors.Error {
 		}
 	}
 
-	// 2. Deduplicate — keep the row with the latest updated_at per (connection_id, repo_id, commit_sha)
+	// 2. Clean up leftover temp tables from a previous interrupted run
+	if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`); dropErr != nil {
+		logger.Warn(dropErr, "[fix-commits-pk] failed to drop leftover _dedup table")
+	}
+	if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_old`); dropErr != nil {
+		logger.Warn(dropErr, "[fix-commits-pk] failed to drop leftover _old table")
+	}
+
+	// 3. Deduplicate — keep exactly one row per (connection_id, repo_id, commit_sha).
+	// Uses ROW_NUMBER with a deterministic tie-breaker (updated_at DESC, created_at DESC)
+	// to handle duplicates that share the same updated_at timestamp.
 	logger.Info("[fix-commits-pk] Deduplicating _tool_codecov_commits")
 
-	err = db.Exec(`
-		CREATE TABLE _tool_codecov_commits_dedup LIKE _tool_codecov_commits
-	`)
+	err = db.Exec(`CREATE TABLE _tool_codecov_commits_dedup LIKE _tool_codecov_commits`)
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to create dedup table")
 	}
 
 	err = db.Exec(`
 		INSERT INTO _tool_codecov_commits_dedup
-		SELECT t.*
-		FROM _tool_codecov_commits t
-		INNER JOIN (
-			SELECT connection_id, repo_id, commit_sha, MAX(updated_at) AS max_updated
+		SELECT t.created_at, t.updated_at, t._raw_data_params, t._raw_data_table,
+		       t._raw_data_id, t._raw_data_remark, t.connection_id, t.repo_id,
+		       t.commit_sha, t.branch, t.commit_timestamp, t.message, t.author, t.parent_sha
+		FROM (
+			SELECT *, ROW_NUMBER() OVER (
+				PARTITION BY connection_id, repo_id, commit_sha
+				ORDER BY updated_at DESC, created_at DESC
+			) AS rn
 			FROM _tool_codecov_commits
-			GROUP BY connection_id, repo_id, commit_sha
-		) keep ON t.connection_id = keep.connection_id
-			AND t.repo_id = keep.repo_id
-			AND t.commit_sha = keep.commit_sha
-			AND t.updated_at = keep.max_updated
+		) t WHERE t.rn = 1
 	`)
 	if err != nil {
-		_ = db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`)
+		if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`); dropErr != nil {
+			logger.Warn(dropErr, "[fix-commits-pk] also failed to clean up _dedup table after INSERT error")
+		}
 		return errors.Default.Wrap(err, "failed to copy unique rows")
 	}
 
-	// 3. Atomic rename
+	// 4. Add PK on the replacement BEFORE swapping — validates uniqueness
+	// and avoids exposing a keyless table if ALTER fails.
+	err = db.Exec(`
+		ALTER TABLE _tool_codecov_commits_dedup
+		ADD PRIMARY KEY (connection_id, repo_id, commit_sha)
+	`)
+	if err != nil {
+		if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`); dropErr != nil {
+			logger.Warn(dropErr, "[fix-commits-pk] also failed to clean up _dedup table after PK error")
+		}
+		return errors.Default.Wrap(err, "failed to add primary key on dedup table")
+	}
+
+	// 5. Atomic rename: swap dedup into service
 	err = db.Exec(`
 		RENAME TABLE _tool_codecov_commits TO _tool_codecov_commits_old,
 		             _tool_codecov_commits_dedup TO _tool_codecov_commits
 	`)
 	if err != nil {
-		_ = db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`)
+		if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`); dropErr != nil {
+			logger.Warn(dropErr, "[fix-commits-pk] also failed to clean up _dedup table after RENAME error")
+		}
 		return errors.Default.Wrap(err, "failed to rename tables")
 	}
 
-	_ = db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_old`)
-
-	// 4. Add composite primary key
-	logger.Info("[fix-commits-pk] Adding PRIMARY KEY (connection_id, repo_id, commit_sha)")
-	err = db.Exec(`
-		ALTER TABLE _tool_codecov_commits
-		ADD PRIMARY KEY (connection_id, repo_id, commit_sha)
-	`)
-	if err != nil {
-		return errors.Default.Wrap(err, "failed to add primary key")
+	// 6. Drop old bloated table
+	if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_old`); dropErr != nil {
+		logger.Warn(dropErr, "[fix-commits-pk] could not drop _old table — clean up manually")
 	}
 
 	logger.Info("[fix-commits-pk] Done — duplicates removed, PK added")
