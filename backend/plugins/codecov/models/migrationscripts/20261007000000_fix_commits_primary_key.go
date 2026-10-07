@@ -31,11 +31,19 @@ type fixCommitsPrimaryKey struct{}
 // AutoMigrateTables, but MySQL's AutoMigrate does not reliably add a
 // composite PK to an existing table. The result: no PK, so
 // CreateOrUpdate always inserts, causing ~32x row duplication.
-func (_ *fixCommitsPrimaryKey) Up(basicRes context.BasicRes) errors.Error {
+func (*fixCommitsPrimaryKey) Up(basicRes context.BasicRes) errors.Error {
 	db := basicRes.GetDal()
 	logger := basicRes.GetLogger()
 
-	// 1. Check if PK already exists (idempotent)
+	// 1. Clean up leftover tables from a previous interrupted run (before any checks)
+	if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`); dropErr != nil {
+		logger.Warn(dropErr, "[fix-commits-pk] failed to drop leftover _dedup table")
+	}
+	if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_old`); dropErr != nil {
+		logger.Warn(dropErr, "[fix-commits-pk] failed to drop leftover _old table")
+	}
+
+	// 2. Check if PK already exists (idempotent)
 	rows, err := db.RawCursor(`
 		SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
 		WHERE TABLE_SCHEMA = DATABASE()
@@ -53,14 +61,6 @@ func (_ *fixCommitsPrimaryKey) Up(basicRes context.BasicRes) errors.Error {
 		}
 	}
 
-	// 2. Clean up leftover temp tables from a previous interrupted run
-	if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_dedup`); dropErr != nil {
-		logger.Warn(dropErr, "[fix-commits-pk] failed to drop leftover _dedup table")
-	}
-	if dropErr := db.Exec(`DROP TABLE IF EXISTS _tool_codecov_commits_old`); dropErr != nil {
-		logger.Warn(dropErr, "[fix-commits-pk] failed to drop leftover _old table")
-	}
-
 	// 3. Deduplicate — keep exactly one row per (connection_id, repo_id, commit_sha).
 	// Uses ROW_NUMBER with a deterministic tie-breaker (updated_at DESC, created_at DESC)
 	// to handle duplicates that share the same updated_at timestamp.
@@ -73,6 +73,9 @@ func (_ *fixCommitsPrimaryKey) Up(basicRes context.BasicRes) errors.Error {
 
 	err = db.Exec(`
 		INSERT INTO _tool_codecov_commits_dedup
+			(created_at, updated_at, _raw_data_params, _raw_data_table,
+			 _raw_data_id, _raw_data_remark, connection_id, repo_id,
+			 commit_sha, branch, commit_timestamp, message, author, parent_sha)
 		SELECT t.created_at, t.updated_at, t._raw_data_params, t._raw_data_table,
 		       t._raw_data_id, t._raw_data_remark, t.connection_id, t.repo_id,
 		       t.commit_sha, t.branch, t.commit_timestamp, t.message, t.author, t.parent_sha
