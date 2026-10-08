@@ -1,0 +1,5 @@
+connection_id,github_id,pull_request_id,body,author_username,author_user_id,commit_sha,github_submit_at,state
+1,501,1001,,reviewer1,201,sha001sha001sha001sha001sha001sha001sha0,2024-01-12T10:00:00.000+00:00,APPROVED
+1,502,1001,,reviewer2,202,sha002sha002sha002sha002sha002sha002sha0,2024-01-12T11:00:00.000+00:00,CHANGES_REQUESTED
+1,503,1001,,reviewer3,203,sha003sha003sha003sha003sha003sha003sha0,2024-01-12T12:00:00.000+00:00,COMMENTED
+1,504,1001,,reviewer2,202,sha004sha004sha004sha004sha004sha004sha0,2024-01-12T13:00:00.000+00:00,APPROVED
