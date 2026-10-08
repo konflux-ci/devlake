@@ -68,9 +68,14 @@ func CollectCommitCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 		logger.Info("[Codecov] CommitCoverage: Using default 90 days from %s", startDate.Format("2006-01-02"))
 	}
 
-	// Get commits filtered by sync policy
+	// Get distinct commits filtered by sync policy.
+	// The commits table may lack a PK (pre-migration), causing duplicate rows.
+	// Only commit_sha is needed downstream for the API iterator.
 	var commits []models.CodecovCommit
-	err = db.All(&commits, dal.Where("connection_id = ? AND repo_id = ? AND commit_timestamp >= ?", data.Options.ConnectionId, data.Options.FullName, startDate))
+	err = db.All(&commits,
+		dal.Select("DISTINCT connection_id, repo_id, commit_sha"),
+		dal.Where("connection_id = ? AND repo_id = ? AND commit_timestamp >= ?", data.Options.ConnectionId, data.Options.FullName, startDate),
+	)
 	if err != nil {
 		return err
 	}

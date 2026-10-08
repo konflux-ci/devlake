@@ -41,5 +41,6 @@ func All() []plugin.MigrationScript {
 		new(addRepoConfigTable),
 		new(dedupRawTables),
 		new(addServiceToConnections),
+		new(fixCommitsPrimaryKey),
 	}
 }
