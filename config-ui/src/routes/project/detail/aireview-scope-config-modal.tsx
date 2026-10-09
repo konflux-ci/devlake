@@ -76,6 +76,7 @@ export const AiReviewScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: Pr
   const cursorBugbotEnabled = Form.useWatch('cursorBugbotEnabled', form);
   const qodoEnabled = Form.useWatch('qodoEnabled', form);
   const geminiEnabled = Form.useWatch('geminiEnabled', form);
+  const fullsendEnabled = Form.useWatch('fullsendEnabled', form);
 
   useEffect(() => {
     const load = async () => {
@@ -247,6 +248,19 @@ export const AiReviewScopeConfigModal = ({ scopeConfigId, onCancel, onSave }: Pr
                     usernameField="geminiUsername"
                     patternField="geminiPattern"
                     enabled={!!geminiEnabled}
+                  />
+                ),
+              },
+              {
+                key: 'fullsend',
+                label: 'Fullsend',
+                children: (
+                  <ToolSection
+                    label="Fullsend"
+                    enabledField="fullsendEnabled"
+                    usernameField="fullsendUsername"
+                    patternField="fullsendPattern"
+                    enabled={!!fullsendEnabled}
                   />
                 ),
               },

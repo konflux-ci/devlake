@@ -45,6 +45,11 @@ type AiReviewScopeConfig struct {
 	GeminiUsername string `mapstructure:"geminiUsername" json:"geminiUsername" gorm:"type:varchar(255)"`
 	GeminiPattern  string `mapstructure:"geminiPattern" json:"geminiPattern" gorm:"type:varchar(500)"`
 
+	// Fullsend detection patterns
+	FullsendEnabled  bool   `mapstructure:"fullsendEnabled" json:"fullsendEnabled" gorm:"type:boolean"`
+	FullsendUsername string `mapstructure:"fullsendUsername" json:"fullsendUsername" gorm:"type:varchar(255)"`
+	FullsendPattern  string `mapstructure:"fullsendPattern" json:"fullsendPattern" gorm:"type:varchar(500)"`
+
 	// Generic AI detection patterns (for commit messages, PR descriptions)
 	// AiCommitPatterns is a single extra catch-all regex (not comma-separated)
 	// applied after built-in Co-Authored-By / Assisted-by / Made-with trailer matchers.
@@ -119,6 +124,9 @@ func GetDefaultScopeConfig() *AiReviewScopeConfig {
 		GeminiEnabled:         true,
 		GeminiUsername:        "gemini-code-assist",
 		GeminiPattern:         `(?i)(I'm Gemini Code Assist|codereviewagent|gstatic\.com/codereviewagent)`,
+		FullsendEnabled:       true,
+		FullsendUsername:      "fullsend-ai-",
+		FullsendPattern:       `(?i)(fullsend|<!-- fullsend:)`,
 		AiCommitPatterns:      `(?i)(?:co-authored-by|assisted-by|made-with):.*(?:\bai\b|chatgpt|openai)`,
 		AiPrLabelPattern:      `(?i)(ai-reviewed|coderabbit|automated-review)`,
 		RiskHighPattern:       `(?i)(critical|security|breaking|major)`,

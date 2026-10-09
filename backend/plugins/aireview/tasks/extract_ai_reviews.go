@@ -223,6 +223,16 @@ func detectAiTool(data *AiReviewTaskData, accountId, body string) (string, bool)
 		}
 	}
 
+	// Check Fullsend
+	if data.Options.ScopeConfig.FullsendEnabled {
+		if data.FullsendUsernameRegex != nil && data.FullsendUsernameRegex.MatchString(accountId) {
+			return models.AiToolFullsend, true
+		}
+		if data.FullsendPatternRegex != nil && data.FullsendPatternRegex.MatchString(body) {
+			return models.AiToolFullsend, true
+		}
+	}
+
 	return "", false
 }
 

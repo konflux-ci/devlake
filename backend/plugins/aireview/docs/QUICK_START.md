@@ -114,8 +114,18 @@ Scope config fields:
   "codeRabbitEnabled": true,
   "codeRabbitUsername": "coderabbitai",
   "codeRabbitPattern": "(?i)(coderabbit|walkthrough|summary by coderabbit)",
+  "qodoEnabled": true,
+  "qodoUsername": "qodo-merge",
+  "qodoPattern": "(?i)(qodo|pr reviewer guide|estimated effort to review)",
+  "geminiEnabled": true,
+  "geminiUsername": "gemini-code-assist",
+  "geminiPattern": "(?i)(I'm Gemini Code Assist|codereviewagent|gstatic\\.com/codereviewagent)",
+  "fullsendEnabled": true,
+  "fullsendUsername": "fullsend-ai-",
+  "fullsendPattern": "(?i)(fullsend|<!-- fullsend:)",
   "cursorBugbotEnabled": false,
   "cursorBugbotUsername": "cursor-bugbot",
+  "cursorBugbotPattern": "(?i)(cursor|bugbot)",
   "riskHighPattern": "(?i)(critical|security|vulnerability|breaking)",
   "riskMediumPattern": "(?i)(warning|caution|potential|moderate)",
   "riskLowPattern": "(?i)(minor|suggestion|consider|nitpick)"
@@ -216,6 +226,8 @@ curl -X POST http://localhost:8080/pipelines \
 |------|------------------|-------------------|---------|
 | CodeRabbit | `coderabbitai` | Summary by CodeRabbit, Walkthrough | Enabled |
 | Qodo | `qodo-merge` | PR Reviewer Guide, Estimated effort to review | Enabled |
+| Gemini Code Assist | `gemini-code-assist` | I'm Gemini Code Assist, codereviewagent | Enabled |
+| Fullsend | `fullsend-ai-` | fullsend, `<!-- fullsend:` HTML comments | Enabled |
 | Cursor Bugbot | `cursor-bugbot` | cursor, bugbot | Disabled |
 
 ## Troubleshooting
