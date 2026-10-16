@@ -349,6 +349,38 @@ fix.
 and `Execute` worker-error logging. Watch for upstream changes around
 `IgnoreQueryErrors` / `isIgnorableGraphqlQueryError`.
 
+## github/github_graphql: graphql client token refresh (cherry-pick)
+
+**Files:**
+- `backend/helpers/pluginhelper/api/graphql_async_client.go`
+- `backend/plugins/github/tasks/api_client.go`
+- `backend/plugins/github/tasks/http_client.go` (new)
+- `backend/plugins/github/token/round_tripper.go`
+- `backend/plugins/github_graphql/impl/impl.go`
+- `backend/plugins/github_graphql/tasks/graphql_client.go` (new)
+- `env.example`
+
+**Reason:** `updateRateRemaining` in `graphql_async_client.go` called `panic(err)`
+when the GitHub rate-limit API returned an error (e.g. 401 from an expired token).
+Because the panic fired inside a background goroutine, Go killed the entire process,
+causing ~80 container restarts in 4 days on the prod instance. The upstream fix
+replaces the panic with a logged fallback + retry, adds `StaticRoundTripper` for
+PAT token rotation, shares the REST client's authenticated HTTP transport with the
+GraphQL client (enabling GitHub App token auto-refresh), and introduces a
+hierarchical rate-limit fallback (`GRAPHQL_RATE_LIMIT` env → `WithFallbackRateLimit`
+→ default 1000).
+
+**Upstream status:** Merged
+**Upstream PR:** https://github.com/apache/devlake/pull/8791
+**Upstream commit:** `61d66a1339d35709868105cd85153c60b824f290`
+**Cherry-picked as:** konflux-ci/devlake#162
+**Owner:** @psturc
+
+**Rebase notes:** Clean cherry-pick, no conflicts. On next upstream rebase this
+entry can be removed — the changes will arrive via the normal merge. Watch for
+upstream changes to `graphql_async_client.go`, `api_client.go`, or
+`round_tripper.go`.
+
 ## ci: unit-test Codecov upload on a separate Ubuntu job
 
 **Files:**
