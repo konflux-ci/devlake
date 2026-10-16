@@ -31,8 +31,11 @@ import (
 	"google.golang.org/api/option"
 )
 
-// OpenshiftCIBucketName is the public GCS bucket that stores Prow job results.
-const OpenshiftCIBucketName = "test-platform-results"
+// OpenshiftCIBucketName is the anonymously readable GCS bucket that stores
+// Prow job artifacts. OpenShift CI cut over from test-platform-results to
+// test-platform-results-public around 2026-09-17; the old bucket no longer
+// allows unauthenticated listing.
+const OpenshiftCIBucketName = "test-platform-results-public"
 
 // maxFileSize caps individual GCS object reads at 10 MB.
 const maxFileSize = 10 * 1024 * 1024
