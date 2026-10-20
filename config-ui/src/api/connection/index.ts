@@ -67,6 +67,7 @@ export const test = (
       | 'githubToken'
       | 'project'
       | 'junitRegex'
+      | 'gitlabConnectionId'
     >
   >,
 ): Promise<IConnectionTestResult> =>
@@ -100,5 +101,6 @@ export const testOld = (
     | 'githubToken'
     | 'project'
     | 'junitRegex'
+    | 'gitlabConnectionId'
   >,
 ): Promise<IConnectionOldTestResult> => request(`/plugins/${plugin}/test`, { method: 'post', data: payload });

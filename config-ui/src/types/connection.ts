@@ -49,6 +49,7 @@ export interface IConnectionAPI {
   githubToken?: string;
   project?: string;
   junitRegex?: string;
+  gitlabConnectionId?: number;
 }
 
 export interface IConnectionTestResult {

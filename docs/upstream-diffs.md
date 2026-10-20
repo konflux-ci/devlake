@@ -421,3 +421,26 @@ the backend falls back to its default (COVERPORT-351).
 
 **Rebase notes:** The lists are additive; on conflict keep both upstream's fields
 and the fork's.
+
+## config-ui: aisdlc plugin registration
+
+**Files:**
+- `config-ui/src/plugins/register/index.ts`
+- `config-ui/src/plugins/register/aisdlc/`
+- `config-ui/src/plugins/components/scope-config-form/index.tsx`
+- `config-ui/src/plugins/components/connection-form/index.tsx`
+- `config-ui/src/api/connection/index.ts`
+- `config-ui/src/types/connection.ts`
+
+**Reason:** The AISDLC plugin is registered in the shared plugin list, and its
+station fields are edited on the scope-config form. `gitlabConnectionId` is also
+added to the connection test whitelist (same silent-drop as COVERPORT-351). The
+connection-form files are shared with the section above; keep both sets of fields.
+
+**Upstream status:** N/A — fork-only plugin.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** Re-apply the `AisdlcConfig` import, the `plugin === 'aisdlc'`
+branch, and the `gitlabConnectionId` entries. Plugin code under
+`config-ui/src/plugins/register/aisdlc/` is new and does not conflict with upstream.
