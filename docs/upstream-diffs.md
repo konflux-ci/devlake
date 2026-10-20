@@ -444,3 +444,20 @@ connection-form files are shared with the section above; keep both sets of field
 **Rebase notes:** Re-apply the `AisdlcConfig` import, the `plugin === 'aisdlc'`
 branch, and the `gitlabConnectionId` entries. Plugin code under
 `config-ui/src/plugins/register/aisdlc/` is new and does not conflict with upstream.
+
+## license header: AISDLC fixture files
+
+**Files:**
+- `.licenserc.yaml`
+
+**Reason:** The RFE result and strategy-task fixtures are copied source artifacts.
+An Apache header would change the bytes the parser tests read, and the strategy
+fixture must start with YAML front matter. They are ignored the same way other
+testdata inputs are.
+
+**Upstream status:** N/A — fork-only fixtures.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** Keep the `backend/plugins/aisdlc/tasks/testdata/**/*.md` entry in
+`paths-ignore`.
