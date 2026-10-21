@@ -224,6 +224,7 @@ func (c *GitlabClient) ListProjects(ctx context.Context, search, page string) ([
 }
 
 // ListBlobs returns parser-owned blobs under prefix.
+// ref is a commit SHA when CollectFiles calls this, so the tree matches GetRaw.
 func (c *GitlabClient) ListBlobs(ctx context.Context, projectPath, ref, prefix, parser string) ([]parse.TreeEntry, error) {
 	prefix = strings.Trim(prefix, "/")
 	if prefix != "" && strings.Contains(pathBase(prefix), ".") {

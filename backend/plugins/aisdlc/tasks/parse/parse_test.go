@@ -83,8 +83,10 @@ func TestParseRFEFixture(t *testing.T) {
 	cfg := testConfig(ParserRFE)
 	firstAt := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
 	secondAt := firstAt.Add(time.Hour)
-	first := Parse(cfg, []File{file}, firstAt)
-	second := Parse(cfg, []File{file}, secondAt)
+	file.CollectedAt = firstAt
+	first := Parse(cfg, []File{file})
+	file.CollectedAt = secondAt
+	second := Parse(cfg, []File{file})
 	if len(first.FileErrors) != 0 {
 		t.Fatal(first.FileErrors)
 	}
@@ -126,7 +128,7 @@ func TestParseStrategyFixture(t *testing.T) {
 	file.BlobID = "blob-strat"
 	file.CommitSHA = "commit-strat"
 	cfg := testConfig(ParserStrat)
-	set := Parse(cfg, []File{file}, time.Now().UTC())
+	set := Parse(cfg, []File{file})
 	if len(set.FileErrors) != 0 {
 		t.Fatal(set.FileErrors)
 	}
@@ -179,7 +181,7 @@ func TestParseStratTaskWithoutRun(t *testing.T) {
 	file := readFixture(t, "strat/RHAISTRAT/20260414-180837/strat-tasks/STRAT-1397.md")
 	file.BlobID = "blob-task"
 	cfg := testConfig(ParserStrat)
-	set := Parse(cfg, []File{file}, time.Now().UTC())
+	set := Parse(cfg, []File{file})
 	if len(set.FileErrors) != 0 || len(set.Observations) != 1 || len(set.Executions) != 0 {
 		t.Fatalf("errors=%v observations=%d executions=%d", set.FileErrors, len(set.Observations), len(set.Executions))
 	}

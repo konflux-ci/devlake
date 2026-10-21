@@ -25,7 +25,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var (
@@ -68,8 +67,8 @@ type built struct {
 }
 
 // Parse converts collected files into observations. Re-parsing the same blobs
-// yields the same observation ids.
-func Parse(cfg Config, files []File, collectedAt time.Time) DraftSet {
+// yields the same observation ids. Each observation keeps file.CollectedAt.
+func Parse(cfg Config, files []File) DraftSet {
 	set := DraftSet{}
 	items := map[string]WorkItem{}
 	execs := map[string]Execution{}
@@ -81,12 +80,12 @@ func Parse(cfg Config, files []File, collectedAt time.Time) DraftSet {
 		var err error
 		switch cfg.Parser {
 		case ParserRFE:
-			result, err = parseRFE(cfg, file, collectedAt)
+			result, err = parseRFE(cfg, file)
 		case ParserStrat:
 			if isPipelineData(file.Path) {
-				result, err = parsePipeline(cfg, file, collectedAt)
+				result, err = parsePipeline(cfg, file)
 			} else {
-				result, err = parseStratTask(cfg, file, collectedAt)
+				result, err = parseStratTask(cfg, file)
 			}
 		default:
 			err = fmt.Errorf("unknown parser %q", cfg.Parser)
@@ -112,7 +111,7 @@ func Parse(cfg Config, files []File, collectedAt time.Time) DraftSet {
 	return set
 }
 
-func parseRFE(cfg Config, file File, collectedAt time.Time) (built, error) {
+func parseRFE(cfg Config, file File) (built, error) {
 	match := rfeFilePattern.FindStringSubmatch(file.Path)
 	if match == nil {
 		return built{}, fmt.Errorf("result file name has no RFE key")
@@ -127,7 +126,7 @@ func parseRFE(cfg Config, file File, collectedAt time.Time) (built, error) {
 	if err != nil {
 		return built{}, err
 	}
-	obs := baseObservation(cfg, file, collectedAt, obsID, KindAssessment, subject, "", "git-rfe-v0.1", "file_assessment", selector)
+	obs := baseObservation(cfg, file, obsID, KindAssessment, subject, "", "git-rfe-v0.1", "file_assessment", selector)
 	obs.Extensions = string(rawExt)
 	if total != nil {
 		obs.AssessmentTotal = total
@@ -148,7 +147,7 @@ func parseRFE(cfg Config, file File, collectedAt time.Time) (built, error) {
 	return built{observations: []Observation{obs}, workItems: []WorkItem{subject}}, nil
 }
 
-func parsePipeline(cfg Config, file File, collectedAt time.Time) (built, error) {
+func parsePipeline(cfg Config, file File) (built, error) {
 	var doc pipelineFile
 	if err := json.Unmarshal([]byte(file.Body), &doc); err != nil {
 		return built{}, fmt.Errorf("pipeline-data.json: %w", err)
@@ -206,7 +205,7 @@ func parsePipeline(cfg Config, file File, collectedAt time.Time) (built, error) 
 		if err != nil {
 			return built{}, err
 		}
-		obs := baseObservation(cfg, file, collectedAt, obsID, KindProcessing, subject, executionID, "git-strat-v0.1", "batch_membership_known", selector)
+		obs := baseObservation(cfg, file, obsID, KindProcessing, subject, executionID, "git-strat-v0.1", "batch_membership_known", selector)
 		obs.RawResult = rawResult
 		obs.Extensions = string(rawExt)
 		obs.Evidence = []Evidence{evidence(cfg, file, obsID, selector)}
@@ -259,7 +258,7 @@ func parsePipeline(cfg Config, file File, collectedAt time.Time) (built, error) 
 	return result, nil
 }
 
-func parseStratTask(cfg Config, file File, collectedAt time.Time) (built, error) {
+func parseStratTask(cfg Config, file File) (built, error) {
 	fields := frontMatter(file.Body)
 	if len(fields) == 0 {
 		return built{}, fmt.Errorf("strat task has no front matter")
@@ -280,7 +279,7 @@ func parseStratTask(cfg Config, file File, collectedAt time.Time) (built, error)
 	if err != nil {
 		return built{}, err
 	}
-	obs := baseObservation(cfg, file, collectedAt, obsID, KindProcessing, subject, "", "git-strat-v0.1", "front_matter_only", selector)
+	obs := baseObservation(cfg, file, obsID, KindProcessing, subject, "", "git-strat-v0.1", "front_matter_only", selector)
 	obs.RawResult = fields["status"]
 	obs.Extensions = string(ext)
 	obs.Evidence = []Evidence{evidence(cfg, file, obsID, selector)}
@@ -304,7 +303,7 @@ func parseStratTask(cfg Config, file File, collectedAt time.Time) (built, error)
 	return built{observations: []Observation{obs}, workItems: items}, nil
 }
 
-func baseObservation(cfg Config, file File, collectedAt time.Time, id, kind string, subject WorkItem, executionID, adapter, completeness, selector string) Observation {
+func baseObservation(cfg Config, file File, id, kind string, subject WorkItem, executionID, adapter, completeness, selector string) Observation {
 	return Observation{
 		ID:            id,
 		Kind:          kind,
@@ -317,7 +316,7 @@ func baseObservation(cfg Config, file File, collectedAt time.Time, id, kind stri
 		FieldSelector: selector,
 		AdapterID:     adapter,
 		Completeness:  completeness,
-		CollectedAt:   collectedAt,
+		CollectedAt:   file.CollectedAt,
 		AttemptStatus: AttemptUnknown,
 	}
 }

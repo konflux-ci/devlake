@@ -18,8 +18,8 @@ limitations under the License.
 package tasks
 
 import (
+	"fmt"
 	"strings"
-	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -38,7 +38,7 @@ var ExtractObservationsMeta = plugin.SubTaskMeta{
 }
 
 // ExtractObservations parses stored blobs into observations.
-// Reading the same blob again updates collected_at and does not add a row.
+// collected_at is copied from the raw file, which collect sets when it last saw the blob.
 func ExtractObservations(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
@@ -50,19 +50,7 @@ func ExtractObservations(taskCtx plugin.SubTaskContext) errors.Error {
 	if err := db.All(&raws, dal.Where("connection_id = ? AND project_path = ?", data.Connection.ID, projectPath)); err != nil {
 		return err
 	}
-	prefix := strings.Trim(cfg.PathPrefix, "/")
-	files := make([]parse.File, 0, len(raws))
-	for _, raw := range raws {
-		if prefix != "" && raw.FilePath != prefix && !strings.HasPrefix(raw.FilePath, prefix+"/") {
-			continue
-		}
-		files = append(files, parse.File{
-			Path:      raw.FilePath,
-			BlobID:    raw.BlobId,
-			CommitSHA: raw.CommitSha,
-			Body:      raw.Body,
-		})
-	}
+	files := filesFromRaw(raws, cfg.PathPrefix)
 	webBase := ""
 	if glConn, glErr := LoadGitlabConnection(db, data.Connection.GitlabConnectionId); glErr == nil {
 		webBase = WebBase(glConn.Endpoint)
@@ -75,16 +63,48 @@ func ExtractObservations(taskCtx plugin.SubTaskContext) errors.Error {
 		Parser:      cfg.Parser,
 		ProjectPath: projectPath,
 		WebBase:     webBase,
-	}, files, time.Now().UTC())
-	for _, message := range set.FileErrors {
-		logger.Warn(nil, "parse %s", message)
+	}, files)
+	if err := saveDraft(db, data.Connection.ID, projectPath, cfg, set); err != nil {
+		return err
 	}
-	return saveDraft(db, data.Connection.ID, projectPath, cfg, set)
+	if len(set.FileErrors) == 0 {
+		return nil
+	}
+	message := strings.Join(set.FileErrors, "\n")
+	for _, item := range set.FileErrors {
+		logger.Warn(nil, "parse %s", item)
+	}
+	if err := appendCheckpointError(db, data.Connection.ID, projectPath, message); err != nil {
+		return err
+	}
+	return errors.Default.New(fmt.Sprintf("%d file(s) failed to parse: %s", len(set.FileErrors), message))
+}
+
+// filesFromRaw keeps each blob's collection time. A file that is no longer in the
+// tree is still here, and its collected_at stays at the last time collect saw it.
+func filesFromRaw(raws []models.AisdlcRawFile, prefix string) []parse.File {
+	prefix = strings.Trim(prefix, "/")
+	files := make([]parse.File, 0, len(raws))
+	for _, raw := range raws {
+		if prefix != "" && raw.FilePath != prefix && !strings.HasPrefix(raw.FilePath, prefix+"/") {
+			continue
+		}
+		files = append(files, parse.File{
+			Path:        raw.FilePath,
+			BlobID:      raw.BlobId,
+			CommitSHA:   raw.CommitSha,
+			Body:        raw.Body,
+			CollectedAt: raw.CollectedAt,
+		})
+	}
+	return files
 }
 
 func saveDraft(db dal.Dal, connectionID uint64, projectPath string, cfg *models.AisdlcScopeConfig, set parse.DraftSet) errors.Error {
+	params := scopeStamp(connectionID, projectPath)
 	for _, exec := range set.Executions {
 		row := &models.AisdlcExecution{
+			NoPKModel:        params,
 			Id:               exec.ID,
 			ConnectionId:     connectionID,
 			SourceId:         exec.SourceID,
@@ -99,6 +119,8 @@ func saveDraft(db dal.Dal, connectionID uint64, projectPath string, cfg *models.
 			return err
 		}
 	}
+	// Work items are shared by every scope on this connection. Leaving
+	// _raw_data_params empty keeps scope delete from removing a key another scope still uses.
 	for _, item := range set.WorkItems {
 		existing := &models.AisdlcWorkItem{}
 		err := db.First(existing, dal.Where("id = ? AND connection_id = ?", item.ID, connectionID))
@@ -125,6 +147,7 @@ func saveDraft(db dal.Dal, connectionID uint64, projectPath string, cfg *models.
 	}
 	for _, obs := range set.Observations {
 		row := &models.AisdlcObservation{
+			NoPKModel:       params,
 			Id:              obs.ID,
 			ConnectionId:    connectionID,
 			SchemaVersion:   parse.SchemaVersion,
@@ -154,14 +177,14 @@ func saveDraft(db dal.Dal, connectionID uint64, projectPath string, cfg *models.
 		if err := db.CreateOrUpdate(row); err != nil {
 			return err
 		}
-		if err := replaceChildren(db, connectionID, obs); err != nil {
+		if err := replaceChildren(db, connectionID, projectPath, obs); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func replaceChildren(db dal.Dal, connectionID uint64, obs parse.Observation) errors.Error {
+func replaceChildren(db dal.Dal, connectionID uint64, projectPath string, obs parse.Observation) errors.Error {
 	where := dal.Where("connection_id = ? AND observation_id = ?", connectionID, obs.ID)
 	if err := db.Delete(&models.AisdlcEvidence{}, where); err != nil {
 		return err
@@ -175,8 +198,10 @@ func replaceChildren(db dal.Dal, connectionID uint64, obs parse.Observation) err
 	if err := db.Delete(&models.AisdlcTime{}, where); err != nil {
 		return err
 	}
+	params := scopeStamp(connectionID, projectPath)
 	for _, ev := range obs.Evidence {
 		row := &models.AisdlcEvidence{
+			NoPKModel:     params,
 			Id:            ev.ID,
 			ConnectionId:  connectionID,
 			ObservationId: obs.ID,
@@ -191,6 +216,7 @@ func replaceChildren(db dal.Dal, connectionID uint64, obs parse.Observation) err
 	}
 	for _, link := range obs.Links {
 		row := &models.AisdlcItemLink{
+			NoPKModel:      params,
 			Id:             link.ID,
 			ConnectionId:   connectionID,
 			ObservationId:  obs.ID,
@@ -205,6 +231,7 @@ func replaceChildren(db dal.Dal, connectionID uint64, obs parse.Observation) err
 	}
 	for _, unknown := range obs.Unknowns {
 		row := &models.AisdlcUnknown{
+			NoPKModel:      params,
 			Id:             unknown.ID,
 			ConnectionId:   connectionID,
 			ObservationId:  obs.ID,
@@ -223,6 +250,7 @@ func replaceChildren(db dal.Dal, connectionID uint64, obs parse.Observation) err
 			normalized = &value
 		}
 		row := &models.AisdlcTime{
+			NoPKModel:      params,
 			Id:             parse.ID(obs.ID, "time", stamp.Type, stamp.Raw),
 			ConnectionId:   connectionID,
 			ObservationId:  obs.ID,

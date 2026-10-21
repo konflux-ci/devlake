@@ -18,6 +18,8 @@ limitations under the License.
 package tasks
 
 import (
+	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/aisdlc/models"
 )
 
@@ -42,3 +44,16 @@ type GitlabConnLookup struct {
 }
 
 func (GitlabConnLookup) TableName() string { return "_tool_gitlab_connections" }
+
+// scopeRawParams is the key DevLake uses to delete one scope's tool rows.
+func scopeRawParams(connectionID uint64, fullName string) string {
+	scope := models.AisdlcScope{FullName: fullName}
+	scope.ConnectionId = connectionID
+	return plugin.MarshalScopeParams(scope.ScopeParams())
+}
+
+func scopeStamp(connectionID uint64, fullName string) common.NoPKModel {
+	return common.NoPKModel{
+		RawDataOrigin: common.RawDataOrigin{RawDataParams: scopeRawParams(connectionID, fullName)},
+	}
+}

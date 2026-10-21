@@ -21,6 +21,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/apache/incubator-devlake/plugins/aisdlc/tasks/parse"
@@ -32,6 +33,9 @@ func TestListBlobsPaginatesAndFilters(t *testing.T) {
 		if r.URL.Path == "/user" {
 			w.WriteHeader(http.StatusOK)
 			return
+		}
+		if strings.Contains(r.URL.Path, "/repository/tree") && r.URL.Query().Get("ref") != "a1b2c3d4" {
+			t.Errorf("tree ref = %q", r.URL.Query().Get("ref"))
 		}
 		if r.URL.Query().Get("page") == "1" {
 			w.Header().Set("X-Next-Page", "2")
@@ -53,7 +57,7 @@ func TestListBlobsPaginatesAndFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := client.ListBlobs(context.Background(), "group/repo", "main", "", parse.ParserRFE)
+	entries, err := client.ListBlobs(context.Background(), "group/repo", "a1b2c3d4", "", parse.ParserRFE)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -27,7 +27,7 @@ Both repositories keep immutable timestamped batch directories on the branch tip
 
 `RHAIRFE/current` and `RHAISTRAT/current` are symlinks to the latest batch. Skip any path segment named `current` so the batch is stored once, under its timestamp directory.
 
-Observation identity is `source_id + blob sha + path + field selector + observation_kind`. A later commit that does not change the blob updates `collected_at` and does not add a row.
+Observation identity is `source_id + blob sha + path + field selector + observation_kind`. A later commit that does not change the blob updates `collected_at` and does not add a row. `collected_at` is the time `collectFiles` last saw the blob in the tree. Extraction copies that time, so a raw file that has left the tree keeps its previous stamp.
 
 ## Field mapping
 
@@ -46,6 +46,7 @@ Batches with no `pipeline-data.json` use `strat-tasks/*.md` front matter. Those 
 - Connection stores `gitlab_connection_id` only. The token is read from `_tool_gitlab_connections`.
 - Do not import `plugins/gitlab`.
 - Do not insert `issues` or `issue_relationships`. `linkWorkItems` sets `domain_issue_id` only when `issues.issue_key` matches exactly one row.
+- Project-scoped tool rows set `_raw_data_params` from the scope (`connectionId` and `fullName`) so deleting a scope removes them. Work items are shared by the connection and stay unstamped.
 - Apache 2.0 license header on every new `.go` file.
 
 ## Don'ts

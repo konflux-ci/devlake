@@ -69,7 +69,8 @@ func CollectFiles(taskCtx plugin.SubTaskContext) errors.Error {
 	if commitErr != nil {
 		return errors.Default.Wrap(commitErr, "gitlab branch commit")
 	}
-	entries, listErr := client.ListBlobs(ctx, projectPath, branch, cfg.PathPrefix, cfg.Parser)
+	// List and download the same commit. A branch name can move between the two calls.
+	entries, listErr := client.ListBlobs(ctx, projectPath, commit, cfg.PathPrefix, cfg.Parser)
 	if listErr != nil {
 		_ = saveCheckpoint(db, data.Connection.ID, projectPath, commit, branch, 0, listErr.Error())
 		return errors.Default.Wrap(listErr, "gitlab tree")
@@ -84,6 +85,7 @@ func CollectFiles(taskCtx plugin.SubTaskContext) errors.Error {
 		if findErr == nil && existing.BlobId == entry.ID && existing.Body != "" {
 			existing.CommitSha = commit
 			existing.CollectedAt = collectedAt
+			existing.RawDataParams = scopeRawParams(data.Connection.ID, projectPath)
 			if updateErr := db.Update(existing); updateErr != nil {
 				return updateErr
 			}
@@ -96,6 +98,7 @@ func CollectFiles(taskCtx plugin.SubTaskContext) errors.Error {
 			continue
 		}
 		row := &models.AisdlcRawFile{
+			NoPKModel:    scopeStamp(data.Connection.ID, projectPath),
 			Id:           rawID,
 			ConnectionId: data.Connection.ID,
 			ProjectPath:  projectPath,
@@ -112,6 +115,9 @@ func CollectFiles(taskCtx plugin.SubTaskContext) errors.Error {
 	message := strings.Join(failures, "\n")
 	if saveErr := saveCheckpoint(db, data.Connection.ID, projectPath, commit, branch, len(entries), message); saveErr != nil {
 		return saveErr
+	}
+	if len(failures) > 0 {
+		return errors.Default.New(fmt.Sprintf("%d download failure(s): %s", len(failures), message))
 	}
 	return nil
 }
@@ -133,7 +139,8 @@ func LoadGitlabConnection(db dal.Dal, id uint64) (*GitlabConnLookup, errors.Erro
 
 func saveCheckpoint(db dal.Dal, connectionID uint64, projectPath, commit, branch string, fileCount int, message string) errors.Error {
 	row := &models.AisdlcCheckpoint{
-		Id:               parse.ID("checkpoint", fmt.Sprintf("%d", connectionID), projectPath),
+		NoPKModel:        scopeStamp(connectionID, projectPath),
+		Id:               checkpointID(connectionID, projectPath),
 		ConnectionId:     connectionID,
 		ProjectPath:      projectPath,
 		ExaminedRevision: commit,
@@ -143,4 +150,26 @@ func saveCheckpoint(db dal.Dal, connectionID uint64, projectPath, commit, branch
 		CollectedAt:      time.Now().UTC(),
 	}
 	return db.CreateOrUpdate(row)
+}
+
+func checkpointID(connectionID uint64, projectPath string) string {
+	return parse.ID("checkpoint", fmt.Sprintf("%d", connectionID), projectPath)
+}
+
+// appendCheckpointError records a later failure without clearing the revision collect stored.
+func appendCheckpointError(db dal.Dal, connectionID uint64, projectPath, message string) errors.Error {
+	row := &models.AisdlcCheckpoint{}
+	err := db.First(row, dal.Where("id = ? AND connection_id = ?", checkpointID(connectionID, projectPath), connectionID))
+	if err != nil {
+		if db.IsErrorNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if row.ErrorMessage != "" {
+		row.ErrorMessage += "\n"
+	}
+	row.ErrorMessage += message
+	row.RawDataParams = scopeRawParams(connectionID, projectPath)
+	return db.Update(row)
 }

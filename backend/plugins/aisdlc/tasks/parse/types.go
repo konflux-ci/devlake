@@ -31,11 +31,13 @@ type Config struct {
 }
 
 // File is one collected artifact.
+// CollectedAt is when collect last saw this blob in the tree, not when it was parsed.
 type File struct {
-	Path      string
-	BlobID    string
-	CommitSHA string
-	Body      string
+	Path        string
+	BlobID      string
+	CommitSHA   string
+	Body        string
+	CollectedAt time.Time
 }
 
 // WorkItem is a source-qualified reference.
