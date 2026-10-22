@@ -37,6 +37,7 @@ import { CircleCITransformation } from '@/plugins/register/circleci';
 import { ArgoCDTransformation } from '@/plugins/register/argocd';
 import { GhCopilotTransformation } from '@/plugins/register/gh-copilot';
 import { AsanaTransformation } from '@/plugins/register/asana';
+import { AisdlcTransformation } from '@/plugins/register/aisdlc';
 import { DOC_URL } from '@/release';
 import { operator } from '@/utils';
 
@@ -304,6 +305,15 @@ export const ScopeConfigForm = ({
                   connectionId={connectionId}
                   transformation={transformation}
                   setTransformation={setTransformation}
+                />
+              )}
+
+              {plugin === 'aisdlc' && (
+                <AisdlcTransformation
+                  entities={entities}
+                  transformation={transformation}
+                  setTransformation={setTransformation}
+                  setHasError={setHasError}
                 />
               )}
 

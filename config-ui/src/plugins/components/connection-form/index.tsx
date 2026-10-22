@@ -70,6 +70,9 @@ const buildUpdateTestPayload = (connection: any, values: any, customHeaders: ICu
   githubToken: isEqual(connection?.githubToken, values.githubToken) ? undefined : values.githubToken,
   project: isEqual(connection?.project, values.project) ? undefined : values.project,
   junitRegex: isEqual(connection?.junitRegex, values.junitRegex) ? undefined : values.junitRegex,
+  gitlabConnectionId: isEqual(connection?.gitlabConnectionId, values.gitlabConnectionId)
+    ? undefined
+    : values.gitlabConnectionId,
 });
 
 const buildCreateTestPayload = (initialValues: any, values: any, customHeaders: ICustomHeader[] | undefined) =>
@@ -106,6 +109,7 @@ const buildCreateTestPayload = (initialValues: any, values: any, customHeaders: 
     'githubToken',
     'project',
     'junitRegex',
+    'gitlabConnectionId',
   ]);
 
 interface Props {

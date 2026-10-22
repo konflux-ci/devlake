@@ -19,6 +19,7 @@
 import { IPluginConfig } from '@/types';
 
 import { AgentReadyConfig } from './agentready';
+import { AisdlcConfig } from './aisdlc';
 import { ArgoCDConfig } from './argocd';
 import { AsanaConfig } from './asana';
 import { AzureConfig, AzureGoConfig } from './azure';
@@ -48,6 +49,7 @@ import { SlackConfig } from './slack/config';
 
 export const pluginConfigs: IPluginConfig[] = [
   AgentReadyConfig,
+  AisdlcConfig,
   ArgoCDConfig,
   AsanaConfig,
   AzureConfig,

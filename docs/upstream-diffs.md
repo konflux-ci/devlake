@@ -421,3 +421,43 @@ the backend falls back to its default (COVERPORT-351).
 
 **Rebase notes:** The lists are additive; on conflict keep both upstream's fields
 and the fork's.
+
+## config-ui: aisdlc plugin registration
+
+**Files:**
+- `config-ui/src/plugins/register/index.ts`
+- `config-ui/src/plugins/register/aisdlc/`
+- `config-ui/src/plugins/components/scope-config-form/index.tsx`
+- `config-ui/src/plugins/components/connection-form/index.tsx`
+- `config-ui/src/api/connection/index.ts`
+- `config-ui/src/types/connection.ts`
+
+**Reason:** The AISDLC plugin is registered in the shared plugin list, and its
+station fields are edited on the scope-config form. `gitlabConnectionId` is also
+added to the connection test whitelist (same silent-drop as COVERPORT-351). The
+connection-form files are shared with the section above; keep both sets of fields.
+
+**Upstream status:** N/A — fork-only plugin.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** Re-apply the `AisdlcConfig` import, the `plugin === 'aisdlc'`
+branch, and the `gitlabConnectionId` entries. Plugin code under
+`config-ui/src/plugins/register/aisdlc/` is new and does not conflict with upstream.
+
+## license header: AISDLC fixture files
+
+**Files:**
+- `.licenserc.yaml`
+
+**Reason:** The RFE result and strategy-task fixtures are copied source artifacts.
+An Apache header would change the bytes the parser tests read, and the strategy
+fixture must start with YAML front matter. They are ignored the same way other
+testdata inputs are.
+
+**Upstream status:** N/A — fork-only fixtures.
+**Upstream PR:** none — not applicable
+**Owner:** @fmuntean
+
+**Rebase notes:** Keep the `backend/plugins/aisdlc/tasks/testdata/**/*.md` entry in
+`paths-ignore`.
