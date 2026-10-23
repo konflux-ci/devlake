@@ -45,6 +45,7 @@ header:
     - "go.sum"
     - "requirements.txt"
     - "**/testdata/*.txt"
+    - "backend/plugins/aisdlc/tasks/testdata/**/*.md"
     - "**/empty"
     - "**/*.conf"
     - "deployment/helm/templates/_helpers.tpl"
