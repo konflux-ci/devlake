@@ -98,6 +98,7 @@ const (
 	AiToolClaude            = "claude"
 	AiToolQodo              = "qodo"
 	AiToolGemini            = "gemini"
+	AiToolFullsend          = "fullsend"
 	AiToolSonarQube         = "sonarqube"
 	AiToolCopilot           = "copilot"
 	AiToolAssistedByUnknown = "assisted_by_unknown"
