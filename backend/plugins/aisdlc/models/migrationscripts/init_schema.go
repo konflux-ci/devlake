@@ -34,7 +34,9 @@ type initSchema struct{}
 // Snapshot of the tool tables at version 20261020000001.
 // These types stay here so a later model change cannot rewrite this migration.
 
-type aisdlcNoPK20261020 struct {
+// AisdlcNoPK20261020 is exported so GORM migrates its fields. An unexported
+// embed is ignored, and created_at plus the _raw_data_* columns are never created.
+type AisdlcNoPK20261020 struct {
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 	RawDataParams string    `gorm:"column:_raw_data_params;type:varchar(255);index" json:"_raw_data_params"`
@@ -53,7 +55,7 @@ func (aisdlcConnection20261020) TableName() string {
 }
 
 type aisdlcScope20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	ConnectionId  uint64 `json:"connectionId" gorm:"primaryKey"`
 	ScopeConfigId uint64 `json:"scopeConfigId,omitempty"`
 	FullName      string `gorm:"primaryKey;type:varchar(255)"`
@@ -85,7 +87,7 @@ func (aisdlcScopeConfig20261020) TableName() string {
 }
 
 type aisdlcRawFile20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id           string `gorm:"primaryKey;type:varchar(64)"`
 	ConnectionId uint64 `gorm:"primaryKey"`
 	ProjectPath  string `gorm:"type:varchar(255);index"`
@@ -101,7 +103,7 @@ func (aisdlcRawFile20261020) TableName() string {
 }
 
 type aisdlcCheckpoint20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id               string `gorm:"primaryKey;type:varchar(64)"`
 	ConnectionId     uint64 `gorm:"primaryKey"`
 	ProjectPath      string `gorm:"type:varchar(255)"`
@@ -117,7 +119,7 @@ func (aisdlcCheckpoint20261020) TableName() string {
 }
 
 type aisdlcExecution20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id               string `gorm:"primaryKey;type:varchar(64)"`
 	ConnectionId     uint64 `gorm:"primaryKey"`
 	SourceId         string `gorm:"type:varchar(255)"`
@@ -134,7 +136,7 @@ func (aisdlcExecution20261020) TableName() string {
 }
 
 type aisdlcWorkItem20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id             string `gorm:"primaryKey;type:varchar(64)"`
 	ConnectionId   uint64 `gorm:"primaryKey"`
 	SourceSystem   string `gorm:"type:varchar(32)"`
@@ -151,7 +153,7 @@ func (aisdlcWorkItem20261020) TableName() string {
 }
 
 type aisdlcObservation20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id              string `gorm:"primaryKey;type:varchar(64)"`
 	ConnectionId    uint64 `gorm:"primaryKey"`
 	SchemaVersion   string `gorm:"type:varchar(16)"`
@@ -184,7 +186,7 @@ func (aisdlcObservation20261020) TableName() string {
 }
 
 type aisdlcEvidence20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id            string `gorm:"primaryKey;type:varchar(128)"`
 	ConnectionId  uint64 `gorm:"primaryKey"`
 	ObservationId string `gorm:"type:varchar(64);index"`
@@ -199,7 +201,7 @@ func (aisdlcEvidence20261020) TableName() string {
 }
 
 type aisdlcItemLink20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id             string `gorm:"primaryKey;type:varchar(128)"`
 	ConnectionId   uint64 `gorm:"primaryKey"`
 	ObservationId  string `gorm:"type:varchar(64);index"`
@@ -214,7 +216,7 @@ func (aisdlcItemLink20261020) TableName() string {
 }
 
 type aisdlcUnknown20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id             string `gorm:"primaryKey;type:varchar(128)"`
 	ConnectionId   uint64 `gorm:"primaryKey"`
 	ObservationId  string `gorm:"type:varchar(64);index"`
@@ -228,7 +230,7 @@ func (aisdlcUnknown20261020) TableName() string {
 }
 
 type aisdlcTime20261020 struct {
-	aisdlcNoPK20261020
+	AisdlcNoPK20261020
 	Id             string  `gorm:"primaryKey;type:varchar(128)"`
 	ConnectionId   uint64  `gorm:"primaryKey"`
 	ObservationId  string  `gorm:"type:varchar(64);index"`
