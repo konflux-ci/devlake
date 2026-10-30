@@ -49,6 +49,9 @@ export const test = (
       | 'token'
       | 'appId'
       | 'secretKey'
+      | 'cloudId'
+      | 'clientId'
+      | 'clientSecret'
       | 'proxy'
       | 'rateLimitPerHour'
       | 'dbUrl'
@@ -56,6 +59,7 @@ export const test = (
       | 'adminApiKey'
       | 'organization'
       | 'organizationId'
+      | 'service'
       | 'customHeaders'
       | 'ciTool'
       | 'quayOrganization'
@@ -63,6 +67,7 @@ export const test = (
       | 'githubToken'
       | 'project'
       | 'junitRegex'
+      | 'gitlabConnectionId'
     >
   >,
 ): Promise<IConnectionTestResult> =>
@@ -79,12 +84,16 @@ export const testOld = (
     | 'token'
     | 'appId'
     | 'secretKey'
+    | 'cloudId'
+    | 'clientId'
+    | 'clientSecret'
     | 'proxy'
     | 'rateLimitPerHour'
     | 'dbUrl'
     | 'adminApiKey'
     | 'organization'
     | 'organizationId'
+    | 'service'
     | 'customHeaders'
     | 'ciTool'
     | 'quayOrganization'
@@ -92,5 +101,6 @@ export const testOld = (
     | 'githubToken'
     | 'project'
     | 'junitRegex'
+    | 'gitlabConnectionId'
   >,
 ): Promise<IConnectionOldTestResult> => request(`/plugins/${plugin}/test`, { method: 'post', data: payload });

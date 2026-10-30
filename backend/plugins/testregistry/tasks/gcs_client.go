@@ -37,7 +37,8 @@ type GCSBucket struct {
 	bkt *storage.BucketHandle
 }
 
-// NewGCSBucketClient creates a new GCS client for the Openshift CI bucket.
+// NewGCSBucketClient creates a new GCS client for the Openshift CI public bucket
+// (test-platform-results-public).
 func NewGCSBucketClient(ctx context.Context) (*GCSBucket, errors.Error) {
 	inner, err := gcshelper.New(ctx, gcshelper.OpenshiftCIBucketName)
 	if err != nil {

@@ -52,6 +52,9 @@ const buildUpdateTestPayload = (connection: any, values: any, customHeaders: ICu
   token: isEqual(connection?.token, values.token) ? undefined : values.token,
   appId: isEqual(connection?.appId, values.appId) ? undefined : values.appId,
   secretKey: isEqual(connection?.secretKey, values.secretKey) ? undefined : values.secretKey,
+  cloudId: isEqual(connection?.cloudId, values.cloudId) ? undefined : values.cloudId,
+  clientId: isEqual(connection?.clientId, values.clientId) ? undefined : values.clientId,
+  clientSecret: isEqual(connection?.clientSecret, values.clientSecret) ? undefined : values.clientSecret,
   proxy: isEqual(connection?.proxy, values.proxy) ? undefined : values.proxy,
   rateLimitPerHour: isEqual(connection?.rateLimitPerHour, values.rateLimitPerHour)
     ? undefined
@@ -59,6 +62,7 @@ const buildUpdateTestPayload = (connection: any, values: any, customHeaders: ICu
   dbUrl: isEqual(connection?.dbUrl, values.dbUrl) ? undefined : values.dbUrl,
   companyId: isEqual(connection?.companyId, values.companyId) ? undefined : values.companyId,
   organization: isEqual(connection?.organization, values.organization) ? undefined : values.organization,
+  service: isEqual(connection?.service, values.service) ? undefined : values.service,
   customHeaders: isEqual(connection?.customHeaders, customHeaders) ? undefined : customHeaders,
   ciTool: isEqual(connection?.ciTool, values.ciTool) ? undefined : values.ciTool,
   quayOrganization: isEqual(connection?.quayOrganization, values.quayOrganization) ? undefined : values.quayOrganization,
@@ -66,6 +70,9 @@ const buildUpdateTestPayload = (connection: any, values: any, customHeaders: ICu
   githubToken: isEqual(connection?.githubToken, values.githubToken) ? undefined : values.githubToken,
   project: isEqual(connection?.project, values.project) ? undefined : values.project,
   junitRegex: isEqual(connection?.junitRegex, values.junitRegex) ? undefined : values.junitRegex,
+  gitlabConnectionId: isEqual(connection?.gitlabConnectionId, values.gitlabConnectionId)
+    ? undefined
+    : values.gitlabConnectionId,
 });
 
 const buildCreateTestPayload = (initialValues: any, values: any, customHeaders: ICustomHeader[] | undefined) =>
@@ -79,6 +86,9 @@ const buildCreateTestPayload = (initialValues: any, values: any, customHeaders: 
     'authMethod',
     'appId',
     'secretKey',
+    'cloudId',
+    'clientId',
+    'clientSecret',
     'accessKeyId',
     'secretAccessKey',
     'region',
@@ -91,6 +101,7 @@ const buildCreateTestPayload = (initialValues: any, values: any, customHeaders: 
     'dbUrl',
     'companyId',
     'organization',
+    'service',
     'customHeaders',
     'ciTool',
     'quayOrganization',
@@ -98,6 +109,7 @@ const buildCreateTestPayload = (initialValues: any, values: any, customHeaders: 
     'githubToken',
     'project',
     'junitRegex',
+    'gitlabConnectionId',
   ]);
 
 interface Props {
