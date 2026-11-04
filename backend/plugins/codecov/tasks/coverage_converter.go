@@ -68,6 +68,7 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 	taskCtx.GetLogger().Info("[ConvertCoverage] pre-loaded %d comparisons into memory", len(comparisonMap))
 
 	extractor, err := helper.NewApiExtractor(helper.ApiExtractorArgs{
+		Incremental: true,
 		RawDataSubTaskArgs: helper.RawDataSubTaskArgs{
 			Ctx: taskCtx,
 			Params: CodecovApiParams{
@@ -202,5 +203,11 @@ func ConvertCoverage(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	return extractor.Execute()
+	if err := extractor.Execute(); err != nil {
+		return err
+	}
+	return deleteConvertedRaw(taskCtx, RAW_COMMIT_COVERAGES_TABLE, CodecovApiParams{
+		ConnectionId: data.Options.ConnectionId,
+		Name:         data.Options.FullName,
+	})
 }

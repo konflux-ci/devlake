@@ -135,6 +135,7 @@ func setupConverterPreloadMocks(mockDal *mockdal.Dal, commits []models.CodecovCo
 		dst := args.Get(0).(*[]ComparisonData)
 		*dst = comparisons
 	}).Return(nil)
+	mockDal.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 }
 
 func setupEmptyTableMocks(mockDal *mockdal.Dal, tableName string) {

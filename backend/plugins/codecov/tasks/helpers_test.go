@@ -19,6 +19,9 @@ package tasks
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestParseFullName(t *testing.T) {
@@ -53,4 +56,29 @@ func TestParseFullName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeleteConvertedRaw_NoTable(t *testing.T) {
+	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	mockDal.On("HasTable", "_raw_codecov_api_commit_coverages").Return(false)
+
+	err := deleteConvertedRaw(mockCtx, RAW_COMMIT_COVERAGES_TABLE, CodecovApiParams{
+		ConnectionId: 1,
+		Name:         "owner/repo",
+	})
+	assert.Nil(t, err)
+	mockDal.AssertNotCalled(t, "Delete")
+}
+
+func TestDeleteConvertedRaw_DeletesMatchingParams(t *testing.T) {
+	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	mockDal.On("HasTable", "_raw_codecov_api_commit_coverages").Return(true)
+	mockDal.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	err := deleteConvertedRaw(mockCtx, RAW_COMMIT_COVERAGES_TABLE, CodecovApiParams{
+		ConnectionId: 1,
+		Name:         "owner/repo",
+	})
+	assert.Nil(t, err)
+	mockDal.AssertCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
 }
