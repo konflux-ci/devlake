@@ -32,6 +32,10 @@ type ApiExtractorArgs struct {
 	Params    interface{}
 	Extract   func(row *RawData) ([]interface{}, errors.Error)
 	BatchSize int
+	// Incremental skips deleting existing tool-layer rows for this raw table+params
+	// before insert. Use when raw may be a partial set (e.g. after truncating
+	// historical raw data) so convert upserts new rows instead of wiping history.
+	Incremental bool
 }
 
 // ApiExtractor helps you extract Raw Data from api responses to Tool Layer Data
@@ -95,6 +99,7 @@ func (extractor *ApiExtractor) Execute() errors.Error {
 	defer cursor.Close()
 	// batch save divider
 	divider := NewBatchSaveDivider(extractor.args.Ctx, extractor.args.BatchSize, extractor.table, extractor.params)
+	divider.SetIncrementalMode(extractor.args.Incremental)
 
 	// progress
 	extractor.args.Ctx.SetProgress(0, -1)
@@ -135,6 +140,10 @@ func (extractor *ApiExtractor) Execute() errors.Error {
 			}
 		}
 		extractor.args.Ctx.IncProgress(1)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return errors.Default.Wrap(err, "error iterating raw data cursor")
 	}
 
 	// save the last batches
