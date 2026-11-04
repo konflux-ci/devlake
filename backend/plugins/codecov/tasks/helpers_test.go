@@ -20,7 +20,6 @@ package tasks
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -66,7 +65,9 @@ func TestDeleteConvertedRaw_NoTable(t *testing.T) {
 		ConnectionId: 1,
 		Name:         "owner/repo",
 	})
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	mockDal.AssertNotCalled(t, "Delete")
 }
 
@@ -79,6 +80,8 @@ func TestDeleteConvertedRaw_DeletesMatchingParams(t *testing.T) {
 		ConnectionId: 1,
 		Name:         "owner/repo",
 	})
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	mockDal.AssertCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
 }

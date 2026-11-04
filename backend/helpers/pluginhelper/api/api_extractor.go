@@ -142,6 +142,10 @@ func (extractor *ApiExtractor) Execute() errors.Error {
 		extractor.args.Ctx.IncProgress(1)
 	}
 
+	if err := cursor.Err(); err != nil {
+		return errors.Default.Wrap(err, "error iterating raw data cursor")
+	}
+
 	// save the last batches
 	return divider.Close()
 }

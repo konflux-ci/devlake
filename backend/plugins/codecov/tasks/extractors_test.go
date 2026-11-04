@@ -20,6 +20,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -145,6 +146,7 @@ func setupEmptyTableMocks(mockDal *mockdal.Dal, tableName string) {
 	mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 }
 
 func TestConvertFlags_EmptyTable(t *testing.T) {
@@ -189,6 +191,7 @@ func TestConvertFlags_WithOneRow(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	flagJSON, _ := json.Marshal(map[string]any{
 		"flag_name":    "unit-tests",
@@ -228,6 +231,7 @@ func TestExtractCommits_WithOneRow(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	commitJSON, _ := json.Marshal(map[string]any{
 		"commitid":  "abc123def",
@@ -271,6 +275,7 @@ func TestConvertComparison_WithOneRow(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(ComparisonInput{
 		CommitSha: "abc123",
@@ -334,6 +339,7 @@ func TestConvertCoverageTrend_WithOneRow(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(map[string]string{"flag_name": "unit-tests"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -378,6 +384,7 @@ func TestConvertCoverage_WithOneRow(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitFlagInput{
 		CommitSha: "abc123",
@@ -431,6 +438,7 @@ func TestConvertCommitCoverage_WithOneRow(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitInput{CommitSha: "abc123"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -499,6 +507,7 @@ func TestConvertCoverageTrend_DateFallback(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(map[string]string{"flag_name": "unit-tests"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -542,6 +551,7 @@ func TestConvertCoverageTrend_InvalidDate(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(map[string]string{"flag_name": "unit-tests"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -589,6 +599,7 @@ func TestConvertCoverage_CommitFound(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitFlagInput{
 		CommitSha: "abc123",
@@ -640,6 +651,7 @@ func TestConvertCoverage_EmptyFlagName(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitFlagInput{CommitSha: "abc123", FlagName: ""})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -688,6 +700,7 @@ func TestConvertCoverage_FlagInMap(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitFlagInput{CommitSha: "abc123", FlagName: "unit-tests"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -744,6 +757,7 @@ func TestConvertCoverage_ComparisonFound(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitFlagInput{CommitSha: "abc123", FlagName: "unit-tests"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -792,6 +806,7 @@ func TestConvertCommitCoverage_CommitFound(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitInput{CommitSha: "abc123"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -840,6 +855,7 @@ func TestConvertCommitCoverage_CommitAndComparison(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitInput{CommitSha: "abc123"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -883,6 +899,7 @@ func TestConvertCommitCoverage_EmptyCommitSha(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitInput{CommitSha: ""})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -926,6 +943,7 @@ func TestConvertComparison_InvalidInputJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
 		dst := args.Get(1).(*helper.RawData)
@@ -957,6 +975,7 @@ func TestConvertComparison_InvalidDataJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(ComparisonInput{
 		CommitSha: "abc123",
@@ -994,6 +1013,7 @@ func TestConvertComparison_PatchNil(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(ComparisonInput{
 		CommitSha: "abc123",
@@ -1044,6 +1064,7 @@ func TestConvertComparison_PatchCoverageNil(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(ComparisonInput{
 		CommitSha: "abc123",
@@ -1100,6 +1121,7 @@ func TestConvertComparison_PatchZeroFilesAndLines(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(ComparisonInput{
 		CommitSha: "abc123",
@@ -1161,6 +1183,7 @@ func TestConvertFlags_InvalidJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
 		dst := args.Get(1).(*helper.RawData)
@@ -1191,6 +1214,7 @@ func TestConvertFlags_EmptyFlagName(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	flagJSON, _ := json.Marshal(map[string]any{
 		"flag_name":    "",
@@ -1232,6 +1256,7 @@ func TestExtractCommits_InvalidJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
 		dst := args.Get(1).(*helper.RawData)
@@ -1262,6 +1287,7 @@ func TestExtractCommits_EmptyTimestamp(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	commitJSON, _ := json.Marshal(map[string]any{
 		"commitid":  "abc123def",
@@ -1305,6 +1331,7 @@ func TestExtractCommits_InvalidTimestamp(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	commitJSON, _ := json.Marshal(map[string]any{
 		"commitid":  "abc123def",
@@ -1350,6 +1377,7 @@ func TestConvertCoverageTrend_InvalidInputJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
 		dst := args.Get(1).(*helper.RawData)
@@ -1381,6 +1409,7 @@ func TestConvertCoverageTrend_InvalidDataJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(map[string]string{"flag_name": "unit-tests"})
 
@@ -1417,6 +1446,7 @@ func TestConvertCoverage_InvalidInputJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
 		dst := args.Get(1).(*helper.RawData)
@@ -1449,6 +1479,7 @@ func TestConvertCoverage_InvalidDataJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitFlagInput{CommitSha: "abc123", FlagName: "unit-tests"})
 
@@ -1486,6 +1517,7 @@ func TestConvertCoverage_FlagNotInMap(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitFlagInput{CommitSha: "abc123", FlagName: "unit-tests"})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -1539,6 +1571,7 @@ func TestConvertCommitCoverage_InvalidInputJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
 		dst := args.Get(1).(*helper.RawData)
@@ -1571,6 +1604,7 @@ func TestConvertCommitCoverage_InvalidDataJSON(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitInput{CommitSha: "abc123"})
 
@@ -1608,6 +1642,7 @@ func TestConvertCommitCoverage_FallbackToTotalsCommitid(t *testing.T) {
 	mockRows.On("Next").Return(true).Once()
 	mockRows.On("Next").Return(false)
 	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
 
 	inputJSON, _ := json.Marshal(CommitInput{CommitSha: ""})
 	dataJSON, _ := json.Marshal(map[string]any{
@@ -1638,4 +1673,90 @@ func TestConvertCommitCoverage_FallbackToTotalsCommitid(t *testing.T) {
 
 	err := ConvertCommitCoverage(mockCtx)
 	assert.Nil(t, err)
+}
+
+func TestConvertCoverage_PartialRawDoesNotWipeExistingToolRows(t *testing.T) {
+	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
+	setupConverterPreloadMocks(mockDal, []models.CodecovCommit{
+		{ConnectionId: 1, RepoId: "owner/repo", CommitSha: "abc123", Branch: "main", CommitTimestamp: &ts},
+	}, nil)
+	mockRows := new(mockdal.Rows)
+
+	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
+	mockDal.On("Count", mock.Anything).Return(int64(1), nil)
+	mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
+	mockRows.On("Next").Return(true).Once()
+	mockRows.On("Next").Return(false)
+	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(nil)
+
+	inputJSON, _ := json.Marshal(CommitFlagInput{
+		CommitSha: "abc123",
+		FlagName:  "unit-tests",
+	})
+	dataJSON, _ := json.Marshal(map[string]any{
+		"commitid": "abc123",
+		"totals": map[string]any{
+			"files": 10, "lines": 500, "hits": 400,
+			"misses": 80, "partials": 20, "coverage": 80.0, "methods": 50,
+		},
+	})
+	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
+		dst := args.Get(1).(*helper.RawData)
+		*dst = helper.RawData{
+			ID:     1,
+			Params: `{"ConnectionId":1,"Name":"owner/repo"}`,
+			Data:   dataJSON,
+			Input:  inputJSON,
+		}
+	}).Return(nil)
+	mockDal.On("GetPrimaryKeyFields", mock.Anything).Return([]reflect.StructField{
+		{Name: "ConnectionId", Type: reflect.TypeOf(uint64(0))},
+		{Name: "RepoId", Type: reflect.TypeOf("")},
+		{Name: "FlagName", Type: reflect.TypeOf("")},
+		{Name: "Branch", Type: reflect.TypeOf("")},
+		{Name: "CommitSha", Type: reflect.TypeOf("")},
+	})
+	mockDal.On("CreateOrUpdate", mock.Anything, mock.Anything).Return(nil)
+	mockDal.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockDal.On("Delete", mock.Anything, mock.Anything).Return(nil)
+
+	err := ConvertCoverage(mockCtx)
+	assert.Nil(t, err)
+	for _, call := range mockDal.Calls {
+		if call.Method != "Delete" {
+			continue
+		}
+		if _, ok := call.Arguments.Get(0).(*models.CodecovCoverage); ok {
+			t.Fatal("tool-layer wipe Delete was called; Incremental convert must upsert only")
+		}
+	}
+}
+
+func TestConvertCoverage_CursorErrSkipsRawCleanup(t *testing.T) {
+	mockCtx, mockDal, _ := setupCodecovMocks(t)
+	setupConverterPreloadMocks(mockDal, nil, nil)
+	mockRows := new(mockdal.Rows)
+
+	mockDal.On("HasTable", "_raw_"+RAW_COMMIT_COVERAGES_TABLE).Return(true)
+	mockDal.On("Count", mock.Anything).Return(int64(1), nil)
+	mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
+	mockRows.On("Next").Return(true).Once()
+	mockRows.On("Next").Return(false)
+	mockRows.On("Close").Return(nil)
+	mockRows.On("Err").Return(fmt.Errorf("cursor failed"))
+	mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
+		dst := args.Get(1).(*helper.RawData)
+		*dst = helper.RawData{
+			ID:     1,
+			Params: `{"ConnectionId":1,"Name":"owner/repo"}`,
+			Data:   []byte(`{}`),
+			Input:  []byte(`{"commit_sha":"abc","flag_name":"unit"}`),
+		}
+	}).Return(nil)
+
+	err := ConvertCoverage(mockCtx)
+	assert.Error(t, err)
+	mockDal.AssertNotCalled(t, "Delete")
 }
