@@ -461,3 +461,30 @@ testdata inputs are.
 
 **Rebase notes:** Keep the `backend/plugins/aisdlc/tasks/testdata/**/*.md` entry in
 `paths-ignore`.
+
+## api_extractor: opt-in Incremental convert and cursor.Err
+
+**Files:**
+- `backend/helpers/pluginhelper/api/api_extractor.go`
+
+**Reason:** Default `ApiExtractor` deletes existing tool-layer rows for the raw
+table+params before insert. Codecov coverage convert can see a partial raw set
+(collectors skip from `_tool_*`, or raw was truncated), so that wipe dropped
+historical `_tool_codecov_coverages` / `_tool_codecov_commit_coverages`.
+`ApiExtractorArgs.Incremental` plus `divider.SetIncrementalMode` makes convert
+upsert instead. `cursor.Err()` after `Next()` false so a failed iterate does
+not look like success (codecov then deletes converted raw).
+
+Default remains full replace. Only codecov coverage converters pass
+`Incremental: true`.
+
+**Upstream status:** Pending — should be contributed upstream as a helper
+opt-in plus a cursor-error check.
+**Upstream PR:** none yet
+**Owner:** @psturc
+
+**Rebase notes:** Watch `ApiExtractorArgs` and `Execute()` around
+`NewBatchSaveDivider` / `SetIncrementalMode` and the cursor loop. Re-apply
+`Incremental bool` (last field), the `SetIncrementalMode` call, and the
+`cursor.Err()` check before `divider.Close()`. Callers outside codecov must
+stay default-false.
