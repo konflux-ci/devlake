@@ -130,21 +130,26 @@ func getRunningTaskById(taskId uint64) *RunningTaskData {
 	return runningTasks.tasks[taskId]
 }
 
+// updateTaskProgress drains the task's progress channel until it is closed,
+// then signals done. runningTasks.mu is shared by every running task, so it is
+// held only for the in-memory update; DB writes happen outside of it and are
+// throttled by runner.ProgressTracker. Holding the lock across a DB round trip
+// per record serialized all concurrent extractors.
 func updateTaskProgress(done chan struct{}, taskId uint64, progress chan plugin.RunningProgress) {
-	data := getRunningTaskById(taskId)
-	if data == nil {
-		return
+	defer func() { done <- struct{}{} }()
+	progressDetail := &models.TaskProgressDetail{}
+	if data := getRunningTaskById(taskId); data != nil {
+		progressDetail = data.ProgressDetail
 	}
-	progressDetail := data.ProgressDetail
-	for {
-		p, hasMore := <-progress
-		if hasMore {
-			runningTasks.mu.Lock()
-			runner.UpdateProgressDetail(basicRes, taskId, progressDetail, &p)
-			runningTasks.mu.Unlock()
-		} else {
-			done <- struct{}{}
-			break
-		}
+	tracker := runner.NewProgressTracker(progressDetail, basicRes.GetConfigReader().GetBool("SKIP_SUBTASK_PROGRESS"))
+	for p := range progress {
+		runningTasks.mu.Lock()
+		writes := tracker.Apply(&p)
+		runningTasks.mu.Unlock()
+		runner.SaveProgressWrites(basicRes, taskId, writes)
 	}
+	runningTasks.mu.Lock()
+	writes := tracker.Flush()
+	runningTasks.mu.Unlock()
+	runner.SaveProgressWrites(basicRes, taskId, writes)
 }

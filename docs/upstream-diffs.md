@@ -488,3 +488,31 @@ opt-in plus a cursor-error check.
 `Incremental bool` (last field), the `SetIncrementalMode` call, and the
 `cursor.Err()` check before `divider.Close()`. Callers outside codecov must
 stay default-false.
+
+## runner: throttle subtask progress writes outside the global task lock
+
+**Files:**
+- `backend/core/runner/progress.go` (new file)
+- `backend/core/runner/progress_test.go` (new file)
+- `backend/core/runner/run_task.go` (removed `UpdateProgressDetail`)
+- `backend/server/services/task_runner.go` (`updateTaskProgress`)
+
+**Reason:** Extractors call `SetProgress(0, -1)` and `IncProgress(1)` per record.
+Upstream `UpdateProgressDetail` then ran `UPDATE _devlake_subtasks` for every
+record while holding `runningTasks.mu`, a mutex shared by all running tasks.
+With `PIPELINE_MAX_PARALLEL=50` this capped prod extractors at ~1 row/s, raw
+cursors stayed open for 10–70+ minutes, and MySQL dropped them
+(`invalid connection`). Before the `cursor.Err()` check, that silently left
+tool tables with 35–40% of the rows. `ProgressTracker` now updates progress in
+memory under the lock, writes `finished_records` at most every
+`SubtaskProgressInterval` (2s) plus a final count at subtask end, and the DB
+writes run after the lock is released. `SKIP_SUBTASK_PROGRESS` is still honored.
+
+**Upstream status:** Pending — upstream has the same per-record write under the
+global lock.
+**Upstream PR:** none yet
+**Owner:** @psturc
+
+**Rebase notes:** If upstream changes `UpdateProgressDetail` or
+`updateTaskProgress`, keep the DB writes out of `runningTasks.mu` and keep the
+throttle. The only caller of the tracker is `updateTaskProgress`.
