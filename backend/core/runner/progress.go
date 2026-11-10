@@ -18,6 +18,8 @@ limitations under the License.
 package runner
 
 import (
+	goerrors "errors"
+	"fmt"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/context"
@@ -56,9 +58,10 @@ func (w ProgressWrites) Empty() bool {
 // decides which DB writes they imply, throttling subtask record counts.
 //
 // A tracker belongs to a single task's progress goroutine and is not safe for
-// concurrent use. Apply and Flush mutate the shared TaskProgressDetail, so the
-// caller must hold whatever lock guards it; the returned writes should be
-// persisted with SaveProgressWrites after releasing that lock.
+// concurrent use. Apply, Flush and Unsaved read or mutate the shared
+// TaskProgressDetail, so the caller must hold whatever lock guards it; the
+// returned writes should be persisted with SaveProgressWrites after releasing
+// that lock.
 type ProgressTracker struct {
 	detail      *models.TaskProgressDetail
 	skipSubtask bool
@@ -68,10 +71,14 @@ type ProgressTracker struct {
 	lastWrite        time.Time
 	persistedName    string
 	persistedRecords int
+	// retry holds failed final counts of subtasks that are no longer current.
+	retry []SubtaskRecords
 }
 
 // NewProgressTracker returns a tracker that updates detail in place.
 // When skipSubtask is true, finished_records is never written to the DB.
+// skipSubtask is fixed for the tracker's lifetime; it comes from an
+// environment variable, which cannot change while the process runs.
 func NewProgressTracker(detail *models.TaskProgressDetail, skipSubtask bool) *ProgressTracker {
 	return &ProgressTracker{
 		detail:      detail,
@@ -83,9 +90,9 @@ func NewProgressTracker(detail *models.TaskProgressDetail, skipSubtask bool) *Pr
 
 // Apply records the event in the progress detail and returns the DB writes it
 // requires, if any.
-func (t *ProgressTracker) Apply(p *plugin.RunningProgress) ProgressWrites {
+func (pt *ProgressTracker) Apply(p *plugin.RunningProgress) ProgressWrites {
 	var w ProgressWrites
-	d := t.detail
+	d := pt.detail
 	switch p.Type {
 	case plugin.TaskSetProgress:
 		d.TotalSubTasks = p.Total
@@ -93,7 +100,7 @@ func (t *ProgressTracker) Apply(p *plugin.RunningProgress) ProgressWrites {
 	case plugin.TaskIncProgress:
 		d.FinishedSubTasks = p.Current
 		// a subtask just finished: persist its final record count
-		t.appendPending(&w)
+		pt.appendPending(&w)
 		if p.Total > 0 {
 			pct := float32(p.Current) / float32(p.Total)
 			w.TaskProgress = &pct
@@ -102,65 +109,91 @@ func (t *ProgressTracker) Apply(p *plugin.RunningProgress) ProgressWrites {
 		d.TotalRecords = p.Total
 	case plugin.SubTaskIncProgress:
 		d.FinishedRecords = p.Current
-		if t.now().Sub(t.lastWrite) >= t.interval {
-			t.appendPending(&w)
+		if pt.now().Sub(pt.lastWrite) >= pt.interval {
+			pt.appendPending(&w)
 		}
 	case plugin.SetCurrentSubTask:
-		t.appendPending(&w)
+		pt.appendPending(&w)
 		d.SubTaskName = p.SubTaskName
 		d.SubTaskNumber = p.SubTaskNumber
 		d.FinishedRecords = 0
 		// let the first progress of the new subtask show up immediately
-		t.lastWrite = time.Time{}
+		pt.lastWrite = time.Time{}
 	}
 	return w
 }
 
 // Flush returns the pending record count of the current subtask, if it has
-// not been persisted yet. Call it once the progress channel is closed.
-func (t *ProgressTracker) Flush() ProgressWrites {
+// not been persisted yet, plus any failed writes still to retry. Call it once
+// the progress channel is closed.
+func (pt *ProgressTracker) Flush() ProgressWrites {
 	var w ProgressWrites
-	t.appendPending(&w)
+	pt.appendPending(&w)
 	return w
 }
 
-func (t *ProgressTracker) appendPending(w *ProgressWrites) {
-	d := t.detail
-	if t.skipSubtask || d.SubTaskName == "" {
+// Unsaved reports subtask writes that SaveProgressWrites failed to persist,
+// so the next write or Flush retries them instead of assuming they were saved.
+func (pt *ProgressTracker) Unsaved(failed []SubtaskRecords) {
+	for _, s := range failed {
+		if s.Name == pt.detail.SubTaskName {
+			if pt.persistedName == s.Name && pt.persistedRecords == s.FinishedRecords {
+				pt.persistedName = ""
+				pt.persistedRecords = 0
+			}
+			continue
+		}
+		pt.retry = append(pt.retry, s)
+	}
+}
+
+func (pt *ProgressTracker) appendPending(w *ProgressWrites) {
+	if len(pt.retry) > 0 {
+		w.Subtasks = append(w.Subtasks, pt.retry...)
+		pt.retry = nil
+		pt.lastWrite = pt.now()
+	}
+	d := pt.detail
+	if pt.skipSubtask || d.SubTaskName == "" {
 		return
 	}
 	persisted := 0
-	if t.persistedName == d.SubTaskName {
-		persisted = t.persistedRecords
+	if pt.persistedName == d.SubTaskName {
+		persisted = pt.persistedRecords
 	}
 	if d.FinishedRecords == persisted {
 		return
 	}
 	w.Subtasks = append(w.Subtasks, SubtaskRecords{Name: d.SubTaskName, FinishedRecords: d.FinishedRecords})
-	t.persistedName = d.SubTaskName
-	t.persistedRecords = d.FinishedRecords
-	t.lastWrite = t.now()
+	pt.persistedName = d.SubTaskName
+	pt.persistedRecords = d.FinishedRecords
+	pt.lastWrite = pt.now()
 }
 
-// SaveProgressWrites persists writes produced by a ProgressTracker. Failures
-// are logged, not returned: progress is informational and must not fail a task.
-func SaveProgressWrites(basicRes context.BasicRes, taskId uint64, w ProgressWrites) {
+// SaveProgressWrites persists writes produced by a ProgressTracker. It attempts
+// every write and returns the subtask writes that failed, so the tracker can
+// retry them, together with all failures joined into one error.
+func SaveProgressWrites(basicRes context.BasicRes, taskId uint64, w ProgressWrites) ([]SubtaskRecords, error) {
 	if w.Empty() {
-		return
+		return nil, nil
 	}
 	db := basicRes.GetDal()
+	var errs []error
 	if w.TaskProgress != nil {
 		task := &models.Task{Model: common.Model{ID: taskId}}
 		if err := db.UpdateColumn(task, "progress", *w.TaskProgress); err != nil {
-			basicRes.GetLogger().Error(err, "failed to update progress")
+			errs = append(errs, fmt.Errorf("updating task %d progress: %w", taskId, err))
 		}
 	}
+	var failed []SubtaskRecords
 	for _, s := range w.Subtasks {
 		err := db.UpdateColumns(&models.Subtask{}, []dal.DalSet{
 			{ColumnName: "finished_records", Value: s.FinishedRecords},
 		}, dal.Where("task_id = ? and name = ?", taskId, s.Name))
 		if err != nil {
-			basicRes.GetLogger().Error(err, "failed to update _devlake_subtasks progress")
+			failed = append(failed, s)
+			errs = append(errs, fmt.Errorf("updating task %d subtask %q finished_records: %w", taskId, s.Name, err))
 		}
 	}
+	return failed, goerrors.Join(errs...)
 }

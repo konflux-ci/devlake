@@ -22,8 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/unithelper"
+	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
 )
 
 type fakeClock struct{ t time.Time }
@@ -191,3 +197,102 @@ func TestProgressTracker_TaskProgress(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestProgressTracker_RetriesFailedWrites(t *testing.T) {
+	tests := []struct {
+		name string
+		// run drives the tracker; fail is the write reported as unsaved.
+		run  func(tr *ProgressTracker) (fail []SubtaskRecords, next func() ProgressWrites)
+		want []SubtaskRecords
+	}{
+		{
+			name: "current subtask final count is retried on flush",
+			run: func(tr *ProgressTracker) ([]SubtaskRecords, func() ProgressWrites) {
+				w := tr.Apply(&plugin.RunningProgress{Type: plugin.TaskIncProgress, Current: 1, Total: 2})
+				return w.Subtasks, tr.Flush
+			},
+			want: []SubtaskRecords{{Name: "A", FinishedRecords: 50}},
+		},
+		{
+			name: "previous subtask final count is retried with the next write",
+			run: func(tr *ProgressTracker) ([]SubtaskRecords, func() ProgressWrites) {
+				w := tr.Apply(setSubtask("B"))
+				return w.Subtasks, tr.Flush
+			},
+			want: []SubtaskRecords{{Name: "A", FinishedRecords: 50}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr, _, _ := newTestTracker(false)
+			tr.Apply(setSubtask("A"))
+			for i := 1; i <= 50; i++ {
+				tr.Apply(incRecords(i))
+			}
+			fail, next := tt.run(tr)
+			if len(fail) == 0 {
+				t.Fatal("expected a write to fail")
+			}
+			tr.Unsaved(fail)
+			if got := subtaskWrites(next()); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("retried writes = %v, want %v", got, tt.want)
+			}
+			if again := subtaskWrites(tr.Flush()); len(again) != 0 {
+				t.Errorf("flush after successful retry wrote %v, want nothing", again)
+			}
+		})
+	}
+}
+
+func TestProgressTracker_UnsavedIgnoresStaleCount(t *testing.T) {
+	tr, _, clock := newTestTracker(false)
+	tr.Apply(setSubtask("A"))
+	stale := tr.Apply(incRecords(1)).Subtasks
+	clock.advance(SubtaskProgressInterval)
+	tr.Apply(incRecords(2)) // saved successfully after the stale one
+	tr.Unsaved(stale)
+	if got := subtaskWrites(tr.Flush()); len(got) != 0 {
+		t.Errorf("flush wrote %v, want nothing: newer count 2 was already saved", got)
+	}
+}
+
+func TestSaveProgressWrites(t *testing.T) {
+	dbErr := errors.Default.New("db down")
+	tests := []struct {
+		name       string
+		failName   string
+		wantFailed []SubtaskRecords
+		wantErr    bool
+	}{
+		{"all succeed", "", nil, false},
+		{"one subtask fails", "B", []SubtaskRecords{{Name: "B", FinishedRecords: 2}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := unithelper.DummyBasicRes(func(mockDal *mockdal.Dal) {
+				mockDal.On("UpdateColumn", mock.Anything, "progress", float32(0.5), mock.Anything).Return(nil).Once()
+				mockDal.On("UpdateColumns", mock.Anything, mock.Anything, mock.Anything).Return(
+					func(_ interface{}, set []dal.DalSet, _ ...dal.Clause) errors.Error {
+						if tt.failName != "" && set[0].Value == 2 {
+							return dbErr
+						}
+						return nil
+					}).Twice()
+			})
+			pct := float32(0.5)
+			failed, err := SaveProgressWrites(res, 7, ProgressWrites{
+				TaskProgress: &pct,
+				Subtasks:     []SubtaskRecords{{Name: "A", FinishedRecords: 1}, {Name: "B", FinishedRecords: 2}},
+			})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(failed, tt.wantFailed) {
+				t.Errorf("failed = %v, want %v", failed, tt.wantFailed)
+			}
+			mockDal := res.GetDal().(*mockdal.Dal)
+			mockDal.AssertNumberOfCalls(t, "UpdateColumn", 1)
+			mockDal.AssertNumberOfCalls(t, "UpdateColumns", 2)
+		})
+	}
+}

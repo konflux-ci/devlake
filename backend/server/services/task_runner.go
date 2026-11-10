@@ -141,15 +141,33 @@ func updateTaskProgress(done chan struct{}, taskId uint64, progress chan plugin.
 	if data := getRunningTaskById(taskId); data != nil {
 		progressDetail = data.ProgressDetail
 	}
+	// SKIP_SUBTASK_PROGRESS is read once per task: it is an environment variable
+	// and cannot change while the process runs.
 	tracker := runner.NewProgressTracker(progressDetail, basicRes.GetConfigReader().GetBool("SKIP_SUBTASK_PROGRESS"))
 	for p := range progress {
 		runningTasks.mu.Lock()
 		writes := tracker.Apply(&p)
 		runningTasks.mu.Unlock()
-		runner.SaveProgressWrites(basicRes, taskId, writes)
+		saveTaskProgress(tracker, taskId, writes)
 	}
 	runningTasks.mu.Lock()
 	writes := tracker.Flush()
 	runningTasks.mu.Unlock()
-	runner.SaveProgressWrites(basicRes, taskId, writes)
+	saveTaskProgress(tracker, taskId, writes)
+}
+
+// saveTaskProgress persists writes outside runningTasks.mu and hands failed
+// subtask writes back to the tracker for retry. Progress is informational, so
+// failures are logged and never fail the task.
+func saveTaskProgress(tracker *runner.ProgressTracker, taskId uint64, writes runner.ProgressWrites) {
+	failed, err := runner.SaveProgressWrites(basicRes, taskId, writes)
+	if err == nil {
+		return
+	}
+	basicRes.GetLogger().Error(errors.Convert(err), "failed to save progress of task %d", taskId)
+	if len(failed) > 0 {
+		runningTasks.mu.Lock()
+		tracker.Unsaved(failed)
+		runningTasks.mu.Unlock()
+	}
 }

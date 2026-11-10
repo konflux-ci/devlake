@@ -495,7 +495,8 @@ stay default-false.
 - `backend/core/runner/progress.go` (new file)
 - `backend/core/runner/progress_test.go` (new file)
 - `backend/core/runner/run_task.go` (removed `UpdateProgressDetail`)
-- `backend/server/services/task_runner.go` (`updateTaskProgress`)
+- `backend/server/services/task_runner.go` (`updateTaskProgress`, `saveTaskProgress`)
+- `backend/server/services/task_runner_test.go` (new file)
 
 **Reason:** Extractors call `SetProgress(0, -1)` and `IncProgress(1)` per record.
 Upstream `UpdateProgressDetail` then ran `UPDATE _devlake_subtasks` for every
@@ -506,7 +507,8 @@ cursors stayed open for 10–70+ minutes, and MySQL dropped them
 tool tables with 35–40% of the rows. `ProgressTracker` now updates progress in
 memory under the lock, writes `finished_records` at most every
 `SubtaskProgressInterval` (2s) plus a final count at subtask end, and the DB
-writes run after the lock is released. `SKIP_SUBTASK_PROGRESS` is still honored.
+writes run after the lock is released; failed subtask writes are retried on
+the next write or final flush. `SKIP_SUBTASK_PROGRESS` is still honored.
 
 **Upstream status:** Pending — upstream has the same per-record write under the
 global lock.
