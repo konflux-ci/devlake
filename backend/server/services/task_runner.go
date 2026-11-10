@@ -26,6 +26,7 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/core/runner"
 	"sync"
+	"time"
 )
 
 // RunningTaskData FIXME ...
@@ -150,24 +151,42 @@ func updateTaskProgress(done chan struct{}, taskId uint64, progress chan plugin.
 		runningTasks.mu.Unlock()
 		saveTaskProgress(tracker, taskId, writes)
 	}
-	runningTasks.mu.Lock()
-	writes := tracker.Flush()
-	runningTasks.mu.Unlock()
-	saveTaskProgress(tracker, taskId, writes)
+	// No event follows the final flush, so retry it here instead of relying on
+	// a later write to pick up failures.
+	for attempt := 0; ; attempt++ {
+		runningTasks.mu.Lock()
+		writes := tracker.Flush()
+		runningTasks.mu.Unlock()
+		if !saveTaskProgress(tracker, taskId, writes) {
+			return
+		}
+		if attempt == len(finalFlushBackoff) {
+			basicRes.GetLogger().Error(nil, "giving up saving final progress of task %d after %d attempts", taskId, attempt+1)
+			return
+		}
+		time.Sleep(finalFlushBackoff[attempt])
+	}
 }
 
+// finalFlushBackoff is the wait before each retry of a task's final progress
+// flush; its length is the number of retries.
+var finalFlushBackoff = []time.Duration{time.Second, 2 * time.Second}
+
 // saveTaskProgress persists writes outside runningTasks.mu and hands failed
-// subtask writes back to the tracker for retry. Progress is informational, so
-// failures are logged and never fail the task.
-func saveTaskProgress(tracker *runner.ProgressTracker, taskId uint64, writes runner.ProgressWrites) {
+// subtask writes back to the tracker for retry. It reports whether any subtask
+// write is still pending. Progress is informational, so failures are logged
+// and never fail the task.
+func saveTaskProgress(tracker *runner.ProgressTracker, taskId uint64, writes runner.ProgressWrites) bool {
 	failed, err := runner.SaveProgressWrites(basicRes, taskId, writes)
 	if err == nil {
-		return
+		return false
 	}
 	basicRes.GetLogger().Error(errors.Convert(err), "failed to save progress of task %d", taskId)
-	if len(failed) > 0 {
-		runningTasks.mu.Lock()
-		tracker.Unsaved(failed)
-		runningTasks.mu.Unlock()
+	if len(failed) == 0 {
+		return false
 	}
+	runningTasks.mu.Lock()
+	tracker.Unsaved(failed)
+	runningTasks.mu.Unlock()
+	return true
 }

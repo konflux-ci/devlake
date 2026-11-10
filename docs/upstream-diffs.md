@@ -508,7 +508,7 @@ tool tables with 35–40% of the rows. `ProgressTracker` now updates progress in
 memory under the lock, writes `finished_records` at most every
 `SubtaskProgressInterval` (2s) plus a final count at subtask end, and the DB
 writes run after the lock is released; failed subtask writes are retried on
-the next write or final flush. `SKIP_SUBTASK_PROGRESS` is still honored.
+the next write, and the final flush is retried with bounded backoff. `SKIP_SUBTASK_PROGRESS` is still honored.
 
 **Upstream status:** Pending — upstream has the same per-record write under the
 global lock.
