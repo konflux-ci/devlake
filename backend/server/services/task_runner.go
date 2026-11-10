@@ -26,6 +26,7 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/core/runner"
 	"sync"
+	"time"
 )
 
 // RunningTaskData FIXME ...
@@ -130,21 +131,62 @@ func getRunningTaskById(taskId uint64) *RunningTaskData {
 	return runningTasks.tasks[taskId]
 }
 
+// updateTaskProgress drains the task's progress channel until it is closed,
+// then signals done. runningTasks.mu is shared by every running task, so it is
+// held only for the in-memory update; DB writes happen outside of it and are
+// throttled by runner.ProgressTracker. Holding the lock across a DB round trip
+// per record serialized all concurrent extractors.
 func updateTaskProgress(done chan struct{}, taskId uint64, progress chan plugin.RunningProgress) {
-	data := getRunningTaskById(taskId)
-	if data == nil {
-		return
+	defer func() { done <- struct{}{} }()
+	progressDetail := &models.TaskProgressDetail{}
+	if data := getRunningTaskById(taskId); data != nil {
+		progressDetail = data.ProgressDetail
 	}
-	progressDetail := data.ProgressDetail
-	for {
-		p, hasMore := <-progress
-		if hasMore {
-			runningTasks.mu.Lock()
-			runner.UpdateProgressDetail(basicRes, taskId, progressDetail, &p)
-			runningTasks.mu.Unlock()
-		} else {
-			done <- struct{}{}
-			break
+	// SKIP_SUBTASK_PROGRESS is read once per task: it is an environment variable
+	// and cannot change while the process runs.
+	tracker := runner.NewProgressTracker(progressDetail, basicRes.GetConfigReader().GetBool("SKIP_SUBTASK_PROGRESS"))
+	for p := range progress {
+		runningTasks.mu.Lock()
+		writes := tracker.Apply(&p)
+		runningTasks.mu.Unlock()
+		saveTaskProgress(tracker, taskId, writes)
+	}
+	// No event follows the final flush, so retry it here instead of relying on
+	// a later write to pick up failures.
+	for attempt := 0; ; attempt++ {
+		runningTasks.mu.Lock()
+		writes := tracker.Flush()
+		runningTasks.mu.Unlock()
+		if !saveTaskProgress(tracker, taskId, writes) {
+			return
 		}
+		if attempt == len(finalFlushBackoff) {
+			basicRes.GetLogger().Error(nil, "giving up saving final progress of task %d after %d attempts", taskId, attempt+1)
+			return
+		}
+		time.Sleep(finalFlushBackoff[attempt])
 	}
+}
+
+// finalFlushBackoff is the wait before each retry of a task's final progress
+// flush; its length is the number of retries.
+var finalFlushBackoff = []time.Duration{time.Second, 2 * time.Second}
+
+// saveTaskProgress persists writes outside runningTasks.mu and hands failed
+// subtask writes back to the tracker for retry. It reports whether any subtask
+// write is still pending. Progress is informational, so failures are logged
+// and never fail the task.
+func saveTaskProgress(tracker *runner.ProgressTracker, taskId uint64, writes runner.ProgressWrites) bool {
+	failed, err := runner.SaveProgressWrites(basicRes, taskId, writes)
+	if err == nil {
+		return false
+	}
+	basicRes.GetLogger().Error(errors.Convert(err), "failed to save progress of task %d", taskId)
+	if len(failed) == 0 {
+		return false
+	}
+	runningTasks.mu.Lock()
+	tracker.Unsaved(failed)
+	runningTasks.mu.Unlock()
+	return true
 }

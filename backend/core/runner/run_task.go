@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apache/incubator-devlake/core/models/common"
-
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -354,57 +352,6 @@ func RunPluginSubTasks(
 	}
 
 	return nil
-}
-
-// UpdateProgressDetail FIXME ...
-func UpdateProgressDetail(basicRes context.BasicRes, taskId uint64, progressDetail *models.TaskProgressDetail, p *plugin.RunningProgress) {
-	cfg := basicRes.GetConfigReader()
-	skipSubtaskProgressUpdate := cfg.GetBool("SKIP_SUBTASK_PROGRESS")
-
-	task := &models.Task{
-		Model: common.Model{ID: taskId},
-	}
-	subtask := &models.Subtask{}
-	originalFinishedRecords := progressDetail.FinishedRecords
-	switch p.Type {
-	case plugin.TaskSetProgress:
-		progressDetail.TotalSubTasks = p.Total
-		progressDetail.FinishedSubTasks = p.Current
-	case plugin.TaskIncProgress:
-		progressDetail.FinishedSubTasks = p.Current
-		// TODO: get rid of db update
-		pct := float32(p.Current) / float32(p.Total)
-		err := basicRes.GetDal().UpdateColumn(task, "progress", pct)
-		if err != nil {
-			basicRes.GetLogger().Error(err, "failed to update progress")
-		}
-	case plugin.SubTaskSetProgress:
-		progressDetail.TotalRecords = p.Total
-	case plugin.SubTaskIncProgress:
-		progressDetail.FinishedRecords = p.Current
-	case plugin.SetCurrentSubTask:
-		progressDetail.SubTaskName = p.SubTaskName
-		progressDetail.SubTaskNumber = p.SubTaskNumber
-		// reset finished records
-		progressDetail.FinishedRecords = 0
-	}
-	if skipSubtaskProgressUpdate {
-		return
-	}
-	currentFinishedRecords := progressDetail.FinishedRecords
-	currentTotalRecords := progressDetail.TotalRecords
-	// update progress if progress is more than 1%
-	// or there is progress if no total record provided
-	if (currentTotalRecords > 0 && float64(currentFinishedRecords-originalFinishedRecords)/float64(currentTotalRecords) > 0.01) || (currentTotalRecords <= 0 && currentFinishedRecords > originalFinishedRecords) {
-		// update subtask progress
-		where := dal.Where("task_id = ? and name = ?", taskId, progressDetail.SubTaskName)
-		err := basicRes.GetDal().UpdateColumns(subtask, []dal.DalSet{
-			{ColumnName: "finished_records", Value: progressDetail.FinishedRecords},
-		}, where)
-		if err != nil {
-			basicRes.GetLogger().Error(err, "failed to update _devlake_subtasks progress")
-		}
-	}
 }
 
 func runSubtask(
