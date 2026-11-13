@@ -65,6 +65,8 @@ type AiReviewTaskData struct {
 	QodoPatternRegex          *regexp.Regexp
 	GeminiUsernameRegex       *regexp.Regexp
 	GeminiPatternRegex        *regexp.Regexp
+	FullsendUsernameRegex     *regexp.Regexp
+	FullsendPatternRegex      *regexp.Regexp
 	AiCommitPatternsRegex     *regexp.Regexp
 	AiPrLabelPatternRegex     *regexp.Regexp
 	RiskHighPatternRegex      *regexp.Regexp
@@ -153,6 +155,20 @@ func CompilePatterns(taskData *AiReviewTaskData) errors.Error {
 		taskData.GeminiPatternRegex, err = regexp.Compile(config.GeminiPattern)
 		if err != nil {
 			return errors.BadInput.Wrap(err, "invalid geminiPattern")
+		}
+	}
+
+	// Fullsend patterns
+	if config.FullsendEnabled && config.FullsendUsername != "" {
+		taskData.FullsendUsernameRegex, err = regexp.Compile("(?i)" + regexp.QuoteMeta(config.FullsendUsername))
+		if err != nil {
+			return errors.BadInput.Wrap(err, "invalid fullsendUsername pattern")
+		}
+	}
+	if config.FullsendEnabled && config.FullsendPattern != "" {
+		taskData.FullsendPatternRegex, err = regexp.Compile(config.FullsendPattern)
+		if err != nil {
+			return errors.BadInput.Wrap(err, "invalid fullsendPattern")
 		}
 	}
 

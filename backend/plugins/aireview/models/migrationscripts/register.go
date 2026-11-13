@@ -33,5 +33,6 @@ func All() []plugin.MigrationScript {
 		&addSuggestionsAccepted{},
 		&addDiffMatching{},
 		&addAiCommits{},
+		&addFullsendConfig{},
 	}
 }
