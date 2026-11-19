@@ -58,7 +58,7 @@ var _ interface {
 ## Features
 
 - **Multi-platform support**: Works with both GitHub PRs and GitLab MRs
-- **Multi-tool support**: Currently supports CodeRabbit, with extensibility for Cursor Bugbot, SonarQube, and other AI review tools
+- **Multi-tool support**: Supports CodeRabbit, Qodo, Gemini Code Assist, Fullsend, and Cursor Bugbot
 - **AI-assisted commit classification**: Precomputes which commits were authored with Cursor/Claude/Copilot/CodeRabbit (from git trailers) into `ai_commits`.
 - **Per-team configuration**: Teams can configure which AI tools they use and customize detection patterns
 - **Prediction accuracy tracking**: Tracks AI predictions against actual outcomes (CI failures, bugs, rollbacks)
@@ -130,6 +130,15 @@ Aggregated metrics over time periods:
   "codeRabbitEnabled": true,
   "codeRabbitUsername": "coderabbitai",
   "codeRabbitPattern": "(?i)(coderabbit|walkthrough|summary by coderabbit)",
+  "qodoEnabled": true,
+  "qodoUsername": "qodo-merge",
+  "qodoPattern": "(?i)(qodo|pr reviewer guide|estimated effort to review)",
+  "geminiEnabled": true,
+  "geminiUsername": "gemini-code-assist",
+  "geminiPattern": "(?i)(I'm Gemini Code Assist|codereviewagent|gstatic\\.com/codereviewagent)",
+  "fullsendEnabled": true,
+  "fullsendUsername": "fullsend-ai-",
+  "fullsendPattern": "(?i)(fullsend|<!-- fullsend:)",
   "cursorBugbotEnabled": false,
   "cursorBugbotUsername": "cursor-bugbot",
   "cursorBugbotPattern": "(?i)(cursor|bugbot)",
