@@ -33,6 +33,7 @@ var (
 	copilotTrailerRe    = regexp.MustCompile(`(?i)(?:co-authored-by:|assisted-by:|made-with:).*copilot`)
 	codeRabbitTrailerRe = regexp.MustCompile(`(?i)(?:co-authored-by:|assisted-by:|made-with:).*coderabbit`)
 	codeRabbitAuthorRe  = regexp.MustCompile(`(?i)coderabbit`)
+	ymirTrailerRe       = regexp.MustCompile(`(?i)(?:co-authored-by:|assisted-by:|made-with:).*ymir`)
 	assistedByRe        = regexp.MustCompile(`(?i)assisted-by:`)
 	madeWithRe          = regexp.MustCompile(`(?i)made-with:`)
 )
@@ -60,6 +61,9 @@ func detectAiCommit(message, authorName string, extraPattern *regexp.Regexp) (st
 	}
 	if codeRabbitTrailerRe.MatchString(trailer) || codeRabbitAuthorRe.MatchString(authorName) {
 		return models.AiToolCodeRabbit, true
+	}
+	if ymirTrailerRe.MatchString(trailer) {
+		return models.AiToolYmir, true
 	}
 	if assistedByRe.MatchString(trailer) {
 		return models.AiToolAssistedByUnknown, true

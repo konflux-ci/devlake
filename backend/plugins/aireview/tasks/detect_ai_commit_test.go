@@ -106,6 +106,30 @@ func TestDetectAiCommit(t *testing.T) {
 			wantAI:     true,
 		},
 		{
+			name:     "Assisted-by Ymir",
+			message:  "feat\n\nAssisted-by: Ymir",
+			wantTool: models.AiToolYmir,
+			wantAI:   true,
+		},
+		{
+			name:     "assisted-by ymir case variant",
+			message:  "tweak\n\nassisted-by: ymir",
+			wantTool: models.AiToolYmir,
+			wantAI:   true,
+		},
+		{
+			name:     "Co-Authored-By Ymir",
+			message:  "fix\n\nCo-Authored-By: Ymir <ymir@example.com>",
+			wantTool: models.AiToolYmir,
+			wantAI:   true,
+		},
+		{
+			name:     "Made-with Ymir",
+			message:  "docs\n\nMade-with: Ymir",
+			wantTool: models.AiToolYmir,
+			wantAI:   true,
+		},
+		{
 			name:     "Cursor takes precedence over Claude in the same message",
 			message:  "both\n\nCo-Authored-By: Cursor <cursoragent@cursor.com>\nCo-Authored-By: Claude <noreply@anthropic.com>",
 			wantTool: models.AiToolCursor,

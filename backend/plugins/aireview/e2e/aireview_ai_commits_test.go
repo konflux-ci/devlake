@@ -76,8 +76,8 @@ func TestExtractAndConvertAiCommits(t *testing.T) {
 	if err := tester.Dal.All(&toolRows); err != nil {
 		t.Fatalf("Failed to query _tool_aireview_commits: %v", err)
 	}
-	if len(toolRows) != 4 {
-		t.Fatalf("Expected 4 AI-positive tool commits (cursor, claude, copilot, coderabbit), got %d", len(toolRows))
+	if len(toolRows) != 5 {
+		t.Fatalf("Expected 5 AI-positive tool commits (cursor, claude, copilot, coderabbit, ymir), got %d", len(toolRows))
 	}
 
 	bySha := make(map[string]models.AiCommit, len(toolRows))
@@ -93,6 +93,7 @@ func TestExtractAndConvertAiCommits(t *testing.T) {
 		"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": models.AiToolClaude,
 		"cccccccccccccccccccccccccccccccccccccccc": models.AiToolCopilot,
 		"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": models.AiToolCodeRabbit,
+		"ffffffffffffffffffffffffffffffffffffffff": models.AiToolYmir,
 	}
 	for sha, tool := range want {
 		got, ok := bySha[sha]
@@ -112,8 +113,8 @@ func TestExtractAndConvertAiCommits(t *testing.T) {
 	if err := tester.Dal.All(&domainRows); err != nil {
 		t.Fatalf("Failed to query ai_commits: %v", err)
 	}
-	if len(domainRows) != 4 {
-		t.Fatalf("Expected 4 domain ai_commits, got %d", len(domainRows))
+	if len(domainRows) != 5 {
+		t.Fatalf("Expected 5 domain ai_commits, got %d", len(domainRows))
 	}
 	for _, row := range domainRows {
 		if row.ProjectName != testProject {
